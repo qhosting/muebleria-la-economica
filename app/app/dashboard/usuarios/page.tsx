@@ -56,8 +56,14 @@ export default function UsuariosPage() {
     try {
       setLoading(true);
       const response = await fetch('/api/users');
+      
+      if (!response.ok) {
+        throw new Error(`Error ${response.status}: ${response.statusText}`);
+      }
+      
       const data = await response.json();
-      setUsuarios(data.users || []);
+      // El API retorna los usuarios directamente, no dentro de un objeto data.users
+      setUsuarios(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error al cargar usuarios:', error);
       toast.error('Error al cargar usuarios');
