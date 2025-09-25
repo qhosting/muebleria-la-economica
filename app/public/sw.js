@@ -1,11 +1,15 @@
 
-const CACHE_NAME = 'muebleria-cobranza-v1';
+const CACHE_NAME = 'muebleria-cobranza-v2';
 const urlsToCache = [
   '/',
+  '/login',
   '/dashboard',
   '/dashboard/cobranza',
-  '/login',
-  '/manifest.json'
+  '/dashboard/cobranza-mobile',
+  '/manifest.json',
+  '/icon-192x192.png',
+  '/icon-512x512.png',
+  '/favicon.ico'
 ];
 
 // Instalar Service Worker

@@ -30,6 +30,25 @@ export default function RootLayout({
       <head>
         <link rel="icon" href="/favicon.ico" />
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              if ('serviceWorker' in navigator) {
+                window.addEventListener('load', function() {
+                  navigator.serviceWorker.register('/sw.js')
+                    .then(function(registration) {
+                      console.log('SW registrado con éxito: ', registration.scope);
+                    }, function(err) {
+                      console.log('SW falló al registrarse: ', err);
+                    });
+                });
+              }
+            `,
+          }}
+        />
       </head>
       <body className={inter.className} suppressHydrationWarning>
         <Providers>
