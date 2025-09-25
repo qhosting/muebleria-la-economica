@@ -1,8 +1,10 @@
 
+// Actualizar página de cobranza para redirigir a la versión móvil en dispositivos móviles
 'use client';
 
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -23,7 +25,9 @@ import {
   Receipt,
   Smartphone,
   Wifi,
-  WifiOff
+  WifiOff,
+  Monitor,
+  ArrowRight
 } from 'lucide-react';
 import { formatCurrency, getDayName } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -32,6 +36,7 @@ import { CobranzaModal } from '@/components/cobranza/cobranza-modal';
 
 export default function CobranzaPage() {
   const { data: session } = useSession();
+  const router = useRouter();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -41,6 +46,7 @@ export default function CobranzaPage() {
   const [isOnline, setIsOnline] = useState(true);
   const [cobranzaHoy, setCobranzaHoy] = useState(0);
   const [clientesVisitados, setClientesVisitados] = useState(0);
+  const [isMobileDevice, setIsMobileDevice] = useState(false);
 
   const userRole = (session?.user as any)?.role;
   const userId = (session?.user as any)?.id;
@@ -52,19 +58,33 @@ export default function CobranzaPage() {
     { value: '4', label: 'Jueves' },
     { value: '5', label: 'Viernes' },
     { value: '6', label: 'Sábado' },
-    { value: '7', label: 'Domingo' },
+    { value: '7', label: 'Domingo' }
   ];
 
+  // Detectar dispositivo móvil
   useEffect(() => {
-    if (session && userRole === 'cobrador') {
-      fetchClientes();
-      fetchEstadisticasHoy();
-    }
+    const checkMobile = () => {
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
+                      window.innerWidth < 768;
+      setIsMobileDevice(isMobile);
+      
+      // Si es cobrador en dispositivo móvil, redirigir a versión móvil
+      if (isMobile && userRole === 'cobrador') {
+        router.push('/dashboard/cobranza-mobile');
+        return;
+      }
+    };
 
-    // Monitor online status
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    
+    return () => window.removeEventListener('resize', checkMobile);
+  }, [userRole, router]);
+
+  useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
+
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
     
@@ -74,324 +94,344 @@ export default function CobranzaPage() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
-  }, [session, userRole, selectedDia]);
+  }, []);
 
-  const fetchClientes = async () => {
+  useEffect(() => {
+    if (userId) {
+      cargarClientes();
+      cargarEstadisticas();
+    }
+  }, [userId, selectedDia]);
+
+  const cargarClientes = async () => {
+    if (!userId) return;
+
+    setLoading(true);
     try {
-      const params = new URLSearchParams({
-        diaPago: selectedDia === 'all' ? '' : selectedDia,
-        statusCuenta: 'activo',
-      });
+      let url = `/api/clientes/cobrador/${userId}`;
+      if (selectedDia !== 'all') {
+        url += `?diaPago=${selectedDia}`;
+      }
 
-      const response = await fetch(`/api/clientes/cobrador/${userId}?${params}`);
+      const response = await fetch(url);
       if (response.ok) {
         const data = await response.json();
         setClientes(data);
       } else {
-        throw new Error('Error al obtener clientes');
+        toast.error('Error al cargar los clientes');
       }
     } catch (error) {
-      console.error('Error:', error);
-      toast.error('Error al cargar clientes');
+      console.error('Error cargando clientes:', error);
+      toast.error('Error al cargar los clientes');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchEstadisticasHoy = async () => {
+  const cargarEstadisticas = async () => {
+    if (!userId) return;
+
     try {
       const hoy = new Date().toISOString().split('T')[0];
-      const response = await fetch(`/api/pagos?cobradorId=${userId}&fechaDesde=${hoy}&fechaHasta=${hoy}`);
+      const response = await fetch(`/api/reportes/cobranza?cobradorId=${userId}&fechaInicio=${hoy}&fechaFin=${hoy}`);
+      
       if (response.ok) {
         const data = await response.json();
-        const totalCobrado = data.pagos?.reduce((sum: number, pago: any) => sum + Number(pago.monto), 0) || 0;
-        setCobranzaHoy(totalCobrado);
-        setClientesVisitados(data.pagos?.length || 0);
+        setCobranzaHoy(data.totalCobrado || 0);
+        setClientesVisitados(data.clientesUnicos || 0);
       }
     } catch (error) {
-      console.error('Error al obtener estadísticas:', error);
+      console.error('Error cargando estadísticas:', error);
     }
   };
 
   const filteredClientes = clientes.filter(cliente =>
     cliente.nombreCompleto.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    cliente.codigoCliente.toLowerCase().includes(searchTerm.toLowerCase())
+    cliente.telefono?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    cliente.direccionCompleta.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handlePago = (cliente: Cliente) => {
+  const handleCobrar = (cliente: Cliente) => {
     setSelectedCliente(cliente);
     setShowCobranzaModal(true);
   };
 
-  const handlePagoSuccess = () => {
+  const handleCobranzaSuccess = () => {
+    cargarClientes();
+    cargarEstadisticas();
     setShowCobranzaModal(false);
     setSelectedCliente(null);
-    fetchClientes();
-    fetchEstadisticasHoy();
-    toast.success('Pago registrado exitosamente');
   };
 
-  // Verificar permisos
-  if (userRole !== 'cobrador') {
+  // Si es cobrador, mostrar opción para versión móvil
+  if (userRole === 'cobrador') {
     return (
       <DashboardLayout>
-        <div className="text-center py-12">
-          <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            Acceso Restringido
-          </h3>
-          <p className="text-gray-600">
-            Esta sección es exclusiva para cobradores.
-          </p>
+        <div className="container mx-auto p-6">
+          {/* Header con opción móvil */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">Gestión de Cobranza</h1>
+                <p className="text-muted-foreground">
+                  Administra tus clientes y registra pagos
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Badge variant={isOnline ? 'default' : 'secondary'}>
+                  {isOnline ? (
+                    <><Wifi className="w-4 h-4 mr-2" />Online</>
+                  ) : (
+                    <><WifiOff className="w-4 h-4 mr-2" />Offline</>
+                  )}
+                </Badge>
+
+                <Button 
+                  onClick={() => router.push('/dashboard/cobranza-mobile')}
+                  className="flex items-center gap-2"
+                >
+                  <Smartphone className="w-4 h-4" />
+                  Versión Móvil
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Promoción de versión móvil */}
+          <Card className="mb-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-blue-800">
+                <Smartphone className="w-5 h-5" />
+                Nueva Versión Móvil PWA
+              </CardTitle>
+              <CardDescription className="text-blue-700">
+                Trabaja offline, sincronización automática y optimizada para cobranza en campo
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid md:grid-cols-2 gap-4 mb-4">
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  Funciona 100% offline
+                </div>
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  Sincronización automática
+                </div>
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  Interfaz optimizada para móvil
+                </div>
+                <div className="flex items-center gap-2 text-sm text-blue-700">
+                  <CheckCircle className="w-4 h-4 text-green-600" />
+                  Registro de motararios
+                </div>
+              </div>
+              
+              <Button 
+                onClick={() => router.push('/dashboard/cobranza-mobile')}
+                className="w-full sm:w-auto"
+              >
+                <Smartphone className="w-4 h-4 mr-2" />
+                Probar Versión Móvil
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Resto del contenido de cobranza desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Cobranza Hoy
+                </CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-600">
+                  {formatCurrency(cobranzaHoy)}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Total cobrado hoy
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Clientes Visitados
+                </CardTitle>
+                <CheckCircle className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{clientesVisitados}</div>
+                <p className="text-xs text-muted-foreground">
+                  Clientes atendidos hoy
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  Total Clientes
+                </CardTitle>
+                <Badge variant="outline" className="text-sm">
+                  {isOnline ? 'Online' : 'Offline'}
+                </Badge>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold">{filteredClientes.length}</div>
+                <p className="text-xs text-muted-foreground">
+                  Clientes asignados
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filtros */}
+          <div className="flex flex-col md:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <Input
+                placeholder="Buscar por nombre, teléfono o dirección..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <Select value={selectedDia} onValueChange={setSelectedDia}>
+              <SelectTrigger className="w-full md:w-48">
+                <SelectValue placeholder="Filtrar por día" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos los días</SelectItem>
+                {diasSemana.map((dia) => (
+                  <SelectItem key={dia.value} value={dia.value}>
+                    {dia.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Lista de clientes */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {loading ? (
+              <div className="col-span-full text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground">Cargando clientes...</p>
+              </div>
+            ) : filteredClientes.length === 0 ? (
+              <div className="col-span-full text-center py-8">
+                <p className="text-muted-foreground">
+                  No se encontraron clientes que coincidan con los filtros aplicados.
+                </p>
+              </div>
+            ) : (
+              filteredClientes.map((cliente) => (
+                <Card key={cliente.id} className="hover:shadow-md transition-shadow">
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg leading-tight">
+                          {cliente.nombreCompleto}
+                        </CardTitle>
+                        <div className="flex items-center gap-4 mt-2">
+                          <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                            <Calendar className="w-4 h-4" />
+                            {getDayName(cliente.diaPago)}
+                          </div>
+                          <div className="flex items-center gap-1 text-sm">
+                            <DollarSign className="w-4 h-4 text-muted-foreground" />
+                            <span className="font-medium">
+                              {formatCurrency(cliente.montoPago)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <Badge 
+                        variant={cliente.saldoActual > 0 ? "destructive" : "default"}
+                        className="ml-2"
+                      >
+                        {cliente.saldoActual > 0 ? "Pendiente" : "Al día"}
+                      </Badge>
+                    </div>
+                  </CardHeader>
+
+                  <CardContent className="space-y-3">
+                    <div className="space-y-2">
+                      {cliente.telefono && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="w-4 h-4 text-muted-foreground" />
+                          <span>{cliente.telefono}</span>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-start gap-2 text-sm">
+                        <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
+                        <span className="text-muted-foreground">
+                          {cliente.direccionCompleta}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Saldo Actual</p>
+                        <p className={`font-semibold ${
+                          cliente.saldoActual > 0 ? 'text-red-600' : 'text-green-600'
+                        }`}>
+                          {formatCurrency(cliente.saldoActual)}
+                        </p>
+                      </div>
+
+                      <Button
+                        onClick={() => handleCobrar(cliente)}
+                        disabled={cliente.statusCuenta !== 'activo'}
+                        size="sm"
+                      >
+                        <CreditCard className="w-4 h-4 mr-2" />
+                        Cobrar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))
+            )}
+          </div>
+
+          {/* Modal de cobranza */}
+          {selectedCliente && (
+            <CobranzaModal
+              cliente={selectedCliente}
+              isOpen={showCobranzaModal}
+              onClose={() => setShowCobranzaModal(false)}
+              onSuccess={handleCobranzaSuccess}
+            />
+          )}
         </div>
       </DashboardLayout>
     );
   }
 
+  // Para otros roles, mostrar mensaje
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Offline Indicator */}
-        {!isOnline && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-center space-x-2">
-              <WifiOff className="h-5 w-5 text-yellow-600" />
-              <span className="text-sm font-medium text-yellow-800">
-                Modo Offline - Los pagos se sincronizarán cuando haya conexión
-              </span>
-            </div>
-          </div>
-        )}
-
-        {/* Header with Status */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Cobranza Móvil</h1>
-            <p className="text-gray-600 mt-1 flex items-center space-x-2">
-              <Smartphone className="h-4 w-4" />
-              <span>Interfaz optimizada para trabajo en campo</span>
-            </p>
-          </div>
-          <div className="flex items-center space-x-2 mt-4 sm:mt-0">
-            {isOnline ? (
-              <Badge variant="success" className="flex items-center space-x-1">
-                <Wifi className="h-3 w-3" />
-                <span>Online</span>
-              </Badge>
-            ) : (
-              <Badge variant="warning" className="flex items-center space-x-1">
-                <WifiOff className="h-3 w-3" />
-                <span>Offline</span>
-              </Badge>
-            )}
-          </div>
+      <div className="container mx-auto p-6">
+        <div className="text-center py-12">
+          <Monitor className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+          <h2 className="text-xl font-semibold mb-2">Acceso Restringido</h2>
+          <p className="text-muted-foreground">
+            Esta sección está disponible solo para cobradores
+          </p>
         </div>
-
-        {/* Stats Cards */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="bg-gradient-to-r from-green-500 to-green-600 text-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <DollarSign className="h-5 w-5" />
-                <span>Cobranza Hoy</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{formatCurrency(cobranzaHoy)}</div>
-              <p className="text-green-100 text-sm">Total cobrado</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <CheckCircle className="h-5 w-5" />
-                <span>Visitas Realizadas</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{clientesVisitados}</div>
-              <p className="text-blue-100 text-sm">Clientes atendidos</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-gradient-to-r from-purple-500 to-purple-600 text-white">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-lg flex items-center space-x-2">
-                <Clock className="h-5 w-5" />
-                <span>Pendientes</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{filteredClientes.length}</div>
-              <p className="text-purple-100 text-sm">En la ruta</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Filtrar Clientes</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Buscar cliente o código..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select value={selectedDia} onValueChange={setSelectedDia}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Día de pago" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos los días</SelectItem>
-                  {diasSemana.map((dia) => (
-                    <SelectItem key={dia.value} value={dia.value}>
-                      {dia.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Clientes List */}
-        {loading ? (
-          <div className="grid gap-4">
-            {[...Array(3)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardHeader className="space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-3/4" />
-                  <div className="h-3 bg-gray-200 rounded w-1/2" />
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <div className="h-3 bg-gray-200 rounded w-full" />
-                  <div className="h-3 bg-gray-200 rounded w-2/3" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : filteredClientes.length === 0 ? (
-          <Card>
-            <CardContent className="text-center py-12">
-              <CreditCard className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                No hay clientes para hoy
-              </h3>
-              <p className="text-gray-600">
-                No tienes clientes asignados para el día seleccionado.
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-4">
-            {filteredClientes.map((cliente) => (
-              <Card 
-                key={cliente.id} 
-                className="animate-fade-in hover:shadow-md transition-all duration-200"
-              >
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg text-gray-900">
-                        {cliente.nombreCompleto}
-                      </CardTitle>
-                      <CardDescription className="flex items-center space-x-2 mt-1">
-                        <span className="font-mono text-sm bg-gray-100 px-2 py-1 rounded">
-                          {cliente.codigoCliente}
-                        </span>
-                        <Badge variant={cliente.saldoActual > 0 ? "warning" : "success"}>
-                          {cliente.saldoActual > 0 ? "Saldo pendiente" : "Al corriente"}
-                        </Badge>
-                      </CardDescription>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid gap-2">
-                    {cliente.telefono && (
-                      <div className="flex items-center space-x-2 text-sm text-gray-600">
-                        <Phone className="h-4 w-4" />
-                        <a 
-                          href={`tel:${cliente.telefono}`}
-                          className="text-blue-600 hover:text-blue-700"
-                        >
-                          {cliente.telefono}
-                        </a>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <MapPin className="h-4 w-4" />
-                      <span className="flex-1">{cliente.direccionCompleta}</span>
-                    </div>
-
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Calendar className="h-4 w-4" />
-                      <span>
-                        {getDayName(cliente.diaPago)} - {formatCurrency(cliente.montoPago)}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between pt-3 border-t border-gray-100">
-                    <div>
-                      <p className="text-sm text-gray-600">Saldo actual:</p>
-                      <p className={`font-bold text-lg ${
-                        cliente.saldoActual > 0 ? 'text-red-600' : 'text-green-600'
-                      }`}>
-                        {formatCurrency(cliente.saldoActual)}
-                      </p>
-                    </div>
-                    <div className="flex space-x-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="flex items-center space-x-1"
-                      >
-                        <Receipt className="h-4 w-4" />
-                        <span>Historial</span>
-                      </Button>
-                      <Button
-                        onClick={() => handlePago(cliente)}
-                        size="sm"
-                        className="flex items-center space-x-1"
-                      >
-                        <Plus className="h-4 w-4" />
-                        <span>Registrar Pago</span>
-                      </Button>
-                    </div>
-                  </div>
-
-                  {cliente.saldoActual > cliente.montoPago && (
-                    <div className="flex items-center space-x-2 text-sm text-orange-600 bg-orange-50 p-2 rounded">
-                      <AlertCircle className="h-4 w-4" />
-                      <span>Cliente con atraso en pagos</span>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
       </div>
-
-      {/* Cobranza Modal */}
-      {showCobranzaModal && selectedCliente && (
-        <CobranzaModal
-          cliente={selectedCliente}
-          isOpen={showCobranzaModal}
-          onClose={() => setShowCobranzaModal(false)}
-          onSuccess={handlePagoSuccess}
-        />
-      )}
     </DashboardLayout>
   );
 }

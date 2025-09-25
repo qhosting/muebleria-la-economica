@@ -1,4 +1,5 @@
 
+// API para sincronización de clientes offline
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -20,50 +21,85 @@ export async function GET(
     const userRole = (session.user as any).role;
     const userId = (session.user as any).id;
 
-    // Verificar permisos
+    // Verificar permisos - el cobrador solo puede ver sus clientes
     if (userRole === 'cobrador' && userId !== params.cobradorId) {
       return NextResponse.json({ error: 'No puedes sincronizar clientes de otros cobradores' }, { status: 403 });
     }
 
+    // Managers pueden ver clientes de sus cobradores asignados
+    if (userRole === 'manager') {
+      const manager = await prisma.user.findUnique({
+        where: { id: userId },
+        include: { clientesAsignados: true }
+      });
+
+      const hasAccess = manager?.clientesAsignados.some((c: any) => c.cobradorAsignadoId === params.cobradorId);
+      if (!hasAccess) {
+        return NextResponse.json({ error: 'No puedes sincronizar clientes de este cobrador' }, { status: 403 });
+      }
+    }
+
     const { searchParams } = new URL(request.url);
+    const full = searchParams.get('full') === 'true';
     const lastSync = searchParams.get('lastSync');
 
-    const where: any = {
+    let whereClause: any = {
       cobradorAsignadoId: params.cobradorId,
-      statusCuenta: 'activo',
+      statusCuenta: 'activo'
     };
 
-    // Si hay fecha de última sincronización, solo obtener actualizados después de esa fecha
-    if (lastSync) {
-      where.updatedAt = {
-        gt: new Date(lastSync),
+    // Si no es sincronización completa, solo traer cambios desde lastSync
+    if (!full && lastSync) {
+      whereClause.updatedAt = {
+        gte: new Date(parseInt(lastSync))
       };
     }
 
     const clientes = await prisma.cliente.findMany({
-      where,
+      where: whereClause,
       select: {
         id: true,
-        codigoCliente: true,
-        fechaVenta: true,
         nombreCompleto: true,
         telefono: true,
         direccionCompleta: true,
-        descripcionProducto: true,
         diaPago: true,
         montoPago: true,
-        periodicidad: true,
         saldoActual: true,
+        statusCuenta: true,
+        cobradorAsignadoId: true,
         updatedAt: true,
+        pagos: {
+          select: {
+            fechaPago: true,
+            monto: true
+          },
+          orderBy: { fechaPago: 'desc' },
+          take: 1
+        }
       },
-      orderBy: { updatedAt: 'desc' },
+      orderBy: [
+        { diaPago: 'asc' },
+        { nombreCompleto: 'asc' }
+      ]
     });
 
-    return NextResponse.json({
-      clientes,
-      total: clientes.length,
-      lastSync: new Date().toISOString(),
-    });
+    // Transformar datos para formato offline
+    const clientesOffline = clientes.map(cliente => ({
+      id: cliente.id,
+      nombreCompleto: cliente.nombreCompleto,
+      telefono: cliente.telefono,
+      direccion: cliente.direccionCompleta,
+      diaPago: cliente.diaPago,
+      montoAcordado: cliente.montoPago,
+      saldoPendiente: cliente.saldoActual,
+      fechaUltimoPago: cliente.pagos[0]?.fechaPago?.toISOString(),
+      statusCuenta: cliente.statusCuenta,
+      cobradorAsignadoId: cliente.cobradorAsignadoId,
+      notas: null // Este campo no existe en el modelo actual
+    }));
+
+    return NextResponse.json(clientesOffline);
+
   } catch (error) {
     console.error('Error en sincronización de clientes:', error);
     return NextResponse.json(

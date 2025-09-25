@@ -1,9 +1,7 @@
 
-"use client"
-
+// Componente Progress que faltaba
 import * as React from "react"
 import * as ProgressPrimitive from "@radix-ui/react-progress"
-
 import { cn } from "@/lib/utils"
 
 const Progress = React.forwardRef<

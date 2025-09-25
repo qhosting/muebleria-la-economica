@@ -30,6 +30,17 @@ enum Periodicidad {
 enum TipoPago {
   regular
   moratorio
+  abono
+  liquidacion
+  mora
+}
+
+enum MotivoMotarario {
+  no_estaba
+  sin_dinero
+  viajo
+  enfermo
+  otro
 }
 
 model User {
@@ -49,6 +60,7 @@ model User {
   // Business relations
   clientesAsignados Cliente[] @relation("CobradorAsignado")
   pagos             Pago[]
+  motararios        Motarario[]
   rutasCobranza     RutaCobranza[]
 
   @@map("users")
@@ -78,6 +90,7 @@ model Cliente {
 
   cobradorAsignado    User?         @relation("CobradorAsignado", fields: [cobradorAsignadoId], references: [id])
   pagos               Pago[]
+  motararios          Motarario[]
 
   @@map("clientes")
 }
@@ -92,6 +105,9 @@ model Pago {
   fechaPago       DateTime  @default(now())
   saldoAnterior   Decimal   @db.Decimal(10,2)
   saldoNuevo      Decimal   @db.Decimal(10,2)
+  metodoPago      String    @default("efectivo") // efectivo, transferencia, cheque
+  numeroRecibo    String?
+  localId         String?   // Para sincronización offline
   ticketImpreso   Boolean   @default(false)
   sincronizado    Boolean   @default(false)
   createdAt       DateTime  @default(now())
@@ -100,6 +116,25 @@ model Pago {
   cobrador        User      @relation(fields: [cobradorId], references: [id])
 
   @@map("pagos")
+}
+
+model Motarario {
+  id              String              @id @default(cuid())
+  clienteId       String
+  cobradorId      String  
+  motivo          MotivoMotarario
+  descripcion     String              @db.Text
+  fecha           DateTime            @default(now())
+  proximaVisita   DateTime?
+  localId         String?             // Para sincronización offline
+  sincronizado    Boolean             @default(false)
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  cliente         Cliente             @relation(fields: [clienteId], references: [id])
+  cobrador        User                @relation(fields: [cobradorId], references: [id])
+
+  @@map("motararios")
 }
 
 model PlantillaTicket {

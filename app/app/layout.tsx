@@ -3,8 +3,6 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/components/providers';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -22,19 +20,11 @@ export const viewport = {
   themeColor: '#0F172A',
 };
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  let session = null;
-  
-  try {
-    session = await getServerSession(authOptions);
-  } catch (error) {
-    console.error('Error getting server session:', error);
-  }
-
   return (
     <html lang="es" suppressHydrationWarning>
       <head>
@@ -42,7 +32,7 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/icon-192x192.png" />
       </head>
       <body className={inter.className} suppressHydrationWarning>
-        <Providers session={session}>
+        <Providers>
           {children}
         </Providers>
       </body>
