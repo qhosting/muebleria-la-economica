@@ -1,7 +1,6 @@
 
-const CACHE_NAME = 'muebleria-cobranza-v1.2.0';
+const CACHE_NAME = 'laeconomica-v1.2.1';
 const urlsToCache = [
-  '/',
   '/login',
   '/dashboard',
   '/dashboard/cobranza',
@@ -17,7 +16,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Cache v1.2.0 abierto');
+        console.log('Cache LaEconomica v1.2.1 abierto');
         return cache.addAll(urlsToCache);
       })
   );
@@ -32,7 +31,8 @@ self.addEventListener('activate', (event) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           // Eliminar cachés que no sean la actual
-          if (cacheName !== CACHE_NAME && cacheName.startsWith('muebleria-cobranza-')) {
+          if (cacheName !== CACHE_NAME && 
+              (cacheName.startsWith('muebleria-cobranza-') || cacheName.startsWith('laeconomica-'))) {
             console.log('Eliminando caché antigua:', cacheName);
             return caches.delete(cacheName);
           }
@@ -46,6 +46,14 @@ self.addEventListener('activate', (event) => {
 
 // Buscar en cache
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url);
+  
+  // Si es la raíz, redirigir directamente a /login sin cachear
+  if (url.pathname === '/' && url.origin === self.location.origin) {
+    event.respondWith(Response.redirect('/login', 302));
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
@@ -61,6 +69,11 @@ self.addEventListener('fetch', (event) => {
               return response;
             }
 
+            // No cachear redirecciones
+            if (response.type === 'opaqueredirect' || response.status >= 300) {
+              return response;
+            }
+
             // IMPORTANTE: Clonar la respuesta. Una respuesta es un stream
             // y porque queremos que el navegador consuma la respuesta
             // así como el cache consuma la respuesta, necesitamos clonarla
@@ -73,7 +86,13 @@ self.addEventListener('fetch', (event) => {
 
             return response;
           }
-        );
+        ).catch(() => {
+          // Si falla la red, intentar devolver login desde caché si existe
+          if (url.pathname === '/login') {
+            return caches.match('/login');
+          }
+          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
+        });
       })
   );
 });
@@ -120,7 +139,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('Mueblería La Económica', options)
+    self.registration.showNotification('LaEconomica', options)
   );
 });
 

@@ -7,8 +7,8 @@ import { Providers } from '@/components/providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Mueblería La Económica v1.2.0 - Sistema de Cobranza',
-  description: 'Sistema integral de gestión de clientes y cobranza en campo - PWA v1.2.0',
+  title: 'LaEconomica - Sistema de Cobranza',
+  description: 'Sistema integral de gestión de clientes y cobranza en campo',
   manifest: '/manifest.json',
 };
 
