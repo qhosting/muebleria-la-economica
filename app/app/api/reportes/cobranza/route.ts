@@ -24,6 +24,8 @@ export async function GET(request: NextRequest) {
     const fechaHasta = searchParams.get('fechaHasta') || new Date().toISOString();
     const cobradorId = searchParams.get('cobradorId');
 
+    console.log('Parámetros recibidos:', { fechaDesde, fechaHasta, cobradorId });
+
     const where: any = {
       fechaPago: {
         gte: new Date(fechaDesde),
@@ -31,7 +33,7 @@ export async function GET(request: NextRequest) {
       },
     };
 
-    if (cobradorId) {
+    if (cobradorId && cobradorId !== 'all') {
       where.cobradorId = cobradorId;
     }
 
@@ -48,11 +50,18 @@ export async function GET(request: NextRequest) {
     });
 
     // Obtener información de cobradores
+    let cobradoresQuery: any = {
+      role: 'cobrador',
+      isActive: true,
+    };
+
+    // Si se especifica un cobrador, solo obtener ese
+    if (cobradorId && cobradorId !== 'all') {
+      cobradoresQuery.id = cobradorId;
+    }
+
     const cobradores = await prisma.user.findMany({
-      where: {
-        role: 'cobrador',
-        isActive: true,
-      },
+      where: cobradoresQuery,
       select: {
         id: true,
         name: true,
@@ -69,19 +78,22 @@ export async function GET(request: NextRequest) {
         r => r.cobradorId === cobrador.id && r.tipoPago === 'moratorio'
       ) || { _sum: { monto: 0 }, _count: { _all: 0 } };
 
+      const totalCobrado = Number(pagosRegulares._sum.monto || 0) + Number(pagosMoratorios._sum.monto || 0);
+      const cantidadPagos = pagosRegulares._count._all + pagosMoratorios._count._all;
+
       return {
         cobrador: cobrador.name,
         cobradorId: cobrador.id,
-        totalCobrado: Number(pagosRegulares._sum.monto || 0) + Number(pagosMoratorios._sum.monto || 0),
+        totalCobrado,
         pagosRegulares: Number(pagosRegulares._sum.monto || 0),
         pagosMoratorios: Number(pagosMoratorios._sum.monto || 0),
-        cantidadPagos: pagosRegulares._count._all + pagosMoratorios._count._all,
+        cantidadPagos,
       };
-    });
+    }).filter(cobrador => cobrador.totalCobrado > 0 || cobrador.cantidadPagos > 0);
 
     // Reporte por día
     let reportePorDia;
-    if (cobradorId) {
+    if (cobradorId && cobradorId !== 'all') {
       reportePorDia = await prisma.$queryRaw`
         SELECT 
           DATE("fechaPago") as fecha,
