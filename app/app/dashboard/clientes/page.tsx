@@ -75,12 +75,16 @@ export default function ClientesPage() {
         const data: ClientesResponse = await response.json();
         setClientes(data.clientes);
         setPagination(data.pagination);
+      } else if (response.status === 401) {
+        console.log('Usuario no autenticado, redirigiendo al login');
+        window.location.href = '/login';
+        return;
       } else {
-        throw new Error('Error al obtener clientes');
+        throw new Error(`Error al obtener clientes: ${response.status}`);
       }
     } catch (error) {
       console.error('Error:', error);
-      toast.error('Error al cargar clientes');
+      toast.error('Error al cargar clientes. Verifique su conexión.');
     } finally {
       setLoading(false);
     }
@@ -92,6 +96,9 @@ export default function ClientesPage() {
       if (response.ok) {
         const users: User[] = await response.json();
         setCobradores(users.filter(u => u.role === 'cobrador' && u.isActive));
+      } else if (response.status === 401) {
+        console.log('Usuario no autenticado al obtener cobradores');
+        return;
       }
     } catch (error) {
       console.error('Error al obtener cobradores:', error);
