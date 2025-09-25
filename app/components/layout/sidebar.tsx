@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { VersionInfo } from '@/components/ui/version-info';
 import {
   LayoutDashboard,
   Users,
@@ -193,12 +194,16 @@ export function Sidebar({ className, session }: SidebarProps) {
               <p className="text-sm font-medium text-gray-900">
                 {session?.user?.name}
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 mb-2">
                 {userRole === 'admin' && 'Administrador'}
                 {userRole === 'gestor_cobranza' && 'Gestor de Cobranza'}
                 {userRole === 'reporte_cobranza' && 'Reportes'}
                 {userRole === 'cobrador' && 'Cobrador'}
               </p>
+              {/* Version Info */}
+              <div className="flex justify-center">
+                <VersionInfo variant="dialog" />
+              </div>
             </div>
           )}
           <Button

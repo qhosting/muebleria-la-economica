@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, LogIn, Loader2 } from 'lucide-react';
+import { VersionInfo } from '@/components/ui/version-info';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -128,8 +129,13 @@ export function LoginForm() {
           </CardContent>
         </Card>
 
-        <div className="text-center mt-6 text-blue-200 text-sm">
-          Sistema desarrollado para control de cobranza
+        <div className="text-center mt-6 space-y-2">
+          <div className="text-blue-200 text-sm">
+            Sistema desarrollado para control de cobranza
+          </div>
+          <div className="flex justify-center">
+            <VersionInfo variant="text" />
+          </div>
         </div>
       </div>
     </div>
