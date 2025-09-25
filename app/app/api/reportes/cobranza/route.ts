@@ -80,19 +80,35 @@ export async function GET(request: NextRequest) {
     });
 
     // Reporte por día
-    const reportePorDia = await prisma.$queryRaw`
-      SELECT 
-        DATE(fecha_pago) as fecha,
-        SUM(CASE WHEN tipo_pago = 'regular' THEN monto ELSE 0 END) as pagos_regulares,
-        SUM(CASE WHEN tipo_pago = 'moratorio' THEN monto ELSE 0 END) as pagos_moratorios,
-        COUNT(*) as total_pagos
-      FROM pagos 
-      WHERE fecha_pago >= ${new Date(fechaDesde)} 
-        AND fecha_pago <= ${new Date(fechaHasta)}
-        ${cobradorId ? prisma.$queryRaw`AND cobrador_id = ${cobradorId}` : prisma.$queryRaw``}
-      GROUP BY DATE(fecha_pago)
-      ORDER BY fecha DESC
-    `;
+    let reportePorDia;
+    if (cobradorId) {
+      reportePorDia = await prisma.$queryRaw`
+        SELECT 
+          DATE("fechaPago") as fecha,
+          SUM(CASE WHEN "tipoPago" = 'regular' THEN "monto" ELSE 0 END) as pagos_regulares,
+          SUM(CASE WHEN "tipoPago" = 'moratorio' THEN "monto" ELSE 0 END) as pagos_moratorios,
+          COUNT(*) as total_pagos
+        FROM "pagos" 
+        WHERE "fechaPago" >= ${new Date(fechaDesde)} 
+          AND "fechaPago" <= ${new Date(fechaHasta)}
+          AND "cobradorId" = ${cobradorId}
+        GROUP BY DATE("fechaPago")
+        ORDER BY fecha DESC
+      `;
+    } else {
+      reportePorDia = await prisma.$queryRaw`
+        SELECT 
+          DATE("fechaPago") as fecha,
+          SUM(CASE WHEN "tipoPago" = 'regular' THEN "monto" ELSE 0 END) as pagos_regulares,
+          SUM(CASE WHEN "tipoPago" = 'moratorio' THEN "monto" ELSE 0 END) as pagos_moratorios,
+          COUNT(*) as total_pagos
+        FROM "pagos" 
+        WHERE "fechaPago" >= ${new Date(fechaDesde)} 
+          AND "fechaPago" <= ${new Date(fechaHasta)}
+        GROUP BY DATE("fechaPago")
+        ORDER BY fecha DESC
+      `;
+    }
 
     const totales = {
       totalCobrado: reportePorCobrador.reduce((sum, r) => sum + r.totalCobrado, 0),
@@ -101,10 +117,18 @@ export async function GET(request: NextRequest) {
       totalPagos: reportePorCobrador.reduce((sum, r) => sum + r.cantidadPagos, 0),
     };
 
+    // Convertir BigInt a Number para serialización JSON
+    const reportePorDiaFormatted = (reportePorDia as any[]).map(row => ({
+      fecha: row.fecha,
+      pagos_regulares: Number(row.pagos_regulares),
+      pagos_moratorios: Number(row.pagos_moratorios),
+      total_pagos: Number(row.total_pagos),
+    }));
+
     return NextResponse.json({
       totales,
       reportePorCobrador,
-      reportePorDia,
+      reportePorDia: reportePorDiaFormatted,
       periodo: {
         desde: fechaDesde,
         hasta: fechaHasta,
