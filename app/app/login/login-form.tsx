@@ -7,18 +7,30 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Building2, LogIn, Loader2 } from 'lucide-react';
 import { VersionInfo } from '@/components/ui/version-info';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
+    // Cargar credenciales recordadas si existen
+    const savedEmail = localStorage.getItem('remembered_email');
+    const savedPassword = localStorage.getItem('remembered_password');
+    const rememberMeStatus = localStorage.getItem('remember_me') === 'true';
+    
+    if (savedEmail && savedPassword && rememberMeStatus) {
+      setEmail(savedEmail);
+      setPassword(savedPassword);
+      setRememberMe(true);
+    }
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,6 +53,17 @@ export function LoginForm() {
       if (result?.error) {
         alert('Credenciales incorrectas');
       } else {
+        // Manejar recordar credenciales
+        if (rememberMe) {
+          localStorage.setItem('remembered_email', email);
+          localStorage.setItem('remembered_password', password);
+          localStorage.setItem('remember_me', 'true');
+        } else {
+          localStorage.removeItem('remembered_email');
+          localStorage.removeItem('remembered_password');
+          localStorage.removeItem('remember_me');
+        }
+
         alert('¡Bienvenido!');
         router.replace('/dashboard');
       }
@@ -107,6 +130,21 @@ export function LoginForm() {
                   disabled={isLoading}
                   className="h-11"
                 />
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="remember-me"
+                  checked={rememberMe}
+                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                  disabled={isLoading}
+                />
+                <label
+                  htmlFor="remember-me"
+                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
+                >
+                  Recordar inicio de sesión
+                </label>
               </div>
               <Button 
                 type="submit" 

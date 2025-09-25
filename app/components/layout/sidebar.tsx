@@ -105,6 +105,14 @@ export function Sidebar({ className, session }: SidebarProps) {
   );
 
   const handleSignOut = () => {
+    // Solo limpiar credenciales si el usuario no eligió recordarlas
+    const rememberMe = localStorage.getItem('remember_me') === 'true';
+    if (!rememberMe) {
+      localStorage.removeItem('remembered_email');
+      localStorage.removeItem('remembered_password');
+      localStorage.removeItem('remember_me');
+    }
+    
     signOut({ callbackUrl: '/login' });
   };
 
