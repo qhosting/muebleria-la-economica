@@ -32,10 +32,10 @@ export function ClienteModal({
     nombreCompleto: '',
     telefono: '',
     vendedor: '',
-    cobradorAsignadoId: '',
+    cobradorAsignadoId: 'sin-asignar',
     direccionCompleta: '',
     descripcionProducto: '',
-    diaPago: '',
+    diaPago: '1',
     montoPago: '',
     periodicidad: 'semanal',
     saldoActual: '',
@@ -55,10 +55,10 @@ export function ClienteModal({
         nombreCompleto: cliente.nombreCompleto || '',
         telefono: cliente.telefono || '',
         vendedor: cliente.vendedor || '',
-        cobradorAsignadoId: cliente.cobradorAsignadoId || '',
+        cobradorAsignadoId: cliente.cobradorAsignadoId || 'sin-asignar',
         direccionCompleta: cliente.direccionCompleta || '',
         descripcionProducto: cliente.descripcionProducto || '',
-        diaPago: cliente.diaPago.toString() || '',
+        diaPago: cliente.diaPago.toString() || '1',
         montoPago: cliente.montoPago.toString() || '',
         periodicidad: cliente.periodicidad || 'semanal',
         saldoActual: cliente.saldoActual.toString() || '',
@@ -74,10 +74,10 @@ export function ClienteModal({
         nombreCompleto: '',
         telefono: '',
         vendedor: '',
-        cobradorAsignadoId: '',
+        cobradorAsignadoId: 'sin-asignar',
         direccionCompleta: '',
         descripcionProducto: '',
-        diaPago: '',
+        diaPago: '1',
         montoPago: '',
         periodicidad: 'semanal',
         saldoActual: '',
@@ -99,12 +99,18 @@ export function ClienteModal({
       const url = isEditMode ? `/api/clientes/${cliente.id}` : '/api/clientes';
       const method = isEditMode ? 'PUT' : 'POST';
 
+      // Prepare data with proper null handling for cobrador assignment
+      const submitData = {
+        ...formData,
+        cobradorAsignadoId: formData.cobradorAsignadoId === 'sin-asignar' ? null : formData.cobradorAsignadoId
+      };
+
       const response = await fetch(url, {
         method,
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(formData),
+        body: JSON.stringify(submitData),
       });
 
       if (response.ok) {
@@ -196,7 +202,7 @@ export function ClienteModal({
                   <SelectValue placeholder="Seleccionar cobrador" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Sin asignar</SelectItem>
+                  <SelectItem value="sin-asignar">Sin asignar</SelectItem>
                   {cobradores.map((cobrador) => (
                     <SelectItem key={cobrador.id} value={cobrador.id}>
                       {cobrador.name}

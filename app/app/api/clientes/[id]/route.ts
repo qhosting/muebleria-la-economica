@@ -50,7 +50,22 @@ export async function GET(
       return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
     }
 
-    return NextResponse.json(cliente);
+    // Convert Decimal fields to numbers for JSON serialization
+    const clienteSerializado = {
+      ...cliente,
+      montoPago: parseFloat(cliente.montoPago.toString()),
+      saldoActual: parseFloat(cliente.saldoActual.toString()),
+      importe1: cliente.importe1 ? parseFloat(cliente.importe1.toString()) : null,
+      importe2: cliente.importe2 ? parseFloat(cliente.importe2.toString()) : null,
+      importe3: cliente.importe3 ? parseFloat(cliente.importe3.toString()) : null,
+      importe4: cliente.importe4 ? parseFloat(cliente.importe4.toString()) : null,
+      pagos: cliente.pagos?.map(pago => ({
+        ...pago,
+        monto: parseFloat(pago.monto.toString())
+      })) || []
+    };
+
+    return NextResponse.json(clienteSerializado);
   } catch (error) {
     console.error('Error al obtener cliente:', error);
     return NextResponse.json(
@@ -102,11 +117,11 @@ export async function PUT(
         nombreCompleto,
         telefono,
         vendedor,
-        cobradorAsignadoId,
+        cobradorAsignadoId: cobradorAsignadoId || null,
         statusCuenta,
         direccionCompleta,
         descripcionProducto,
-        diaPago,
+        diaPago: diaPago,
         montoPago: montoPago ? parseFloat(montoPago) : undefined,
         periodicidad,
         saldoActual: saldoActual ? parseFloat(saldoActual) : undefined,
@@ -127,7 +142,18 @@ export async function PUT(
       },
     });
 
-    return NextResponse.json(cliente);
+    // Convert Decimal fields to numbers for JSON serialization
+    const clienteSerializado = {
+      ...cliente,
+      montoPago: parseFloat(cliente.montoPago.toString()),
+      saldoActual: parseFloat(cliente.saldoActual.toString()),
+      importe1: cliente.importe1 ? parseFloat(cliente.importe1.toString()) : null,
+      importe2: cliente.importe2 ? parseFloat(cliente.importe2.toString()) : null,
+      importe3: cliente.importe3 ? parseFloat(cliente.importe3.toString()) : null,
+      importe4: cliente.importe4 ? parseFloat(cliente.importe4.toString()) : null,
+    };
+
+    return NextResponse.json(clienteSerializado);
   } catch (error) {
     console.error('Error al actualizar cliente:', error);
     return NextResponse.json(

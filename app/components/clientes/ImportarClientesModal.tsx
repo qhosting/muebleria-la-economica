@@ -208,7 +208,7 @@ export function ImportarClientesModal({
             vendedor: row.vendedor || null,
             direccionCompleta: row.direccionCompleta,
             descripcionProducto: row.descripcionProducto,
-            diaPago: parseInt(row.diaPago),
+            diaPago: row.diaPago,
             montoPago: parseFloat(row.montoPago),
             periodicidad: row.periodicidad,
             saldoActual: row.saldoActual ? parseFloat(row.saldoActual) : parseFloat(row.montoPago),
