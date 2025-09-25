@@ -1,0 +1,163 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/muebleria_la_economica/app/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  admin
+  gestor_cobranza
+  reporte_cobranza
+  cobrador
+}
+
+enum StatusCuenta {
+  activo
+  inactivo
+}
+
+enum Periodicidad {
+  semanal
+  quincenal
+  mensual
+}
+
+enum TipoPago {
+  regular
+  moratorio
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String
+  password      String?
+  role          UserRole   @default(cobrador)
+  isActive      Boolean    @default(true)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  // NextAuth relations
+  accounts      Account[]
+  sessions      Session[]
+
+  // Business relations
+  clientesAsignados Cliente[] @relation("CobradorAsignado")
+  pagos             Pago[]
+  rutasCobranza     RutaCobranza[]
+
+  @@map("users")
+}
+
+model Cliente {
+  id                  String        @id @default(cuid())
+  codigoCliente       String        @unique
+  fechaVenta          DateTime
+  nombreCompleto      String
+  telefono            String?
+  vendedor            String?
+  cobradorAsignadoId  String?
+  statusCuenta        StatusCuenta  @default(activo)
+  direccionCompleta   String
+  descripcionProducto String
+  diaPago             String
+  montoPago           Decimal       @db.Decimal(10,2)
+  periodicidad        Periodicidad
+  saldoActual         Decimal       @db.Decimal(10,2)
+  importe1            Decimal?      @db.Decimal(10,2)
+  importe2            Decimal?      @db.Decimal(10,2)
+  importe3            Decimal?      @db.Decimal(10,2)
+  importe4            Decimal?      @db.Decimal(10,2)
+  createdAt           DateTime      @default(now())
+  updatedAt           DateTime      @updatedAt
+
+  cobradorAsignado    User?         @relation("CobradorAsignado", fields: [cobradorAsignadoId], references: [id])
+  pagos               Pago[]
+
+  @@map("clientes")
+}
+
+model Pago {
+  id              String    @id @default(cuid())
+  clienteId       String
+  cobradorId      String
+  monto           Decimal   @db.Decimal(10,2)
+  concepto        String?
+  tipoPago        TipoPago  @default(regular)
+  fechaPago       DateTime  @default(now())
+  saldoAnterior   Decimal   @db.Decimal(10,2)
+  saldoNuevo      Decimal   @db.Decimal(10,2)
+  ticketImpreso   Boolean   @default(false)
+  sincronizado    Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+
+  cliente         Cliente   @relation(fields: [clienteId], references: [id])
+  cobrador        User      @relation(fields: [cobradorId], references: [id])
+
+  @@map("pagos")
+}
+
+model PlantillaTicket {
+  id          String    @id @default(cuid())
+  nombre      String    @unique
+  contenido   String    @db.Text
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@map("plantillas_ticket")
+}
+
+model RutaCobranza {
+  id                String    @id @default(cuid())
+  cobradorId        String
+  fecha             DateTime
+  clientesVisitados Json
+  totalCobrado      Decimal   @db.Decimal(10,2)
+  createdAt         DateTime  @default(now())
+
+  cobrador          User      @relation(fields: [cobradorId], references: [id])
+
+  @@map("rutas_cobranza")
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
