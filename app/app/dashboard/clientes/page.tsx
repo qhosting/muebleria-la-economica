@@ -195,19 +195,24 @@ export default function ClientesPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Gestión de Clientes</h1>
             <p className="text-gray-600 mt-1">
-              Administra la información y asignaciones de clientes
+              {userRole === 'admin' ? 
+                'Administra la información y asignaciones de clientes' :
+                'Visualiza los clientes asignados (solo lectura)'
+              }
             </p>
           </div>
-          <div className="flex space-x-2 mt-4 sm:mt-0">
-            <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-              <Upload className="h-4 w-4 mr-2" />
-              Importar
-            </Button>
-            <Button onClick={handleCreateCliente}>
-              <Plus className="h-4 w-4 mr-2" />
-              Nuevo Cliente
-            </Button>
-          </div>
+          {userRole === 'admin' && (
+            <div className="flex space-x-2 mt-4 sm:mt-0">
+              <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+                <Upload className="h-4 w-4 mr-2" />
+                Importar
+              </Button>
+              <Button onClick={handleCreateCliente}>
+                <Plus className="h-4 w-4 mr-2" />
+                Nuevo Cliente
+              </Button>
+            </div>
+          )}
         </div>
 
         {/* Filters */}
@@ -285,10 +290,12 @@ export default function ClientesPage() {
               <p className="text-gray-600 mb-4">
                 No se encontraron clientes con los filtros aplicados.
               </p>
-              <Button onClick={handleCreateCliente}>
-                <Plus className="h-4 w-4 mr-2" />
-                Crear primer cliente
-              </Button>
+              {userRole === 'admin' && (
+                <Button onClick={handleCreateCliente}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Crear primer cliente
+                </Button>
+              )}
             </CardContent>
           </Card>
         ) : (
@@ -318,17 +325,24 @@ export default function ClientesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
-                          <Edit className="h-4 w-4 mr-2" />
-                          Editar Cliente
-                        </DropdownMenuItem>
                         {userRole === 'admin' && (
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteCliente(cliente)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Desactivar Cliente
+                          <>
+                            <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar Cliente
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteCliente(cliente)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Desactivar Cliente
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                        {userRole === 'gestor_cobranza' && (
+                          <DropdownMenuItem disabled>
+                            <span className="text-gray-500">Solo visualización</span>
                           </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
@@ -433,20 +447,24 @@ export default function ClientesPage() {
         )}
       </div>
 
-      {/* Modals */}
-      <ClienteModal
-        open={clienteModalOpen}
-        onOpenChange={setClienteModalOpen}
-        cliente={selectedCliente}
-        cobradores={cobradores}
-        onSuccess={handleModalSuccess}
-      />
+      {/* Modals - Solo para admin */}
+      {userRole === 'admin' && (
+        <>
+          <ClienteModal
+            open={clienteModalOpen}
+            onOpenChange={setClienteModalOpen}
+            cliente={selectedCliente}
+            cobradores={cobradores}
+            onSuccess={handleModalSuccess}
+          />
 
-      <ImportarClientesModal
-        open={importModalOpen}
-        onOpenChange={setImportModalOpen}
-        onSuccess={handleModalSuccess}
-      />
+          <ImportarClientesModal
+            open={importModalOpen}
+            onOpenChange={setImportModalOpen}
+            onSuccess={handleModalSuccess}
+          />
+        </>
+      )}
     </DashboardLayout>
   );
 }

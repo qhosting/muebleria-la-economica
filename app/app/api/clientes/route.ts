@@ -43,8 +43,13 @@ export async function GET(request: NextRequest) {
     }
 
     const userRole = (session.user as any).role;
+    const userId = (session.user as any).id;
+    
     if (userRole === 'cobrador') {
-      where.cobradorAsignadoId = (session.user as any).id;
+      where.cobradorAsignadoId = userId;
+    } else if (userRole === 'gestor_cobranza') {
+      // El gestor solo ve los clientes asignados a él
+      where.cobradorAsignadoId = userId;
     }
 
     const [clientes, total] = await Promise.all([
@@ -104,8 +109,8 @@ export async function POST(request: NextRequest) {
     }
 
     const userRole = (session.user as any).role;
-    if (!['admin', 'gestor_cobranza'].includes(userRole)) {
-      return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 });
+    if (userRole !== 'admin') {
+      return NextResponse.json({ error: 'Solo el administrador puede crear clientes' }, { status: 403 });
     }
 
     const body = await request.json();

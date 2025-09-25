@@ -46,7 +46,12 @@ export async function GET(
     }
 
     const userRole = (session.user as any).role;
-    if (userRole === 'cobrador' && cliente.cobradorAsignadoId !== (session.user as any).id) {
+    const userId = (session.user as any).id;
+    
+    // Restricciones de acceso por rol
+    if (userRole === 'cobrador' && cliente.cobradorAsignadoId !== userId) {
+      return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
+    } else if (userRole === 'gestor_cobranza' && cliente.cobradorAsignadoId !== userId) {
       return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
     }
 
@@ -87,8 +92,8 @@ export async function PUT(
     }
 
     const userRole = (session.user as any).role;
-    if (!['admin', 'gestor_cobranza'].includes(userRole)) {
-      return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 });
+    if (userRole !== 'admin') {
+      return NextResponse.json({ error: 'Solo el administrador puede editar clientes' }, { status: 403 });
     }
 
     const body = await request.json();
