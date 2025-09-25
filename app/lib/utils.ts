@@ -14,22 +14,52 @@ export function formatCurrency(amount: number): string {
   }).format(amount);
 }
 
-export function formatDate(date: Date): string {
+export function formatDate(date: Date | string | null | undefined): string {
+  if (!date) return 'N/A';
+  
+  let dateObj: Date;
+  
+  if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else {
+    dateObj = date;
+  }
+  
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) {
+    return 'Fecha inválida';
+  }
+  
   return new Intl.DateTimeFormat('es-MX', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  }).format(date);
+  }).format(dateObj);
 }
 
-export function formatDateTime(date: Date): string {
+export function formatDateTime(date: Date | string | null | undefined): string {
+  if (!date) return 'N/A';
+  
+  let dateObj: Date;
+  
+  if (typeof date === 'string') {
+    dateObj = new Date(date);
+  } else {
+    dateObj = date;
+  }
+  
+  // Check if the date is valid
+  if (isNaN(dateObj.getTime())) {
+    return 'Fecha inválida';
+  }
+  
   return new Intl.DateTimeFormat('es-MX', {
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(date);
+  }).format(dateObj);
 }
 
 export function getDayName(dayNumber: string): string {
@@ -54,7 +84,22 @@ export function getPeriodicidadLabel(periodicidad: Periodicidad): string {
   return labels[periodicidad];
 }
 
-export function calcularDiasAtraso(fechaUltimoPago: Date, periodicidad: Periodicidad): number {
+export function calcularDiasAtraso(fechaUltimoPago: Date | string | null | undefined, periodicidad: Periodicidad): number {
+  if (!fechaUltimoPago) return 0;
+  
+  let fechaObj: Date;
+  
+  if (typeof fechaUltimoPago === 'string') {
+    fechaObj = new Date(fechaUltimoPago);
+  } else {
+    fechaObj = fechaUltimoPago;
+  }
+  
+  // Check if the date is valid
+  if (isNaN(fechaObj.getTime())) {
+    return 0;
+  }
+  
   const hoy = new Date();
   const diasPorPeriodicidad = {
     semanal: 7,
@@ -63,7 +108,7 @@ export function calcularDiasAtraso(fechaUltimoPago: Date, periodicidad: Periodic
   };
   
   const diasTranscurridos = Math.floor(
-    (hoy.getTime() - fechaUltimoPago.getTime()) / (1000 * 60 * 60 * 24)
+    (hoy.getTime() - fechaObj.getTime()) / (1000 * 60 * 60 * 24)
   );
   
   const diasCiclo = diasPorPeriodicidad[periodicidad];
