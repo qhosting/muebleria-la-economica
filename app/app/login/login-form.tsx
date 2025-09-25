@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Building2, LogIn, Loader2 } from 'lucide-react';
-import { VersionInfo } from '@/components/ui/version-info';
+import { VersionInfo } from '@/components/version-info';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -172,7 +172,7 @@ export function LoginForm() {
             Sistema desarrollado para control de cobranza
           </div>
           <div className="flex justify-center">
-            <VersionInfo variant="text" />
+            <VersionInfo showButton={false} />
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'muebleria-cobranza-v2';
+const CACHE_NAME = 'muebleria-cobranza-v1.2.0';
 const urlsToCache = [
   '/',
   '/login',
@@ -17,10 +17,31 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Cache abierto');
+        console.log('Cache v1.2.0 abierto');
         return cache.addAll(urlsToCache);
       })
   );
+  // Forzar activación inmediata
+  self.skipWaiting();
+});
+
+// Activar Service Worker y limpiar cachés antiguas
+self.addEventListener('activate', (event) => {
+  event.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          // Eliminar cachés que no sean la actual
+          if (cacheName !== CACHE_NAME && cacheName.startsWith('muebleria-cobranza-')) {
+            console.log('Eliminando caché antigua:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    })
+  );
+  // Tomar control de todas las páginas inmediatamente
+  return self.clients.claim();
 });
 
 // Buscar en cache

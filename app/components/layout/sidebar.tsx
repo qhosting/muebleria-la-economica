@@ -7,7 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { VersionInfo } from '@/components/ui/version-info';
+import { VersionInfo } from '@/components/version-info';
 import {
   LayoutDashboard,
   Users,
@@ -210,7 +210,7 @@ export function Sidebar({ className, session }: SidebarProps) {
               </p>
               {/* Version Info */}
               <div className="flex justify-center">
-                <VersionInfo variant="dialog" />
+                <VersionInfo showButton={true} />
               </div>
             </div>
           )}

@@ -37,6 +37,7 @@ import { MotararioModal } from './motarario-modal';
 import { formatCurrency, getDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useLiveQuery } from 'dexie-react-hooks';
+import { FooterVersion } from '@/components/version-info';
 
 interface CobranzaMobileProps {
   initialClientes?: OfflineCliente[];
@@ -364,6 +365,11 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
             />
           </>
         )}
+
+        {/* Footer con información de versión */}
+        <div className="mt-8 pt-4 border-t">
+          <FooterVersion />
+        </div>
       </div>
     </DashboardLayout>
   );

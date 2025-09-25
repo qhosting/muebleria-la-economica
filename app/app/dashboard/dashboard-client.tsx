@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
-import { VersionBanner } from '@/components/ui/version-banner';
+import { VersionInfo } from '@/components/version-info';
 
 interface DashboardStats {
   totalClientes: number;
@@ -143,7 +143,7 @@ export function DashboardClient({ session }: DashboardClientProps) {
             </div>
 
             {/* Version Banner */}
-            <VersionBanner />
+            <VersionInfo compact />
 
             {/* Stats Grid */}
             {stats && (

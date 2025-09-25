@@ -1,36 +1,27 @@
 
-export interface AppVersion {
-  version: string;
-  buildDate: string;
-  buildNumber: string;
-  environment: string;
-  features: string[];
-  lastUpdate: string;
+// Configuración de versión de la aplicación
+export const APP_VERSION = '1.2.0';
+export const BUILD_DATE = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+export const BUILD_NUMBER = Date.now().toString().slice(-6); // Últimos 6 dígitos del timestamp
+
+export const VERSION_INFO = {
+  version: APP_VERSION,
+  buildDate: BUILD_DATE,
+  buildNumber: BUILD_NUMBER,
+  fullVersion: `${APP_VERSION}.${BUILD_NUMBER}`,
+  displayName: `v${APP_VERSION} Build ${BUILD_NUMBER}`
+} as const;
+
+export function getVersionInfo() {
+  return VERSION_INFO;
 }
 
-export const APP_VERSION: AppVersion = {
-  version: "1.3.0",
-  buildDate: new Date().toISOString(),
-  buildNumber: "202509250002",
-  environment: process.env.NODE_ENV || "development",
-  features: [
-    "Sistema de control de versiones completo",
-    "Banner de actualizaciones automático",
-    "Changelog integrado en el sistema", 
-    "Dashboard corregido y funcional",
-    "Menú lateral con roles",
-    "200 clientes de prueba"
-  ],
-  lastUpdate: "25 Sep 2025 - Control de versiones implementado"
-};
-
-export function getVersionInfo(): AppVersion {
-  return {
-    ...APP_VERSION,
-    buildDate: new Date().toISOString()
-  };
-}
-
-export function getVersionString(): string {
-  return `v${APP_VERSION.version} (Build ${APP_VERSION.buildNumber})`;
+// Para debugging - mostrar info de versión en consola
+if (typeof window !== 'undefined') {
+  console.log(`%c🏠 Mueblería La Económica PWA`, 
+    'color: #0F172A; font-weight: bold; font-size: 14px');
+  console.log(`%c📱 Versión: ${VERSION_INFO.displayName}`, 
+    'color: #3B82F6; font-weight: bold');
+  console.log(`%c📅 Build: ${VERSION_INFO.buildDate}`, 
+    'color: #6B7280');
 }

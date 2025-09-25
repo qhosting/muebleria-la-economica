@@ -1,8 +1,8 @@
 
 {
-  "name": "Mueblería La Económica - Sistema de Cobranza",
-  "short_name": "Cobranza MLÉ",
-  "description": "Sistema integral de gestión de clientes y cobranza en campo",
+  "name": "Mueblería La Económica - Sistema de Cobranza v1.2.0",
+  "short_name": "Cobranza MLÉ v1.2",
+  "description": "Sistema integral de gestión de clientes y cobranza en campo - Versión 1.2.0 con PWA móvil",
   "theme_color": "#0F172A",
   "background_color": "#0F172A",
   "display": "standalone",
