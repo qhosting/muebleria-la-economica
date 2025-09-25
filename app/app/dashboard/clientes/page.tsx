@@ -9,6 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ClienteModal } from '@/components/clientes/ClienteModal';
+import { ImportarClientesModal } from '@/components/clientes/ImportarClientesModal';
 import { 
   Users, 
   Search, 
@@ -19,11 +21,14 @@ import {
   MapPin, 
   Calendar,
   DollarSign,
-  Filter
+  Filter,
+  Upload,
+  MoreVertical
 } from 'lucide-react';
 import { formatCurrency, formatDate, getDayName, getPeriodicidadLabel } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Cliente, User } from '@/lib/types';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 interface ClientesResponse {
   clientes: Cliente[];
@@ -50,6 +55,11 @@ export default function ClientesPage() {
     currentPage: 1,
     perPage: 20,
   });
+
+  // Modal states
+  const [clienteModalOpen, setClienteModalOpen] = useState(false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
 
   const userRole = (session?.user as any)?.role;
 
@@ -121,6 +131,45 @@ export default function ClientesPage() {
     return <Badge variant="secondary">Sin saldo</Badge>;
   };
 
+  // Modal handlers
+  const handleCreateCliente = () => {
+    setSelectedCliente(null);
+    setClienteModalOpen(true);
+  };
+
+  const handleEditCliente = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setClienteModalOpen(true);
+  };
+
+  const handleDeleteCliente = async (cliente: Cliente) => {
+    if (!confirm(`¿Está seguro de que desea desactivar el cliente "${cliente.nombreCompleto}"?`)) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/clientes/${cliente.id}`, {
+        method: 'DELETE',
+      });
+
+      if (response.ok) {
+        toast.success('Cliente desactivado exitosamente');
+        fetchClientes();
+      } else {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Error al desactivar cliente');
+      }
+    } catch (error) {
+      console.error('Error:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al desactivar cliente');
+    }
+  };
+
+  const handleModalSuccess = () => {
+    fetchClientes();
+    setSelectedCliente(null);
+  };
+
   // Verificar permisos
   if (!['admin', 'gestor_cobranza'].includes(userRole)) {
     return (
@@ -149,10 +198,16 @@ export default function ClientesPage() {
               Administra la información y asignaciones de clientes
             </p>
           </div>
-          <Button className="mt-4 sm:mt-0">
-            <Plus className="h-4 w-4 mr-2" />
-            Nuevo Cliente
-          </Button>
+          <div className="flex space-x-2 mt-4 sm:mt-0">
+            <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+              <Upload className="h-4 w-4 mr-2" />
+              Importar
+            </Button>
+            <Button onClick={handleCreateCliente}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nuevo Cliente
+            </Button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -230,7 +285,7 @@ export default function ClientesPage() {
               <p className="text-gray-600 mb-4">
                 No se encontraron clientes con los filtros aplicados.
               </p>
-              <Button>
+              <Button onClick={handleCreateCliente}>
                 <Plus className="h-4 w-4 mr-2" />
                 Crear primer cliente
               </Button>
@@ -256,20 +311,28 @@ export default function ClientesPage() {
                         {getStatusBadge(cliente.statusCuenta)}
                       </CardDescription>
                     </div>
-                    <div className="flex space-x-1">
-                      <Button variant="ghost" size="icon" className="h-8 w-8">
-                        <Edit className="h-4 w-4" />
-                      </Button>
-                      {userRole === 'admin' && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-8 w-8 text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
-                      )}
-                    </div>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Editar Cliente
+                        </DropdownMenuItem>
+                        {userRole === 'admin' && (
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteCliente(cliente)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Desactivar Cliente
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -369,6 +432,21 @@ export default function ClientesPage() {
           </div>
         )}
       </div>
+
+      {/* Modals */}
+      <ClienteModal
+        open={clienteModalOpen}
+        onOpenChange={setClienteModalOpen}
+        cliente={selectedCliente}
+        cobradores={cobradores}
+        onSuccess={handleModalSuccess}
+      />
+
+      <ImportarClientesModal
+        open={importModalOpen}
+        onOpenChange={setImportModalOpen}
+        onSuccess={handleModalSuccess}
+      />
     </DashboardLayout>
   );
 }
