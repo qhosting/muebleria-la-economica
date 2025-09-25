@@ -1,26 +1,30 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Building2, LogIn, Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const router = useRouter();
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!email || !password) {
-      toast.error('Por favor complete todos los campos');
+      alert('Por favor complete todos los campos');
       return;
     }
 
@@ -34,18 +38,26 @@ export function LoginForm() {
       });
 
       if (result?.error) {
-        toast.error('Credenciales incorrectas');
+        alert('Credenciales incorrectas');
       } else {
-        toast.success('¡Bienvenido!');
+        alert('¡Bienvenido!');
         router.replace('/dashboard');
       }
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
-      toast.error('Error al iniciar sesión');
+      alert('Error al iniciar sesión');
     } finally {
       setIsLoading(false);
     }
   };
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center p-4">
+        <div className="text-white">Cargando...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center p-4">

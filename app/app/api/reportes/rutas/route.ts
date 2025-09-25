@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
 
     // Construir filtros
     let whereConditions: any = {
-      fecha: {
+      fechaPago: {
         gte: fechaInicio,
         lte: fechaFin,
       },
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         },
       },
       orderBy: [
-        { fecha: 'desc' },
+        { fechaPago: 'desc' },
         { createdAt: 'desc' }
       ],
     });
@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
 
     pagos.forEach(pago => {
       const cobradorId = pago.cobradorId;
-      const fecha = format(pago.fecha, 'yyyy-MM-dd');
+      const fecha = format(pago.fechaPago, 'yyyy-MM-dd');
       
       if (!rutasPorCobrador[cobradorId]) {
         rutasPorCobrador[cobradorId] = {
@@ -105,20 +105,20 @@ export async function GET(request: NextRequest) {
       // Agregar pago al día
       rutasPorCobrador[cobradorId].dias[fecha].pagos.push({
         id: pago.id,
-        monto: pago.monto,
-        metodoPago: pago.metodoPago,
-        observaciones: pago.observaciones,
+        monto: pago.monto.toNumber(),
+        tipoPago: pago.tipoPago,
+        concepto: pago.concepto,
         hora: pago.createdAt,
         cliente: pago.cliente,
       });
 
       // Actualizar estadísticas del día
       rutasPorCobrador[cobradorId].dias[fecha].resumen.totalPagos++;
-      rutasPorCobrador[cobradorId].dias[fecha].resumen.totalImporte += pago.monto;
+      rutasPorCobrador[cobradorId].dias[fecha].resumen.totalImporte += pago.monto.toNumber();
       
       // Actualizar estadísticas generales
       rutasPorCobrador[cobradorId].estadisticas.totalPagos++;
-      rutasPorCobrador[cobradorId].estadisticas.totalImporte += pago.monto;
+      rutasPorCobrador[cobradorId].estadisticas.totalImporte += pago.monto.toNumber();
       rutasPorCobrador[cobradorId].estadisticas.clientesVisitados.add(pago.clienteId);
       rutasPorCobrador[cobradorId].estadisticas.diasTrabajados.add(fecha);
     });
