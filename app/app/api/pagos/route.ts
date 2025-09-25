@@ -64,8 +64,16 @@ export async function GET(request: NextRequest) {
       prisma.pago.count({ where }),
     ]);
 
+    // Convert Decimal fields to numbers for JSON serialization
+    const pagosSerializados = pagos.map(pago => ({
+      ...pago,
+      monto: parseFloat(pago.monto.toString()),
+      saldoAnterior: parseFloat(pago.saldoAnterior.toString()),
+      saldoNuevo: parseFloat(pago.saldoNuevo.toString()),
+    }));
+
     return NextResponse.json({
-      pagos,
+      pagos: pagosSerializados,
       pagination: {
         total,
         pages: Math.ceil(total / limit),

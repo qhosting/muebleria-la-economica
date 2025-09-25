@@ -65,10 +65,10 @@ export async function GET() {
       totalClientes,
       clientesActivos,
       totalCobradores,
-      cobranzaHoy: cobranzaHoy._sum.monto || 0,
-      cobranzaMes: cobranzaMes._sum.monto || 0,
+      cobranzaHoy: cobranzaHoy._sum.monto ? parseFloat(cobranzaHoy._sum.monto.toString()) : 0,
+      cobranzaMes: cobranzaMes._sum.monto ? parseFloat(cobranzaMes._sum.monto.toString()) : 0,
       clientesMorosos,
-      saldosTotales: saldosTotales._sum.saldoActual || 0,
+      saldosTotales: saldosTotales._sum.saldoActual ? parseFloat(saldosTotales._sum.saldoActual.toString()) : 0,
     };
 
     return NextResponse.json(stats);

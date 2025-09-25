@@ -66,8 +66,19 @@ export async function GET(request: NextRequest) {
       prisma.cliente.count({ where }),
     ]);
 
+    // Convert Decimal fields to numbers for JSON serialization
+    const clientesSerializados = clientes.map(cliente => ({
+      ...cliente,
+      montoPago: parseFloat(cliente.montoPago.toString()),
+      saldoActual: parseFloat(cliente.saldoActual.toString()),
+      importe1: cliente.importe1 ? parseFloat(cliente.importe1.toString()) : null,
+      importe2: cliente.importe2 ? parseFloat(cliente.importe2.toString()) : null,
+      importe3: cliente.importe3 ? parseFloat(cliente.importe3.toString()) : null,
+      importe4: cliente.importe4 ? parseFloat(cliente.importe4.toString()) : null,
+    }));
+
     return NextResponse.json({
-      clientes,
+      clientes: clientesSerializados,
       pagination: {
         total,
         pages: Math.ceil(total / limit),
@@ -155,7 +166,18 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    return NextResponse.json(cliente, { status: 201 });
+    // Convert Decimal fields to numbers for JSON serialization
+    const clienteSerializado = {
+      ...cliente,
+      montoPago: parseFloat(cliente.montoPago.toString()),
+      saldoActual: parseFloat(cliente.saldoActual.toString()),
+      importe1: cliente.importe1 ? parseFloat(cliente.importe1.toString()) : null,
+      importe2: cliente.importe2 ? parseFloat(cliente.importe2.toString()) : null,
+      importe3: cliente.importe3 ? parseFloat(cliente.importe3.toString()) : null,
+      importe4: cliente.importe4 ? parseFloat(cliente.importe4.toString()) : null,
+    };
+
+    return NextResponse.json(clienteSerializado, { status: 201 });
   } catch (error) {
     console.error('Error al crear cliente:', error);
     return NextResponse.json(
