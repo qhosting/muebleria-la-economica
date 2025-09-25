@@ -179,7 +179,7 @@ Cobrador: {{cobrador}}
         montoPago: 500,
         periodicidad: 'semanal' as const,
         saldoActual: 2500,
-        cobrador: cobrador1.id,
+        cobrador: gestorUser.id, // Asignado al gestor
         vendedor: 'Mario López'
       },
       {
@@ -191,7 +191,7 @@ Cobrador: {{cobrador}}
         montoPago: 750,
         periodicidad: 'quincenal' as const,
         saldoActual: 4500,
-        cobrador: cobrador1.id,
+        cobrador: gestorUser.id, // Asignado al gestor
         vendedor: 'Sandra Cruz'
       },
       {
@@ -203,7 +203,7 @@ Cobrador: {{cobrador}}
         montoPago: 600,
         periodicidad: 'semanal' as const,
         saldoActual: 1800,
-        cobrador: cobrador2.id,
+        cobrador: gestorUser.id, // Asignado al gestor
         vendedor: 'Mario López'
       },
       {
@@ -215,7 +215,7 @@ Cobrador: {{cobrador}}
         montoPago: 400,
         periodicidad: 'semanal' as const,
         saldoActual: 1600,
-        cobrador: cobrador2.id,
+        cobrador: cobrador1.id,
         vendedor: 'Sandra Cruz'
       },
       {
@@ -227,7 +227,7 @@ Cobrador: {{cobrador}}
         montoPago: 800,
         periodicidad: 'quincenal' as const,
         saldoActual: 3200,
-        cobrador: cobrador3.id,
+        cobrador: cobrador2.id,
         vendedor: 'Mario López'
       },
       {
@@ -239,7 +239,7 @@ Cobrador: {{cobrador}}
         montoPago: 350,
         periodicidad: 'semanal' as const,
         saldoActual: 1050,
-        cobrador: cobrador3.id,
+        cobrador: cobrador2.id,
         vendedor: 'Sandra Cruz'
       },
       {
@@ -251,7 +251,7 @@ Cobrador: {{cobrador}}
         montoPago: 450,
         periodicidad: 'semanal' as const,
         saldoActual: 2250,
-        cobrador: cobrador4.id,
+        cobrador: cobrador3.id,
         vendedor: 'Mario López'
       },
       {
@@ -263,7 +263,7 @@ Cobrador: {{cobrador}}
         montoPago: 550,
         periodicidad: 'quincenal' as const,
         saldoActual: 2750,
-        cobrador: cobrador4.id,
+        cobrador: cobrador3.id,
         vendedor: 'Sandra Cruz'
       },
       {
@@ -275,7 +275,7 @@ Cobrador: {{cobrador}}
         montoPago: 700,
         periodicidad: 'semanal' as const,
         saldoActual: 0, // Cliente al corriente
-        cobrador: cobrador1.id,
+        cobrador: cobrador4.id,
         vendedor: 'Mario López'
       },
       {
@@ -287,7 +287,7 @@ Cobrador: {{cobrador}}
         montoPago: 300,
         periodicidad: 'semanal' as const,
         saldoActual: 900,
-        cobrador: cobrador2.id,
+        cobrador: cobrador4.id,
         vendedor: 'Sandra Cruz'
       },
     ];
@@ -366,7 +366,10 @@ Cobrador: {{cobrador}}
       const colonia = colonias[Math.floor(Math.random() * colonias.length)];
       const producto = productos[Math.floor(Math.random() * productos.length)];
       const vendedor = vendedores[Math.floor(Math.random() * vendedores.length)];
-      const cobrador = cobradores[Math.floor(Math.random() * cobradores.length)];
+      
+      // Asignar algunos clientes al gestor (30%) y el resto a cobradores
+      const todosCobradores = [...cobradores, gestorUser];
+      const cobrador = Math.random() < 0.30 ? gestorUser : cobradores[Math.floor(Math.random() * cobradores.length)];
       
       const montoPago = [300, 400, 500, 600, 700, 800][Math.floor(Math.random() * 6)];
       const periodicidad = ['semanal', 'quincenal'][Math.floor(Math.random() * 2)] as 'semanal' | 'quincenal';
