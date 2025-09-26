@@ -42,6 +42,7 @@ interface CobroModalProps {
 export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: CobroModalProps) {
   const { data: session } = useSession();
   const [monto, setMonto] = useState('');
+  const [montoMoratorio, setMontoMoratorio] = useState('');
   const [tipoPago, setTipoPago] = useState<'regular' | 'abono' | 'liquidacion' | 'mora'>('regular');
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia' | 'cheque'>('efectivo');
   const [concepto, setConcepto] = useState('');
@@ -49,7 +50,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   const [loading, setLoading] = useState(false);
   const [calculatedValues, setCalculatedValues] = useState({
     saldoAnterior: 0,
-    saldoNuevo: 0
+    saldoNuevo: 0,
+    montoParaSaldo: 0,
+    montoMoratorio: 0
   });
 
   const userId = (session?.user as any)?.id;
@@ -58,34 +61,47 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   useEffect(() => {
     if (isOpen) {
       setMonto('');
+      setMontoMoratorio('');
       setTipoPago('regular');
       setMetodoPago('efectivo');
       setConcepto('');
       setNumeroRecibo('');
       setCalculatedValues({
         saldoAnterior: cliente.saldoPendiente,
-        saldoNuevo: cliente.saldoPendiente
+        saldoNuevo: cliente.saldoPendiente,
+        montoParaSaldo: 0,
+        montoMoratorio: 0
       });
     }
   }, [isOpen, cliente]);
 
-  // Calcular nuevo saldo cuando cambia el monto
+  // Calcular nuevo saldo cuando cambia el monto o moratorio
   useEffect(() => {
-    if (monto && !isNaN(parseFloat(monto))) {
-      const montoNum = parseFloat(monto);
-      const nuevoSaldo = Math.max(0, cliente.saldoPendiente - montoNum);
+    const montoNum = parseFloat(monto) || 0;
+    const moratorioNum = parseFloat(montoMoratorio) || 0;
+    
+    // Validar que el moratorio no sea mayor al monto total
+    const moratorioFinal = Math.min(moratorioNum, montoNum);
+    const montoParaSaldo = montoNum - moratorioFinal;
+    
+    if (montoNum > 0) {
+      const nuevoSaldo = Math.max(0, cliente.saldoPendiente - montoParaSaldo);
       
       setCalculatedValues({
         saldoAnterior: cliente.saldoPendiente,
-        saldoNuevo: nuevoSaldo
+        saldoNuevo: nuevoSaldo,
+        montoParaSaldo: montoParaSaldo,
+        montoMoratorio: moratorioFinal
       });
     } else {
       setCalculatedValues({
         saldoAnterior: cliente.saldoPendiente,
-        saldoNuevo: cliente.saldoPendiente
+        saldoNuevo: cliente.saldoPendiente,
+        montoParaSaldo: 0,
+        montoMoratorio: 0
       });
     }
-  }, [monto, cliente.saldoPendiente]);
+  }, [monto, montoMoratorio, cliente.saldoPendiente]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -103,11 +119,11 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     setLoading(true);
 
     try {
-      const pagoData = {
+      const pagoRegular = {
         id: '', // Se generará en el servidor
         clienteId: cliente.id,
         cobradorId: userId,
-        monto: parseFloat(monto),
+        monto: calculatedValues.montoParaSaldo, // Solo el monto que va al saldo
         tipoPago,
         concepto: concepto || `Pago ${tipoPago}`,
         fechaPago: new Date().toISOString(),
@@ -115,26 +131,62 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         numeroRecibo: numeroRecibo || undefined
       };
 
+      const pagoMoratorio = calculatedValues.montoMoratorio > 0 ? {
+        id: '', // Se generará en el servidor
+        clienteId: cliente.id,
+        cobradorId: userId,
+        monto: calculatedValues.montoMoratorio,
+        tipoPago: 'mora' as const,
+        concepto: `Moratorio - ${concepto || 'Recargo por mora'}`,
+        fechaPago: new Date().toISOString(),
+        metodoPago,
+        numeroRecibo: numeroRecibo ? `${numeroRecibo}-M` : undefined
+      } : null;
+
       if (isOnline) {
-        // Si está online, enviar directamente al servidor
-        const response = await fetch('/api/pagos', {
+        // Registrar pago regular
+        const responsePrincipal = await fetch('/api/pagos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pagoData)
+          body: JSON.stringify(pagoRegular)
         });
 
-        if (!response.ok) {
-          throw new Error('Error al procesar el pago');
+        if (!responsePrincipal.ok) {
+          throw new Error('Error al procesar el pago regular');
         }
 
-        const pago = await response.json();
-        toast.success('Pago registrado exitosamente');
+        // Registrar pago moratorio si existe
+        if (pagoMoratorio) {
+          const responseMoratorio = await fetch('/api/pagos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pagoMoratorio)
+          });
+
+          if (!responseMoratorio.ok) {
+            console.error('Error al registrar moratorio, pero pago regular fue exitoso');
+          }
+        }
+
+        const mensaje = pagoMoratorio 
+          ? `Pago registrado exitosamente: ${formatCurrency(calculatedValues.montoParaSaldo)} al saldo + ${formatCurrency(calculatedValues.montoMoratorio)} moratorio`
+          : 'Pago registrado exitosamente';
+        
+        toast.success(mensaje);
         
       } else {
         // Si está offline, guardar localmente
-        await syncService.addPagoOffline(pagoData);
+        await syncService.addPagoOffline(pagoRegular);
         
-        toast.success('Pago guardado offline', {
+        if (pagoMoratorio) {
+          await syncService.addPagoOffline(pagoMoratorio);
+        }
+        
+        const mensaje = pagoMoratorio 
+          ? 'Pagos guardados offline (regular + moratorio)'
+          : 'Pago guardado offline';
+        
+        toast.success(mensaje, {
           description: 'Se sincronizará cuando tengas conexión'
         });
       }
@@ -253,6 +305,28 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             </div>
           </div>
 
+          {/* Monto Moratorio */}
+          <div className="space-y-2">
+            <Label htmlFor="montoMoratorio">Monto Moratorio (Opcional)</Label>
+            <div className="relative">
+              <AlertTriangle className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-500" />
+              <Input
+                id="montoMoratorio"
+                type="number"
+                step="0.01"
+                min="0"
+                max={monto || "0"}
+                value={montoMoratorio}
+                onChange={(e) => setMontoMoratorio(e.target.value)}
+                placeholder="0.00"
+                className="pl-9"
+              />
+            </div>
+            <div className="text-xs text-muted-foreground">
+              El monto moratorio se registra por separado y NO se aplica al saldo pendiente
+            </div>
+          </div>
+
           {/* Tipo de pago */}
           <div className="space-y-2">
             <Label htmlFor="tipoPago">Tipo de Pago</Label>
@@ -324,11 +398,38 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span>Monto a Pagar:</span>
-                  <span className="font-medium text-green-600">
-                    -{formatCurrency(parseFloat(monto) || 0)}
+                  <span>Monto Total Cobrado:</span>
+                  <span className="font-medium text-blue-600">
+                    {formatCurrency(parseFloat(monto) || 0)}
                   </span>
                 </div>
+                
+                {calculatedValues.montoMoratorio > 0 && (
+                  <>
+                    <div className="flex justify-between text-sm text-orange-600">
+                      <span>├ Moratorio:</span>
+                      <span className="font-medium">
+                        {formatCurrency(calculatedValues.montoMoratorio)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>└ Aplicado al saldo:</span>
+                      <span className="font-medium">
+                        -{formatCurrency(calculatedValues.montoParaSaldo)}
+                      </span>
+                    </div>
+                  </>
+                )}
+                
+                {calculatedValues.montoMoratorio === 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Aplicado al saldo:</span>
+                    <span className="font-medium text-green-600">
+                      -{formatCurrency(calculatedValues.montoParaSaldo)}
+                    </span>
+                  </div>
+                )}
+                
                 <div className="flex justify-between text-sm pt-2 border-t">
                   <span>Nuevo Saldo:</span>
                   <span className={`font-semibold ${
@@ -342,6 +443,13 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
                   <div className="flex items-center gap-1 text-green-600 text-sm mt-2">
                     <CheckCircle className="w-4 h-4" />
                     ¡Cliente quedará al día!
+                  </div>
+                )}
+                
+                {calculatedValues.montoMoratorio > 0 && (
+                  <div className="p-2 bg-orange-50 rounded text-xs text-orange-700 mt-2">
+                    <AlertTriangle className="w-3 h-3 inline mr-1" />
+                    Se registrarán 2 pagos: uno regular por {formatCurrency(calculatedValues.montoParaSaldo)} y uno moratorio por {formatCurrency(calculatedValues.montoMoratorio)}
                   </div>
                 )}
               </CardContent>
