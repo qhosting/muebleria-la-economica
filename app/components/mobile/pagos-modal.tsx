@@ -249,341 +249,349 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-hidden flex flex-col">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-lg flex items-center gap-2">
-              <Receipt className="w-5 h-5 text-blue-500" />
-              Historial de Pagos
-            </DialogTitle>
-            
-            <div className="flex items-center gap-2">
-              <Badge variant={isOnline ? 'default' : 'secondary'} className="text-xs">
-                {isOnline ? (
-                  <><Wifi className="w-3 h-3 mr-1" />Online</>
-                ) : (
-                  <><WifiOff className="w-3 h-3 mr-1" />Offline</>
+      <DialogContent className="max-w-md h-[95vh] sm:h-[90vh] overflow-hidden flex flex-col p-0">
+        <div className="flex flex-col h-full">
+          <DialogHeader className="px-6 py-4 border-b bg-white sticky top-0 z-10">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg flex items-center gap-2">
+                <Receipt className="w-5 h-5 text-blue-500" />
+                Historial de Pagos
+              </DialogTitle>
+              
+              <div className="flex items-center gap-2">
+                <Badge variant={isOnline ? 'default' : 'secondary'} className="text-xs">
+                  {isOnline ? (
+                    <><Wifi className="w-3 h-3 mr-1" />Online</>
+                  ) : (
+                    <><WifiOff className="w-3 h-3 mr-1" />Offline</>
+                  )}
+                </Badge>
+                
+                <Badge variant={isPrinterConnected ? 'default' : 'secondary'} className="text-xs">
+                  <Printer className="w-3 h-3 mr-1" />
+                  {isPrinterConnected ? 'Imp. OK' : 'Sin Imp.'}
+                </Badge>
+                
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPrinterConfig(true)}
+                  className="h-6 w-6 p-0"
+                >
+                  <Settings className="w-3 h-3" />
+                </Button>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-hidden">
+            <div className="p-6 pb-0 space-y-4">
+              {/* Información del cliente */}
+              <Card className="border-l-4 border-l-blue-500">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <User className="w-4 h-4" />
+                    {cliente.nombreCompleto}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <div className="text-sm text-muted-foreground flex items-center gap-1">
+                    <MapPin className="w-3 h-3" />
+                    {cliente.direccion}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Saldo Actual: </span>
+                      <span className="font-semibold text-red-600">
+                        {formatCurrency(cliente.saldoPendiente)}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Total Pagos: </span>
+                      <span className="font-semibold text-green-600">
+                        {formatCurrency(totalPagos)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Estadísticas rápidas */}
+              <div className="grid grid-cols-2 gap-2">
+                <Card className="text-center">
+                  <CardContent className="p-3">
+                    <div className="text-sm font-semibold text-green-600">
+                      {formatCurrency(totalPagosMes)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Este mes ({pagosMes.length})</div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="text-center">
+                  <CardContent className="p-3">
+                    <div className="text-sm font-semibold text-blue-600">
+                      {filteredPagos.length}
+                    </div>
+                    <div className="text-xs text-muted-foreground">Total pagos</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Filtros */}
+              <div className="space-y-3">
+                {/* Búsqueda */}
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Buscar por concepto, recibo..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
+
+                {/* Toggle filtros avanzados */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowFilters(!showFilters)}
+                  className="w-full h-8 text-xs"
+                >
+                  <Filter className="w-3 h-3 mr-2" />
+                  Filtros por fecha
+                  {showFilters ? <ChevronUp className="w-3 h-3 ml-2" /> : <ChevronDown className="w-3 h-3 ml-2" />}
+                </Button>
+
+                {/* Filtros de fecha */}
+                {showFilters && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <Label htmlFor="fechaDesde" className="text-xs">Desde</Label>
+                      <Input
+                        id="fechaDesde"
+                        type="date"
+                        value={fechaDesde}
+                        onChange={(e) => setFechaDesde(e.target.value)}
+                        min={dateLimits.min}
+                        max={dateLimits.max}
+                        className="h-8"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="fechaHasta" className="text-xs">Hasta</Label>
+                      <Input
+                        id="fechaHasta"
+                        type="date"
+                        value={fechaHasta}
+                        onChange={(e) => setFechaHasta(e.target.value)}
+                        min={dateLimits.min}
+                        max={dateLimits.max}
+                        className="h-8"
+                      />
+                    </div>
+                  </div>
                 )}
-              </Badge>
-              
-              <Badge variant={isPrinterConnected ? 'default' : 'secondary'} className="text-xs">
-                <Printer className="w-3 h-3 mr-1" />
-                {isPrinterConnected ? 'Imp. OK' : 'Sin Imp.'}
-              </Badge>
-              
+              </div>
+            </div>
+
+            {/* Lista de pagos con scroll */}
+            <div className="px-6 pt-4 flex-1 min-h-0">
+              <div className="h-full overflow-y-auto">
+                {loading ? (
+                  <div className="flex items-center justify-center h-32">
+                    <RefreshCw className="w-6 h-6 animate-spin mr-2" />
+                    <span className="text-muted-foreground">Cargando pagos...</span>
+                  </div>
+                ) : !isOnline ? (
+                  <div className="flex items-center justify-center h-32 text-center">
+                    <div>
+                      <WifiOff className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-muted-foreground text-sm">
+                        Se requiere conexión para ver el historial
+                      </p>
+                    </div>
+                  </div>
+                ) : filteredPagos.length === 0 ? (
+                  <div className="flex items-center justify-center h-32 text-center">
+                    <div>
+                      <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      <p className="text-muted-foreground text-sm">
+                        {pagos.length === 0 ? 'No hay pagos registrados' : 'No se encontraron pagos con los filtros aplicados'}
+                      </p>
+                      {searchTerm || fechaDesde || fechaHasta ? (
+                        <Button
+                          variant="link"
+                          size="sm"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setFechaDesde('');
+                            setFechaHasta('');
+                          }}
+                          className="text-xs mt-2"
+                        >
+                          Limpiar filtros
+                        </Button>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 pb-6">
+                    {filteredPagos.map((pago, index) => (
+                      <Card key={pago.id} className="border-l-2 border-l-green-400">
+                        <CardContent className="p-3">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="font-semibold text-green-600">
+                                  {formatCurrency(pago.monto)}
+                                </span>
+                                {getTipoPagoBadge(pago.tipoPago)}
+                                {pago.ticketImpreso && (
+                                  <CheckCircle className="w-3 h-3 text-green-500" />
+                                )}
+                              </div>
+                              
+                              <p className="text-xs text-muted-foreground line-clamp-2">
+                                {pago.concepto || 'Pago de cuota'}
+                              </p>
+                              
+                              <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                  <Calendar className="w-3 h-3" />
+                                  {format(new Date(pago.fechaPago), 'dd/MM/yyyy', { locale: es })}
+                                </span>
+                                
+                                <span className="flex items-center gap-1">
+                                  <User className="w-3 h-3" />
+                                  {pago.cobrador?.name || 'N/A'}
+                                </span>
+                              </div>
+
+                              {pago.numeroRecibo && (
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  Recibo: #{pago.numeroRecibo}
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
+                                <div>
+                                  <span className="text-muted-foreground">Saldo anterior: </span>
+                                  <span className="font-medium">{formatCurrency(pago.saldoAnterior)}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground">Saldo nuevo: </span>
+                                  <span className="font-medium">{formatCurrency(pago.saldoNuevo)}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Botón de reimpresión */}
+                          <div className="flex gap-2 mt-3">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleReimprimirRecibo(pago)}
+                              disabled={printingRecibo === pago.id || !isPrinterConnected}
+                              className="flex-1 h-7 text-xs"
+                            >
+                              {printingRecibo === pago.id ? (
+                                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                              ) : (
+                                <Printer className="w-3 h-3 mr-1" />
+                              )}
+                              {printingRecibo === pago.id ? 'Imprimiendo...' : 'Reimprimir'}
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => setSelectedPago(selectedPago === pago ? null : pago)}
+                              className="h-7 w-7 p-0"
+                            >
+                              {selectedPago === pago ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                            </Button>
+                          </div>
+
+                          {/* Detalles expandidos */}
+                          {selectedPago === pago && (
+                            <div className="mt-3 pt-3 border-t space-y-2 text-xs">
+                              <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                  <span className="text-muted-foreground block">Método de pago:</span>
+                                  <span className="font-medium">{pago.metodoPago || 'Efectivo'}</span>
+                                </div>
+                                <div>
+                                  <span className="text-muted-foreground block">Hora:</span>
+                                  <span className="font-medium">
+                                    {format(new Date(pago.fechaPago), 'HH:mm', { locale: es })}
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <span className="text-muted-foreground block">ID de transacción:</span>
+                                <span className="font-mono text-xs">{pago.id}</span>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <span className="text-muted-foreground">Estado de sincronización:</span>
+                                {pago.sincronizado ? (
+                                  <><CheckCircle className="w-3 h-3 text-green-500" /><span className="text-green-600">Sincronizado</span></>
+                                ) : (
+                                  <><Clock className="w-3 h-3 text-orange-500" /><span className="text-orange-600">Pendiente</span></>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer con acciones - Sticky bottom */}
+          <div className="px-6 py-4 border-t bg-white sticky bottom-0">
+            <div className="flex gap-2">
               <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowPrinterConfig(true)}
-                className="h-6 w-6 p-0"
+                variant="outline"
+                onClick={onClose}
+                className="flex-1"
               >
-                <Settings className="w-3 h-3" />
+                Cerrar
               </Button>
-            </div>
-          </div>
-        </DialogHeader>
-
-        {/* Información del cliente */}
-        <Card className="border-l-4 border-l-blue-500">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <User className="w-4 h-4" />
-              {cliente.nombreCompleto}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="text-sm text-muted-foreground flex items-center gap-1">
-              <MapPin className="w-3 h-3" />
-              {cliente.direccion}
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Saldo Actual: </span>
-                <span className="font-semibold text-red-600">
-                  {formatCurrency(cliente.saldoPendiente)}
-                </span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Total Pagos: </span>
-                <span className="font-semibold text-green-600">
-                  {formatCurrency(totalPagos)}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Estadísticas rápidas */}
-        <div className="grid grid-cols-2 gap-2">
-          <Card className="text-center">
-            <CardContent className="p-3">
-              <div className="text-sm font-semibold text-green-600">
-                {formatCurrency(totalPagosMes)}
-              </div>
-              <div className="text-xs text-muted-foreground">Este mes ({pagosMes.length})</div>
-            </CardContent>
-          </Card>
-          
-          <Card className="text-center">
-            <CardContent className="p-3">
-              <div className="text-sm font-semibold text-blue-600">
-                {filteredPagos.length}
-              </div>
-              <div className="text-xs text-muted-foreground">Total pagos</div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filtros */}
-        <div className="space-y-3">
-          {/* Búsqueda */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por concepto, recibo..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9"
-            />
-          </div>
-
-          {/* Toggle filtros avanzados */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowFilters(!showFilters)}
-            className="w-full h-8 text-xs"
-          >
-            <Filter className="w-3 h-3 mr-2" />
-            Filtros por fecha
-            {showFilters ? <ChevronUp className="w-3 h-3 ml-2" /> : <ChevronDown className="w-3 h-3 ml-2" />}
-          </Button>
-
-          {/* Filtros de fecha */}
-          {showFilters && (
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <Label htmlFor="fechaDesde" className="text-xs">Desde</Label>
-                <Input
-                  id="fechaDesde"
-                  type="date"
-                  value={fechaDesde}
-                  onChange={(e) => setFechaDesde(e.target.value)}
-                  min={dateLimits.min}
-                  max={dateLimits.max}
-                  className="h-8"
-                />
-              </div>
-              <div>
-                <Label htmlFor="fechaHasta" className="text-xs">Hasta</Label>
-                <Input
-                  id="fechaHasta"
-                  type="date"
-                  value={fechaHasta}
-                  onChange={(e) => setFechaHasta(e.target.value)}
-                  min={dateLimits.min}
-                  max={dateLimits.max}
-                  className="h-8"
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Lista de pagos */}
-        <div className="flex-1 min-h-0">
-          {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <RefreshCw className="w-6 h-6 animate-spin mr-2" />
-              <span className="text-muted-foreground">Cargando pagos...</span>
-            </div>
-          ) : !isOnline ? (
-            <div className="flex items-center justify-center h-32 text-center">
-              <div>
-                <WifiOff className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-muted-foreground text-sm">
-                  Se requiere conexión para ver el historial
-                </p>
-              </div>
-            </div>
-          ) : filteredPagos.length === 0 ? (
-            <div className="flex items-center justify-center h-32 text-center">
-              <div>
-                <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                <p className="text-muted-foreground text-sm">
-                  {pagos.length === 0 ? 'No hay pagos registrados' : 'No se encontraron pagos con los filtros aplicados'}
-                </p>
-                {searchTerm || fechaDesde || fechaHasta ? (
-                  <Button
-                    variant="link"
-                    size="sm"
-                    onClick={() => {
-                      setSearchTerm('');
-                      setFechaDesde('');
-                      setFechaHasta('');
-                    }}
-                    className="text-xs mt-2"
-                  >
-                    Limpiar filtros
-                  </Button>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <ScrollArea className="h-full">
-              <div className="space-y-2">
-                {filteredPagos.map((pago, index) => (
-                  <Card key={pago.id} className="border-l-2 border-l-green-400">
-                    <CardContent className="p-3">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-semibold text-green-600">
-                              {formatCurrency(pago.monto)}
-                            </span>
-                            {getTipoPagoBadge(pago.tipoPago)}
-                            {pago.ticketImpreso && (
-                              <CheckCircle className="w-3 h-3 text-green-500" />
-                            )}
-                          </div>
-                          
-                          <p className="text-xs text-muted-foreground line-clamp-2">
-                            {pago.concepto || 'Pago de cuota'}
-                          </p>
-                          
-                          <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              {format(new Date(pago.fechaPago), 'dd/MM/yyyy', { locale: es })}
-                            </span>
-                            
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3" />
-                              {pago.cobrador?.name || 'N/A'}
-                            </span>
-                          </div>
-
-                          {pago.numeroRecibo && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              Recibo: #{pago.numeroRecibo}
-                            </div>
-                          )}
-
-                          <div className="grid grid-cols-2 gap-2 mt-2 text-xs">
-                            <div>
-                              <span className="text-muted-foreground">Saldo anterior: </span>
-                              <span className="font-medium">{formatCurrency(pago.saldoAnterior)}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground">Saldo nuevo: </span>
-                              <span className="font-medium">{formatCurrency(pago.saldoNuevo)}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Botón de reimpresión */}
-                      <div className="flex gap-2 mt-3">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleReimprimirRecibo(pago)}
-                          disabled={printingRecibo === pago.id || !isPrinterConnected}
-                          className="flex-1 h-7 text-xs"
-                        >
-                          {printingRecibo === pago.id ? (
-                            <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
-                          ) : (
-                            <Printer className="w-3 h-3 mr-1" />
-                          )}
-                          {printingRecibo === pago.id ? 'Imprimiendo...' : 'Reimprimir'}
-                        </Button>
-
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => setSelectedPago(selectedPago === pago ? null : pago)}
-                          className="h-7 w-7 p-0"
-                        >
-                          {selectedPago === pago ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                        </Button>
-                      </div>
-
-                      {/* Detalles expandidos */}
-                      {selectedPago === pago && (
-                        <div className="mt-3 pt-3 border-t space-y-2 text-xs">
-                          <div className="grid grid-cols-2 gap-2">
-                            <div>
-                              <span className="text-muted-foreground block">Método de pago:</span>
-                              <span className="font-medium">{pago.metodoPago || 'Efectivo'}</span>
-                            </div>
-                            <div>
-                              <span className="text-muted-foreground block">Hora:</span>
-                              <span className="font-medium">
-                                {format(new Date(pago.fechaPago), 'HH:mm', { locale: es })}
-                              </span>
-                            </div>
-                          </div>
-                          
-                          <div>
-                            <span className="text-muted-foreground block">ID de transacción:</span>
-                            <span className="font-mono text-xs">{pago.id}</span>
-                          </div>
-
-                          <div className="flex items-center gap-1">
-                            <span className="text-muted-foreground">Estado de sincronización:</span>
-                            {pago.sincronizado ? (
-                              <><CheckCircle className="w-3 h-3 text-green-500" /><span className="text-green-600">Sincronizado</span></>
-                            ) : (
-                              <><Clock className="w-3 h-3 text-orange-500" /><span className="text-orange-600">Pendiente</span></>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </ScrollArea>
-          )}
-        </div>
-
-        {/* Footer con acciones */}
-        <div className="flex gap-2 pt-4 border-t">
-          <Button
-            variant="outline"
-            onClick={onClose}
-            className="flex-1"
-          >
-            Cerrar
-          </Button>
-          
-          {isOnline && (
-            <Button
-              variant="outline"
-              onClick={loadPagosCliente}
-              disabled={loading}
-              className="px-3"
-            >
-              {loading ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
-              ) : (
-                <RefreshCw className="w-4 h-4" />
+              
+              {isOnline && (
+                <Button
+                  variant="outline"
+                  onClick={loadPagosCliente}
+                  disabled={loading}
+                  className="px-3"
+                >
+                  {loading ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <RefreshCw className="w-4 h-4" />
+                  )}
+                </Button>
               )}
-            </Button>
-          )}
-        </div>
-
-        {/* Advertencia offline */}
-        {!isOnline && (
-          <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-lg border-l-2 border-yellow-400 mt-2">
-            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
-            <div className="text-sm text-yellow-800">
-              Funcionalidad offline limitada. Conecta a internet para ver el historial completo.
             </div>
+
+            {/* Advertencia offline */}
+            {!isOnline && (
+              <div className="flex items-center gap-2 p-3 bg-yellow-50 rounded-lg border-l-2 border-yellow-400 mt-2">
+                <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
+                <div className="text-sm text-yellow-800">
+                  Funcionalidad offline limitada. Conecta a internet para ver el historial completo.
+                </div>
+              </div>
+            )}
           </div>
-        )}
+        </div>
 
         {/* Modal de Configuración de Impresora */}
         <PrinterConfigModal
