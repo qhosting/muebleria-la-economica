@@ -1,10 +1,18 @@
 
-const CACHE_NAME = 'laeconomica-v1.2.1';
+const CACHE_NAME = 'laeconomica-v1.3.0';
 const urlsToCache = [
   '/login',
   '/dashboard',
   '/dashboard/cobranza',
   '/dashboard/cobranza-mobile',
+  '/dashboard/clientes',
+  '/dashboard/usuarios', 
+  '/dashboard/reportes',
+  '/dashboard/pagos',
+  '/dashboard/rutas',
+  '/dashboard/plantillas',
+  '/dashboard/configuracion',
+  '/dashboard/morosidad',
   '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
@@ -16,7 +24,7 @@ self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Cache LaEconomica v1.2.1 abierto');
+        console.log('Cache LaEconomica v1.3.0 abierto');
         return cache.addAll(urlsToCache);
       })
   );
@@ -44,7 +52,7 @@ self.addEventListener('activate', (event) => {
   return self.clients.claim();
 });
 
-// Buscar en cache
+// Buscar en cache con estrategia Network First para páginas dinámicas
 self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   
@@ -54,31 +62,69 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Solo manejar requests del mismo origen
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  // Para páginas de dashboard, usar estrategia Network First
+  if (url.pathname.startsWith('/dashboard') || url.pathname === '/login') {
+    event.respondWith(
+      fetch(event.request)
+        .then((response) => {
+          // Si la respuesta es exitosa, guardar en cache y devolver
+          if (response && response.status === 200 && response.type === 'basic') {
+            const responseToCache = response.clone();
+            caches.open(CACHE_NAME)
+              .then((cache) => {
+                cache.put(event.request, responseToCache);
+              });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Si la red falla, intentar desde cache
+          return caches.match(event.request)
+            .then((cachedResponse) => {
+              if (cachedResponse) {
+                return cachedResponse;
+              }
+              
+              // Si no hay cache y es una página de navegación, devolver el dashboard principal
+              if (url.pathname.startsWith('/dashboard') && url.pathname !== '/dashboard') {
+                return caches.match('/dashboard');
+              }
+              
+              // Para login, intentar desde cache
+              if (url.pathname === '/login') {
+                return caches.match('/login');
+              }
+              
+              return new Response('Página no disponible offline', { 
+                status: 503, 
+                statusText: 'Service Unavailable' 
+              });
+            });
+        })
+    );
+    return;
+  }
+
+  // Para otros recursos, usar estrategia Cache First
   event.respondWith(
     caches.match(event.request)
       .then((response) => {
-        // Cache hit - devolver respuesta
         if (response) {
           return response;
         }
-
+        
         return fetch(event.request).then(
           (response) => {
-            // Verificar si recibimos una respuesta válida
             if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
-            // No cachear redirecciones
-            if (response.type === 'opaqueredirect' || response.status >= 300) {
-              return response;
-            }
-
-            // IMPORTANTE: Clonar la respuesta. Una respuesta es un stream
-            // y porque queremos que el navegador consuma la respuesta
-            // así como el cache consuma la respuesta, necesitamos clonarla
-            var responseToCache = response.clone();
-
+            const responseToCache = response.clone();
             caches.open(CACHE_NAME)
               .then((cache) => {
                 cache.put(event.request, responseToCache);
@@ -86,13 +132,7 @@ self.addEventListener('fetch', (event) => {
 
             return response;
           }
-        ).catch(() => {
-          // Si falla la red, intentar devolver login desde caché si existe
-          if (url.pathname === '/login') {
-            return caches.match('/login');
-          }
-          return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
-        });
+        );
       })
   );
 });
