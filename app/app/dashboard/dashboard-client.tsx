@@ -38,8 +38,13 @@ export function DashboardClient({ session }: DashboardClientProps) {
   const userRole = session?.user?.role;
 
   useEffect(() => {
-    fetchStats();
-  }, []);
+    // Solo cargar estadísticas si el usuario tiene permisos
+    if (['admin', 'gestor_cobranza', 'reporte_cobranza'].includes(userRole)) {
+      fetchStats();
+    } else {
+      setLoading(false); // Para cobradores, no cargar estadísticas
+    }
+  }, [userRole]);
 
   const fetchStats = async () => {
     try {
@@ -137,34 +142,30 @@ export function DashboardClient({ session }: DashboardClientProps) {
         {/* Version Banner */}
         <VersionInfo compact />
 
-        {/* Stats Grid */}
-        {stats && (
+        {/* Stats Grid - Solo para roles con permisos */}
+        {stats && userRole !== 'cobrador' && (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {(userRole !== 'cobrador') && (
-              <>
-                <StatCard
-                  title="Total Clientes"
-                  value={stats.totalClientes}
-                  description="Clientes registrados"
-                  icon={Users}
-                  color="blue"
-                />
-                <StatCard
-                  title="Clientes Activos"
-                  value={stats.clientesActivos}
-                  description="Con cuentas activas"
-                  icon={Users}
-                  color="green"
-                />
-                <StatCard
-                  title="Cobradores Activos"
-                  value={stats.totalCobradores}
-                  description="En el sistema"
-                  icon={Users}
-                  color="purple"
-                />
-              </>
-            )}
+            <StatCard
+              title="Total Clientes"
+              value={stats.totalClientes}
+              description="Clientes registrados"
+              icon={Users}
+              color="blue"
+            />
+            <StatCard
+              title="Clientes Activos"
+              value={stats.clientesActivos}
+              description="Con cuentas activas"
+              icon={Users}
+              color="green"
+            />
+            <StatCard
+              title="Cobradores Activos"
+              value={stats.totalCobradores}
+              description="En el sistema"
+              icon={Users}
+              color="purple"
+            />
             
             <StatCard
               title="Cobranza Hoy"
@@ -182,25 +183,21 @@ export function DashboardClient({ session }: DashboardClientProps) {
               color="blue"
             />
             
-            {(userRole !== 'cobrador') && (
-              <>
-                <StatCard
-                  title="Clientes Morosos"
-                  value={stats.clientesMorosos}
-                  description="Con saldos pendientes"
-                  icon={AlertTriangle}
-                  color="red"
-                />
-                
-                <StatCard
-                  title="Saldos Totales"
-                  value={formatCurrency(stats.saldosTotales)}
-                  description="Por cobrar"
-                  icon={CreditCard}
-                  color="orange"
-                />
-              </>
-            )}
+            <StatCard
+              title="Clientes Morosos"
+              value={stats.clientesMorosos}
+              description="Con saldos pendientes"
+              icon={AlertTriangle}
+              color="red"
+            />
+            
+            <StatCard
+              title="Saldos Totales"
+              value={formatCurrency(stats.saldosTotales)}
+              description="Por cobrar"
+              icon={CreditCard}
+              color="orange"
+            />
           </div>
         )}
 
@@ -276,7 +273,7 @@ export function DashboardClient({ session }: DashboardClientProps) {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground">
-                  {stats?.clientesMorosos} clientes con pagos pendientes
+                  {stats?.clientesMorosos || 0} clientes con pagos pendientes
                 </p>
               </CardContent>
             </Card>
