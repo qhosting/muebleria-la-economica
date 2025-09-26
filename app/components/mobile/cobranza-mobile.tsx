@@ -33,7 +33,7 @@ import { syncService } from '@/lib/sync-service';
 import { SyncStatus } from './sync-status';
 import { ClientCard } from './client-card';
 import { CobroModal } from './cobro-modal';
-import { MotararioModal } from './motarario-modal';
+import { PagosModal } from './pagos-modal';
 import { formatCurrency, getDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -57,7 +57,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedCliente, setSelectedCliente] = useState<OfflineCliente | null>(null);
   const [showCobroModal, setShowCobroModal] = useState(false);
-  const [showMotararioModal, setShowMotararioModal] = useState(false);
+  const [showPagosModal, setShowPagosModal] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -188,9 +188,9 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     setShowCobroModal(true);
   };
 
-  const handleMotarario = (cliente: OfflineCliente) => {
+  const handleVerPagos = (cliente: OfflineCliente) => {
     setSelectedCliente(cliente);
-    setShowMotararioModal(true);
+    setShowPagosModal(true);
   };
 
   const handleModalSuccess = () => {
@@ -343,7 +343,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
                 cliente={cliente}
                 isOnline={isOnline}
                 onCobrar={handleCobrar}
-                onMotarario={handleMotarario}
+                onVerPagos={handleVerPagos}
                 showSyncStatus={true}
               />
             ))}
@@ -361,11 +361,10 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
               isOnline={isOnline}
             />
 
-            <MotararioModal
+            <PagosModal
               cliente={selectedCliente}
-              isOpen={showMotararioModal}
-              onClose={() => setShowMotararioModal(false)}
-              onSuccess={handleModalSuccess}
+              isOpen={showPagosModal}
+              onClose={() => setShowPagosModal(false)}
               isOnline={isOnline}
             />
           </>

@@ -12,12 +12,13 @@ import {
   Calendar, 
   DollarSign,
   CreditCard,
-  AlertTriangle,
+  Receipt,
   MessageSquare,
   Clock,
   CheckCircle,
   Wifi,
-  WifiOff
+  WifiOff,
+  AlertTriangle
 } from 'lucide-react';
 import { OfflineCliente } from '@/lib/offline-db';
 import { formatCurrency, getDayName } from '@/lib/utils';
@@ -28,7 +29,7 @@ interface ClientCardProps {
   cliente: OfflineCliente;
   isOnline: boolean;
   onCobrar: (cliente: OfflineCliente) => void;
-  onMotarario: (cliente: OfflineCliente) => void;
+  onVerPagos: (cliente: OfflineCliente) => void;
   onCall?: (telefono: string) => void;
   showSyncStatus?: boolean;
 }
@@ -37,7 +38,7 @@ export function ClientCard({
   cliente, 
   isOnline, 
   onCobrar, 
-  onMotarario,
+  onVerPagos,
   onCall,
   showSyncStatus = true
 }: ClientCardProps) {
@@ -201,12 +202,12 @@ export function ClientCard({
           </Button>
           
           <Button
-            onClick={() => onMotarario(cliente)}
+            onClick={() => onVerPagos(cliente)}
             variant="outline"
             className="flex-1 h-9 text-xs"
           >
-            <AlertTriangle className="w-4 h-4 mr-1" />
-            Motarario
+            <Receipt className="w-4 h-4 mr-1" />
+            Ver Pagos
           </Button>
         </div>
 
