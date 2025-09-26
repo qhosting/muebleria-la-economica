@@ -173,6 +173,11 @@ export default function ClientesPage() {
     setClienteModalOpen(true);
   };
 
+  const handleViewClienteDetails = (cliente: Cliente) => {
+    setSelectedCliente(cliente);
+    setClienteModalOpen(true);
+  };
+
   const handleDeleteCliente = async (cliente: Cliente) => {
     if (!confirm(`¿Está seguro de que desea desactivar el cliente "${cliente.nombreCompleto}"?`)) {
       return;
@@ -363,28 +368,35 @@ export default function ClientesPage() {
                         {getStatusBadge(cliente.statusCuenta)}
                       </CardDescription>
                     </div>
-                    {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
-                            <Edit className="h-4 w-4 mr-2" />
-                            Editar Cliente
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        {userRole === 'cobrador' ? (
+                          <DropdownMenuItem onClick={() => handleViewClienteDetails(cliente)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Ver Detalles
                           </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            onClick={() => handleDeleteCliente(cliente)}
-                            className="text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Desactivar Cliente
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                        ) : (
+                          <>
+                            <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
+                              <Edit className="h-4 w-4 mr-2" />
+                              Editar Cliente
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteCliente(cliente)}
+                              className="text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Desactivar Cliente
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -485,25 +497,23 @@ export default function ClientesPage() {
         )}
       </div>
 
-      {/* Modals - Solo para admin y gestor */}
-      {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
-        <>
-          <ClienteModal
-            open={clienteModalOpen}
-            onOpenChange={setClienteModalOpen}
-            cliente={selectedCliente}
-            cobradores={cobradores}
-            onSuccess={handleModalSuccess}
-          />
+      {/* Modal de Cliente - Para todos los roles */}
+      <ClienteModal
+        open={clienteModalOpen}
+        onOpenChange={setClienteModalOpen}
+        cliente={selectedCliente}
+        cobradores={cobradores}
+        onSuccess={handleModalSuccess}
+        readOnly={userRole === 'cobrador'}
+      />
 
-          {userRole === 'admin' && (
-            <ImportarClientesModal
-              open={importModalOpen}
-              onOpenChange={setImportModalOpen}
-              onSuccess={handleModalSuccess}
-            />
-          )}
-        </>
+      {/* Modal de Importación - Solo para admin */}
+      {userRole === 'admin' && (
+        <ImportarClientesModal
+          open={importModalOpen}
+          onOpenChange={setImportModalOpen}
+          onSuccess={handleModalSuccess}
+        />
       )}
     </DashboardLayout>
   );

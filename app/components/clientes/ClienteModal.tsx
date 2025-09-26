@@ -18,6 +18,7 @@ interface ClienteModalProps {
   cliente?: Cliente | null;
   cobradores: User[];
   onSuccess: () => void;
+  readOnly?: boolean;
 }
 
 export function ClienteModal({ 
@@ -25,7 +26,8 @@ export function ClienteModal({
   onOpenChange, 
   cliente, 
   cobradores, 
-  onSuccess 
+  onSuccess,
+  readOnly = false 
 }: ClienteModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -153,11 +155,11 @@ export function ClienteModal({
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {isEditMode ? 'Editar Cliente' : 'Nuevo Cliente'}
+            {readOnly ? 'Detalles del Cliente' : (isEditMode ? 'Editar Cliente' : 'Nuevo Cliente')}
           </DialogTitle>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="nombreCompleto">Nombre Completo *</Label>
@@ -165,8 +167,9 @@ export function ClienteModal({
                 id="nombreCompleto"
                 value={formData.nombreCompleto}
                 onChange={(e) => setFormData({ ...formData, nombreCompleto: e.target.value })}
-                required
+                required={!readOnly}
                 placeholder="Nombre completo del cliente"
+                disabled={readOnly}
               />
             </div>
 
@@ -177,6 +180,7 @@ export function ClienteModal({
                 value={formData.telefono}
                 onChange={(e) => setFormData({ ...formData, telefono: e.target.value })}
                 placeholder="Número de teléfono"
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -189,6 +193,7 @@ export function ClienteModal({
                 value={formData.vendedor}
                 onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })}
                 placeholder="Nombre del vendedor"
+                disabled={readOnly}
               />
             </div>
 
@@ -197,6 +202,7 @@ export function ClienteModal({
               <Select 
                 value={formData.cobradorAsignadoId} 
                 onValueChange={(value) => setFormData({ ...formData, cobradorAsignadoId: value })}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar cobrador" />
@@ -219,9 +225,10 @@ export function ClienteModal({
               id="direccionCompleta"
               value={formData.direccionCompleta}
               onChange={(e) => setFormData({ ...formData, direccionCompleta: e.target.value })}
-              required
+              required={!readOnly}
               placeholder="Dirección completa del cliente"
               rows={2}
+              disabled={readOnly}
             />
           </div>
 
@@ -231,9 +238,10 @@ export function ClienteModal({
               id="descripcionProducto"
               value={formData.descripcionProducto}
               onChange={(e) => setFormData({ ...formData, descripcionProducto: e.target.value })}
-              required
+              required={!readOnly}
               placeholder="Descripción del producto vendido"
               rows={2}
+              disabled={readOnly}
             />
           </div>
 
@@ -243,6 +251,7 @@ export function ClienteModal({
               <Select 
                 value={formData.diaPago} 
                 onValueChange={(value) => setFormData({ ...formData, diaPago: value })}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Seleccionar día" />
@@ -262,6 +271,7 @@ export function ClienteModal({
               <Select 
                 value={formData.periodicidad} 
                 onValueChange={(value) => setFormData({ ...formData, periodicidad: value })}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -285,8 +295,9 @@ export function ClienteModal({
                 min="0"
                 value={formData.montoPago}
                 onChange={(e) => setFormData({ ...formData, montoPago: e.target.value })}
-                required
+                required={!readOnly}
                 placeholder="0.00"
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -301,6 +312,7 @@ export function ClienteModal({
                 value={formData.saldoActual}
                 onChange={(e) => setFormData({ ...formData, saldoActual: e.target.value })}
                 placeholder="0.00"
+                disabled={readOnly}
               />
             </div>
 
@@ -311,6 +323,7 @@ export function ClienteModal({
                 type="date"
                 value={formData.fechaVenta}
                 onChange={(e) => setFormData({ ...formData, fechaVenta: e.target.value })}
+                disabled={readOnly}
               />
             </div>
           </div>
@@ -321,6 +334,7 @@ export function ClienteModal({
               <Select 
                 value={formData.statusCuenta} 
                 onValueChange={(value) => setFormData({ ...formData, statusCuenta: value })}
+                disabled={readOnly}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -343,6 +357,7 @@ export function ClienteModal({
                 value={formData.importe1}
                 onChange={(e) => setFormData({ ...formData, importe1: e.target.value })}
                 placeholder="0.00"
+                disabled={readOnly}
               />
             </div>
 
@@ -355,6 +370,7 @@ export function ClienteModal({
                 value={formData.importe2}
                 onChange={(e) => setFormData({ ...formData, importe2: e.target.value })}
                 placeholder="0.00"
+                disabled={readOnly}
               />
             </div>
 
@@ -367,6 +383,7 @@ export function ClienteModal({
                 value={formData.importe3}
                 onChange={(e) => setFormData({ ...formData, importe3: e.target.value })}
                 placeholder="0.00"
+                disabled={readOnly}
               />
             </div>
 
@@ -379,28 +396,41 @@ export function ClienteModal({
                 value={formData.importe4}
                 onChange={(e) => setFormData({ ...formData, importe4: e.target.value })}
                 placeholder="0.00"
+                disabled={readOnly}
               />
             </div>
           </div>
 
           <div className="flex justify-end space-x-2 pt-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
-              disabled={loading}
-            >
-              <X className="h-4 w-4 mr-2" />
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={loading}>
-              {loading ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Save className="h-4 w-4 mr-2" />
-              )}
-              {isEditMode ? 'Actualizar' : 'Crear'} Cliente
-            </Button>
+            {readOnly ? (
+              <Button 
+                type="button" 
+                onClick={() => onOpenChange(false)}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cerrar
+              </Button>
+            ) : (
+              <>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  onClick={() => onOpenChange(false)}
+                  disabled={loading}
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={loading}>
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Save className="h-4 w-4 mr-2" />
+                  )}
+                  {isEditMode ? 'Actualizar' : 'Crear'} Cliente
+                </Button>
+              </>
+            )}
           </div>
         </form>
       </DialogContent>
