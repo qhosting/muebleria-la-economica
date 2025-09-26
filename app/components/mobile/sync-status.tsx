@@ -106,6 +106,37 @@ export function SyncStatus() {
     }
   };
 
+  const handleDebugPagos = async () => {
+    if (!userId) return;
+    
+    try {
+      const pagosOffline = await syncService.getPagosOffline(userId);
+      console.log('=== DEBUG PAGOS OFFLINE ===');
+      console.log(`Total de pagos offline: ${pagosOffline.length}`);
+      
+      const pagosPorTipo = pagosOffline.reduce((acc: any, pago: any) => {
+        acc[pago.tipoPago] = (acc[pago.tipoPago] || 0) + 1;
+        return acc;
+      }, {});
+      
+      console.log('Pagos por tipo:', pagosPorTipo);
+      
+      const pagosPendientes = pagosOffline.filter(p => p.syncStatus === 'pending');
+      console.log(`Pagos pendientes de sincronizar: ${pagosPendientes.length}`);
+      
+      pagosPendientes.forEach((pago: any) => {
+        console.log(`- ${pago.localId}: ${pago.tipoPago} $${pago.monto} (${pago.fechaPago})`);
+      });
+      
+      toast.info(`Debug: ${pagosOffline.length} pagos offline (${pagosPendientes.length} pendientes)`, {
+        description: 'Revisa la consola para más detalles'
+      });
+      
+    } catch (error) {
+      console.error('Error en debug:', error);
+    }
+  };
+
   if (userRole !== 'cobrador' || !userId) {
     return null;
   }
@@ -196,20 +227,31 @@ export function SyncStatus() {
             Última sync: {getLastSyncText()}
           </div>
 
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleManualSync}
-            disabled={syncing || !isOnline}
-            className="h-8"
-          >
-            {syncing ? (
-              <RefreshCw className="w-4 h-4 animate-spin" />
-            ) : (
-              <RefreshCw className="w-4 h-4" />
-            )}
-            {syncing ? 'Sincronizando...' : 'Sincronizar'}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={handleDebugPagos}
+              className="h-8 px-2 text-xs"
+            >
+              Debug
+            </Button>
+            
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleManualSync}
+              disabled={syncing || !isOnline}
+              className="h-8"
+            >
+              {syncing ? (
+                <RefreshCw className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              {syncing ? 'Sincronizando...' : 'Sincronizar'}
+            </Button>
+          </div>
         </div>
 
         {/* Indicadores de estado */}

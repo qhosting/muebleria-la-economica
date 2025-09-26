@@ -226,19 +226,23 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         
       } else {
         // Si está offline, guardar localmente
+        console.log('Guardando pago regular offline:', pagoRegular);
         await syncService.addPagoOffline(pagoRegular);
         
         if (pagoMoratorio) {
+          console.log('Guardando pago moratorio offline:', pagoMoratorio);
           await syncService.addPagoOffline(pagoMoratorio);
         }
         
         const mensaje = pagoMoratorio 
-          ? 'Pagos guardados offline (regular + moratorio)'
+          ? `Pagos guardados offline: Regular (${formatCurrency(calculatedValues.montoParaSaldo)}) + Moratorio (${formatCurrency(calculatedValues.montoMoratorio)})`
           : 'Pago guardado offline';
         
         toast.success(mensaje, {
           description: 'Se sincronizará cuando tengas conexión'
         });
+
+        console.log(`Pagos offline guardados - Regular: ${!!pagoRegular}, Moratorio: ${!!pagoMoratorio}`);
 
         // Imprimir ticket si está habilitado y la impresora está conectada (también offline)
         if (imprimirTicket && isPrinterConnected) {

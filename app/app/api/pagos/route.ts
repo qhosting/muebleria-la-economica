@@ -108,7 +108,12 @@ export async function POST(request: NextRequest) {
       concepto,
       tipoPago = 'regular',
       fechaPago,
+      metodoPago = 'efectivo',
+      numeroRecibo,
+      localId
     } = body;
+
+    console.log('Recibiendo pago:', { clienteId, monto, tipoPago, concepto, metodoPago, numeroRecibo, localId });
 
     if (!clienteId || !monto) {
       return NextResponse.json(
@@ -150,6 +155,8 @@ export async function POST(request: NextRequest) {
           concepto: concepto || 'Pago de cuota',
           tipoPago,
           fechaPago: fechaPago ? new Date(fechaPago) : new Date(),
+          metodoPago: metodoPago || 'efectivo',
+          numeroRecibo: numeroRecibo || null,
           saldoAnterior,
           saldoNuevo,
           sincronizado: true,

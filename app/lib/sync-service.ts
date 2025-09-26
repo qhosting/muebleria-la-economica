@@ -68,7 +68,7 @@ export class SyncService {
       // 2. Subir pagos pendientes
       await this.uploadPagos(cobradorId);
 
-      // 3. Subir motararios pendientes  
+      // 3. Subir motararios pendientes (si existen)
       await this.uploadMotararios(cobradorId);
 
       // 4. Actualizar timestamp de sincronización
@@ -121,28 +121,41 @@ export class SyncService {
       .and(pago => pago.cobradorId === cobradorId)
       .toArray();
 
+    console.log(`Pagos pendientes para sincronizar: ${pagosPendientes.length}`);
+    pagosPendientes.forEach(pago => {
+      console.log(`Pago: ${pago.localId}, tipo: ${pago.tipoPago}, monto: ${pago.monto}`);
+    });
+
     for (const pago of pagosPendientes) {
       try {
+        console.log(`Sincronizando pago ${pago.localId} (${pago.tipoPago})`);
+        
         // Marcar como sincronizando
-        await db.pagos.update(pago.localId, { syncStatus: 'synced' });
+        await db.pagos.update(pago.localId, { syncStatus: 'syncing' });
+
+        const payloadPago = {
+          clienteId: pago.clienteId,
+          monto: pago.monto,
+          tipoPago: pago.tipoPago,
+          concepto: pago.concepto,
+          fechaPago: pago.fechaPago,
+          metodoPago: pago.metodoPago,
+          numeroRecibo: pago.numeroRecibo,
+          localId: pago.localId
+        };
+
+        console.log('Enviando pago al servidor:', payloadPago);
 
         const response = await fetch('/api/pagos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clienteId: pago.clienteId,
-            monto: pago.monto,
-            tipoPago: pago.tipoPago,
-            concepto: pago.concepto,
-            fechaPago: pago.fechaPago,
-            metodoPago: pago.metodoPago,
-            numeroRecibo: pago.numeroRecibo,
-            localId: pago.localId
-          })
+          body: JSON.stringify(payloadPago)
         });
 
         if (response.ok) {
           const pagoServidor = await response.json();
+          console.log(`Pago ${pago.localId} sincronizado exitosamente con ID: ${pagoServidor.id}`);
+          
           // Actualizar con ID del servidor
           await db.pagos.update(pago.localId, {
             id: pagoServidor.id,
@@ -150,12 +163,15 @@ export class SyncService {
             lastSync: Date.now()
           });
         } else {
+          const errorText = await response.text();
+          console.error(`Error en respuesta del servidor para pago ${pago.localId}:`, response.status, errorText);
+          
           // Marcar como fallido
           await db.pagos.update(pago.localId, { syncStatus: 'failed' });
         }
 
       } catch (error) {
-        console.error('Error subiendo pago:', error);
+        console.error(`Error subiendo pago ${pago.localId}:`, error);
         await db.pagos.update(pago.localId, { syncStatus: 'failed' });
       }
     }
@@ -163,11 +179,24 @@ export class SyncService {
 
   // Subir motararios pendientes al servidor
   private async uploadMotararios(cobradorId: string) {
+    // Verificar si hay motararios pendientes
     const motarariosPendientes = await db.motararios
       .where('syncStatus').equals('pending')
       .and(motarario => motarario.cobradorId === cobradorId)
       .toArray();
 
+    console.log(`Motararios pendientes para sincronizar: ${motarariosPendientes.length}`);
+
+    // Si no hay endpoint de motararios, simplemente marcar como omitidos por ahora
+    if (motarariosPendientes.length === 0) {
+      return;
+    }
+
+    // Por ahora, comentamos la sincronización de motararios hasta que el endpoint esté disponible
+    console.log('Sincronización de motararios pendiente - endpoint no disponible');
+    // TODO: Implementar endpoint /api/motararios si se necesita
+
+    /*
     for (const motarario of motarariosPendientes) {
       try {
         const response = await fetch('/api/motararios', {
@@ -199,6 +228,7 @@ export class SyncService {
         await db.motararios.update(motarario.localId, { syncStatus: 'failed' });
       }
     }
+    */
   }
 
   // Actualizar timestamp de última sincronización
@@ -225,6 +255,7 @@ export class SyncService {
       printStatus: 'pending'
     };
 
+    console.log('Agregando pago offline:', pago);
     await db.pagos.add(pago);
     
     // Agregar a cola de sincronización
@@ -236,6 +267,7 @@ export class SyncService {
       status: 'pending'
     });
 
+    console.log(`Pago offline agregado con localId: ${localId}, tipo: ${pago.tipoPago}`);
     return localId;
   }
 
@@ -281,6 +313,20 @@ export class SyncService {
       isOnline: navigator.onLine,
       syncInProgress: this.syncInProgress
     };
+  }
+
+  // Función para debuggear pagos offline
+  public async getPagosOffline(cobradorId: string) {
+    const pagosOffline = await db.pagos
+      .where('cobradorId').equals(cobradorId)
+      .toArray();
+    
+    console.log(`Pagos offline encontrados: ${pagosOffline.length}`);
+    pagosOffline.forEach(pago => {
+      console.log(`${pago.localId}: ${pago.tipoPago} - ${pago.monto} - Status: ${pago.syncStatus}`);
+    });
+    
+    return pagosOffline;
   }
 }
 

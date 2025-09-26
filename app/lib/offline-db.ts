@@ -32,7 +32,7 @@ export interface OfflinePago {
   numeroRecibo?: string;
   // Metadatos offline
   localId: string; // ID temporal local hasta sincronizar
-  syncStatus: 'pending' | 'synced' | 'failed';
+  syncStatus: 'pending' | 'syncing' | 'synced' | 'failed';
   createdOffline: boolean;
   printStatus: 'pending' | 'printed' | 'reprinted';
   lastSync?: number;
@@ -48,7 +48,7 @@ export interface OfflineMotarorio {
   proximaVisita?: string;
   // Metadatos offline
   localId: string;
-  syncStatus: 'pending' | 'synced' | 'failed';
+  syncStatus: 'pending' | 'syncing' | 'synced' | 'failed';
   createdOffline: boolean;
   lastSync?: number;
 }
