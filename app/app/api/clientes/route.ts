@@ -50,12 +50,11 @@ export async function GET(request: NextRequest) {
     const userRole = (session.user as any).role;
     const userId = (session.user as any).id;
     
+    // Solo los cobradores tienen restricción de ver únicamente sus clientes asignados
     if (userRole === 'cobrador') {
       where.cobradorAsignadoId = userId;
-    } else if (userRole === 'gestor_cobranza') {
-      // El gestor solo ve los clientes asignados a él
-      where.cobradorAsignadoId = userId;
     }
+    // Los gestores de cobranza y admins pueden ver todos los clientes
 
     const [clientes, total] = await Promise.all([
       prisma.cliente.findMany({

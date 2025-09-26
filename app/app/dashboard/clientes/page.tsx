@@ -72,8 +72,20 @@ export default function ClientesPage() {
     if (session) {
       fetchClientes();
       fetchCobradores();
+      
+      // Inicializar filtro de cobrador según el rol del usuario
+      if (userRole && userRole !== 'admin' && selectedCobrador === 'all') {
+        setSelectedCobrador('');
+      }
     }
   }, [session, currentPage, searchTerm, selectedCobrador, selectedDiaPago]);
+
+  // Ajustar filtro inicial cuando se carga el rol del usuario
+  useEffect(() => {
+    if (userRole && userRole !== 'admin' && selectedCobrador === 'all') {
+      setSelectedCobrador('');
+    }
+  }, [userRole]);
 
   const fetchClientes = async () => {
     try {
@@ -257,7 +269,9 @@ export default function ClientesPage() {
                   <SelectValue placeholder="Seleccionar cobrador" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los cobradores</SelectItem>
+                  {userRole === 'admin' && (
+                    <SelectItem value="all">Todos los cobradores</SelectItem>
+                  )}
                   {cobradores.map((cobrador) => (
                     <SelectItem key={cobrador.id} value={cobrador.id}>
                       {cobrador.name}
