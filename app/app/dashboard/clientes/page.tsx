@@ -83,6 +83,7 @@ export default function ClientesPage() {
   // Ajustar filtro inicial cuando se carga el rol del usuario
   useEffect(() => {
     if (userRole && userRole !== 'admin' && selectedCobrador === 'all') {
+      // Para gestores y cobradores, no necesitan filtro de cobrador ya que solo ven sus clientes
       setSelectedCobrador('');
     }
   }, [userRole]);
@@ -227,7 +228,9 @@ export default function ClientesPage() {
             <p className="text-gray-600 mt-1">
               {userRole === 'admin' ? 
                 'Administra la información y asignaciones de clientes' :
-                'Visualiza los clientes asignados (solo lectura)'
+                userRole === 'gestor_cobranza' ?
+                'Visualiza tus clientes asignados (solo lectura)' :
+                'Visualiza tus clientes asignados (solo lectura)'
               }
             </p>
           </div>
@@ -254,7 +257,7 @@ export default function ClientesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className={`grid gap-4 ${userRole === 'admin' ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -264,21 +267,22 @@ export default function ClientesPage() {
                   className="pl-10"
                 />
               </div>
-              <Select value={selectedCobrador} onValueChange={setSelectedCobrador}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Seleccionar cobrador" />
-                </SelectTrigger>
-                <SelectContent>
-                  {userRole === 'admin' && (
+              {/* Filtro de cobradores solo visible para admin */}
+              {userRole === 'admin' && (
+                <Select value={selectedCobrador} onValueChange={setSelectedCobrador}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar cobrador" />
+                  </SelectTrigger>
+                  <SelectContent>
                     <SelectItem value="all">Todos los cobradores</SelectItem>
-                  )}
-                  {cobradores.map((cobrador) => (
-                    <SelectItem key={cobrador.id} value={cobrador.id}>
-                      {cobrador.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                    {cobradores.map((cobrador) => (
+                      <SelectItem key={cobrador.id} value={cobrador.id}>
+                        {cobrador.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Select value={selectedDiaPago} onValueChange={setSelectedDiaPago}>
                 <SelectTrigger>
                   <SelectValue placeholder="Día de pago" />
