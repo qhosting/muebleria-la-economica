@@ -50,11 +50,11 @@ export async function GET(request: NextRequest) {
     const userRole = (session.user as any).role;
     const userId = (session.user as any).id;
     
-    // Cobradores y gestores solo pueden ver sus clientes asignados
-    if (userRole === 'cobrador' || userRole === 'gestor_cobranza') {
+    // Solo cobradores tienen restricción de ver únicamente sus clientes asignados
+    if (userRole === 'cobrador') {
       where.cobradorAsignadoId = userId;
     }
-    // Solo los admins pueden ver todos los clientes
+    // Admins y gestores pueden ver todos los clientes
 
     const [clientes, total] = await Promise.all([
       prisma.cliente.findMany({
@@ -113,8 +113,8 @@ export async function POST(request: NextRequest) {
     }
 
     const userRole = (session.user as any).role;
-    if (userRole !== 'admin') {
-      return NextResponse.json({ error: 'Solo el administrador puede crear clientes' }, { status: 403 });
+    if (userRole !== 'admin' && userRole !== 'gestor_cobranza') {
+      return NextResponse.json({ error: 'Solo administradores y gestores pueden crear clientes' }, { status: 403 });
     }
 
     const body = await request.json();

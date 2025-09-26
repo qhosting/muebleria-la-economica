@@ -51,9 +51,8 @@ export async function GET(
     // Restricciones de acceso por rol
     if (userRole === 'cobrador' && cliente.cobradorAsignadoId !== userId) {
       return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
-    } else if (userRole === 'gestor_cobranza' && cliente.cobradorAsignadoId !== userId) {
-      return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
     }
+    // Gestores y admins pueden ver todos los clientes
 
     // Convert Decimal fields to numbers for JSON serialization
     const clienteSerializado = {
@@ -92,8 +91,8 @@ export async function PUT(
     }
 
     const userRole = (session.user as any).role;
-    if (userRole !== 'admin') {
-      return NextResponse.json({ error: 'Solo el administrador puede editar clientes' }, { status: 403 });
+    if (userRole !== 'admin' && userRole !== 'gestor_cobranza') {
+      return NextResponse.json({ error: 'Solo administradores y gestores pueden editar clientes' }, { status: 403 });
     }
 
     const body = await request.json();
@@ -180,8 +179,8 @@ export async function DELETE(
     }
 
     const userRole = (session.user as any).role;
-    if (userRole !== 'admin') {
-      return NextResponse.json({ error: 'Solo administradores pueden eliminar clientes' }, { status: 403 });
+    if (userRole !== 'admin' && userRole !== 'gestor_cobranza') {
+      return NextResponse.json({ error: 'Solo administradores y gestores pueden desactivar clientes' }, { status: 403 });
     }
 
     await prisma.cliente.update({

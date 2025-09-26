@@ -82,8 +82,8 @@ export default function ClientesPage() {
 
   // Ajustar filtro inicial cuando se carga el rol del usuario
   useEffect(() => {
-    if (userRole && userRole !== 'admin' && selectedCobrador === 'all') {
-      // Para gestores y cobradores, no necesitan filtro de cobrador ya que solo ven sus clientes
+    if (userRole && userRole !== 'admin' && userRole !== 'gestor_cobranza' && selectedCobrador === 'all') {
+      // Para cobradores, no necesitan filtro de cobrador ya que solo ven sus clientes
       setSelectedCobrador('');
     }
   }, [userRole]);
@@ -229,17 +229,19 @@ export default function ClientesPage() {
               {userRole === 'admin' ? 
                 'Administra la información y asignaciones de clientes' :
                 userRole === 'gestor_cobranza' ?
-                'Visualiza tus clientes asignados (solo lectura)' :
+                'Administra clientes y asignaciones de cobradores' :
                 'Visualiza tus clientes asignados (solo lectura)'
               }
             </p>
           </div>
-          {userRole === 'admin' && (
+          {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
             <div className="flex space-x-2 mt-4 sm:mt-0">
-              <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                Importar
-              </Button>
+              {userRole === 'admin' && (
+                <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Importar
+                </Button>
+              )}
               <Button onClick={handleCreateCliente}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Cliente
@@ -257,7 +259,7 @@ export default function ClientesPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className={`grid gap-4 ${userRole === 'admin' ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
+            <div className={`grid gap-4 ${(userRole === 'admin' || userRole === 'gestor_cobranza') ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
@@ -267,8 +269,8 @@ export default function ClientesPage() {
                   className="pl-10"
                 />
               </div>
-              {/* Filtro de cobradores solo visible para admin */}
-              {userRole === 'admin' && (
+              {/* Filtro de cobradores visible para admin y gestor */}
+              {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
                 <Select value={selectedCobrador} onValueChange={setSelectedCobrador}>
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar cobrador" />
@@ -366,7 +368,7 @@ export default function ClientesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        {userRole === 'admin' && (
+                        {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
                           <>
                             <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
                               <Edit className="h-4 w-4 mr-2" />
@@ -380,11 +382,6 @@ export default function ClientesPage() {
                               Desactivar Cliente
                             </DropdownMenuItem>
                           </>
-                        )}
-                        {userRole === 'gestor_cobranza' && (
-                          <DropdownMenuItem disabled>
-                            <span className="text-gray-500">Solo visualización</span>
-                          </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
