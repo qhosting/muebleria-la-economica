@@ -47,7 +47,12 @@ export default function ClientesPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCobrador, setSelectedCobrador] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
+  const [selectedDiaPago, setSelectedDiaPago] = useState(() => {
+    // Obtener día actual de la semana (0=domingo, 1=lunes, ..., 6=sábado)
+    const today = new Date().getDay();
+    const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
+    return diasSemana[today];
+  });
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
     total: 0,
@@ -68,7 +73,7 @@ export default function ClientesPage() {
       fetchClientes();
       fetchCobradores();
     }
-  }, [session, currentPage, searchTerm, selectedCobrador, selectedStatus]);
+  }, [session, currentPage, searchTerm, selectedCobrador, selectedDiaPago]);
 
   const fetchClientes = async () => {
     try {
@@ -77,7 +82,7 @@ export default function ClientesPage() {
         limit: '20',
         search: searchTerm,
         cobrador: selectedCobrador === 'all' ? '' : selectedCobrador,
-        status: selectedStatus === 'all' ? '' : selectedStatus,
+        diaPago: selectedDiaPago === 'todos' ? '' : selectedDiaPago,
       });
 
       const response = await fetch(`/api/clientes?${params}`);
@@ -120,6 +125,19 @@ export default function ClientesPage() {
       return <Badge variant="success">Activo</Badge>;
     }
     return <Badge variant="secondary">Inactivo</Badge>;
+  };
+
+  const getDiaPagoLabel = (dia: string) => {
+    const dias: { [key: string]: string } = {
+      'lunes': 'LUNES',
+      'martes': 'MARTES',
+      'miercoles': 'MIÉRCOLES',
+      'jueves': 'JUEVES',
+      'viernes': 'VIERNES',
+      'sabado': 'SÁBADO',
+      'domingo': 'DOMINGO'
+    };
+    return dias[dia] || dia.toUpperCase();
   };
 
   const getSaldoBadge = (saldo: number) => {
@@ -247,14 +265,19 @@ export default function ClientesPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+              <Select value={selectedDiaPago} onValueChange={setSelectedDiaPago}>
                 <SelectTrigger>
-                  <SelectValue placeholder="Estado de cuenta" />
+                  <SelectValue placeholder="Día de pago" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los estados</SelectItem>
-                  <SelectItem value="activo">Activos</SelectItem>
-                  <SelectItem value="inactivo">Inactivos</SelectItem>
+                  <SelectItem value="todos">TODOS</SelectItem>
+                  <SelectItem value="lunes">LUNES</SelectItem>
+                  <SelectItem value="martes">MARTES</SelectItem>
+                  <SelectItem value="miercoles">MIÉRCOLES</SelectItem>
+                  <SelectItem value="jueves">JUEVES</SelectItem>
+                  <SelectItem value="viernes">VIERNES</SelectItem>
+                  <SelectItem value="sabado">SÁBADO</SelectItem>
+                  <SelectItem value="domingo">DOMINGO</SelectItem>
                 </SelectContent>
               </Select>
               <div className="flex items-center text-sm text-gray-600">

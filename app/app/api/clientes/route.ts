@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     const search = searchParams.get('search') || '';
     const cobrador = searchParams.get('cobrador') || '';
     const status = searchParams.get('status') || '';
+    const diaPago = searchParams.get('diaPago') || '';
     
     const skip = (page - 1) * limit;
     
@@ -40,6 +41,10 @@ export async function GET(request: NextRequest) {
 
     if (status) {
       where.statusCuenta = status;
+    }
+
+    if (diaPago) {
+      where.diaPago = diaPago;
     }
 
     const userRole = (session.user as any).role;
