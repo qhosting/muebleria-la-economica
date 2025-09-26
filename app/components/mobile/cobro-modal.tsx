@@ -17,11 +17,9 @@ import {
   DollarSign, 
   CreditCard, 
   Calculator,
-  Receipt,
   Save,
   Wifi,
   WifiOff,
-  Printer,
   CheckCircle,
   AlertTriangle
 } from 'lucide-react';
