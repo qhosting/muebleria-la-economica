@@ -21,13 +21,19 @@ import {
   Wifi,
   WifiOff,
   CheckCircle,
-  AlertTriangle
+  AlertTriangle,
+  Printer,
+  Settings
 } from 'lucide-react';
 import { OfflineCliente } from '@/lib/offline-db';
 import { syncService } from '@/lib/sync-service';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { generateLocalId } from '@/lib/offline-db';
+import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
+import { TicketData } from '@/lib/bluetooth-printer';
+import { PrinterConfigModal } from './printer-config-modal';
+import { Switch } from '@/components/ui/switch';
 
 interface CobroModalProps {
   cliente: OfflineCliente;
@@ -46,6 +52,8 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   const [concepto, setConcepto] = useState('');
   const [numeroRecibo, setNumeroRecibo] = useState('');
   const [loading, setLoading] = useState(false);
+  const [imprimirTicket, setImprimirTicket] = useState(true);
+  const [showPrinterConfig, setShowPrinterConfig] = useState(false);
   const [calculatedValues, setCalculatedValues] = useState({
     saldoAnterior: 0,
     saldoNuevo: 0,
@@ -54,6 +62,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   });
 
   const userId = (session?.user as any)?.id;
+  const { isConnected: isPrinterConnected, printTicket } = useBluetoothPrinter();
 
   // Reset form cuando se abre el modal
   useEffect(() => {
@@ -100,6 +109,38 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
       });
     }
   }, [monto, montoMoratorio, cliente.saldoPendiente]);
+
+  const createTicketData = (fechaPago: string, numeroReciboFinal: string): TicketData => {
+    return {
+      numeroRecibo: numeroReciboFinal,
+      cliente: {
+        nombreCompleto: cliente.nombreCompleto,
+        telefono: cliente.telefono,
+        direccion: cliente.direccion,
+        diaPago: cliente.diaPago
+      },
+      cobrador: {
+        nombre: (session?.user as any)?.name || 'Cobrador',
+        id: userId
+      },
+      pago: {
+        monto: parseFloat(monto),
+        tipoPago: tipoPago,
+        metodoPago: metodoPago,
+        concepto: concepto,
+        fechaPago: fechaPago
+      },
+      saldos: {
+        anterior: calculatedValues.saldoAnterior,
+        nuevo: calculatedValues.saldoNuevo
+      },
+      empresa: {
+        nombre: 'MUEBLERIA LA ECONOMICA',
+        direccion: 'Dirección de la empresa',
+        telefono: 'Tel: (555) 123-4567'
+      }
+    };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -171,6 +212,17 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
           : 'Pago registrado exitosamente';
         
         toast.success(mensaje);
+
+        // Imprimir ticket si está habilitado y la impresora está conectada
+        if (imprimirTicket && isPrinterConnected) {
+          try {
+            const ticketData = createTicketData(pagoRegular.fechaPago, pagoRegular.numeroRecibo || '');
+            await printTicket(ticketData);
+          } catch (error) {
+            console.error('Error imprimiendo ticket:', error);
+            toast.error('El pago se registró correctamente, pero hubo un error al imprimir el ticket');
+          }
+        }
         
       } else {
         // Si está offline, guardar localmente
@@ -187,6 +239,17 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         toast.success(mensaje, {
           description: 'Se sincronizará cuando tengas conexión'
         });
+
+        // Imprimir ticket si está habilitado y la impresora está conectada (también offline)
+        if (imprimirTicket && isPrinterConnected) {
+          try {
+            const ticketData = createTicketData(pagoRegular.fechaPago, pagoRegular.numeroRecibo || '');
+            await printTicket(ticketData);
+          } catch (error) {
+            console.error('Error imprimiendo ticket:', error);
+            toast.error('El pago se guardó offline correctamente, pero hubo un error al imprimir el ticket');
+          }
+        }
       }
 
       onSuccess();
@@ -454,6 +517,62 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             </Card>
           )}
 
+          {/* Configuración de Impresión */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Printer className="w-4 h-4" />
+                Impresión de Ticket
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Estado de la impresora */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-muted-foreground">
+                  Estado de Impresora
+                </span>
+                <div className="flex items-center gap-2">
+                  <Badge variant={isPrinterConnected ? 'default' : 'secondary'} className="text-xs">
+                    {isPrinterConnected ? 'Conectada' : 'Desconectada'}
+                  </Badge>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowPrinterConfig(true)}
+                    className="h-6 w-6 p-0"
+                  >
+                    <Settings className="w-3 h-3" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Switch para imprimir automáticamente */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <div className="text-sm font-medium">
+                    Imprimir ticket automáticamente
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    Se imprimirá después de registrar el pago
+                  </div>
+                </div>
+                <Switch
+                  checked={imprimirTicket}
+                  onCheckedChange={setImprimirTicket}
+                  disabled={!isPrinterConnected}
+                />
+              </div>
+
+              {!isPrinterConnected && (
+                <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
+                  <AlertTriangle className="w-3 h-3 inline mr-1" />
+                  Conecta una impresora para habilitar la impresión automática
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Botones de acción */}
           <div className="flex gap-2">
             <Button
@@ -492,6 +611,12 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             </div>
           )}
         </form>
+
+        {/* Modal de Configuración de Impresora */}
+        <PrinterConfigModal
+          isOpen={showPrinterConfig}
+          onClose={() => setShowPrinterConfig(false)}
+        />
       </DialogContent>
     </Dialog>
   );

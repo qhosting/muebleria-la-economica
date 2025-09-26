@@ -39,6 +39,10 @@ import { formatCurrency, formatDate } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
+import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
+import { TicketData } from '@/lib/bluetooth-printer';
+import { PrinterConfigModal } from './printer-config-modal';
+import { Settings } from 'lucide-react';
 
 interface PagosModalProps {
   cliente: OfflineCliente;
@@ -58,9 +62,11 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
   const [showFilters, setShowFilters] = useState(false);
   const [selectedPago, setSelectedPago] = useState<Pago | null>(null);
   const [printingRecibo, setPrintingRecibo] = useState<string | null>(null);
+  const [showPrinterConfig, setShowPrinterConfig] = useState(false);
   
   const userId = (session?.user as any)?.id;
   const userRole = (session?.user as any)?.role;
+  const { isConnected: isPrinterConnected, printTicket } = useBluetoothPrinter();
 
   useEffect(() => {
     if (isOpen && cliente.id) {
@@ -133,43 +139,69 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
     setFilteredPagos(filtered);
   };
 
+  const createReimpresionTicketData = (pago: Pago): TicketData => {
+    return {
+      numeroRecibo: pago.numeroRecibo || `REC-${pago.id.slice(-8)}`,
+      cliente: {
+        nombreCompleto: cliente.nombreCompleto,
+        telefono: cliente.telefono,
+        direccion: cliente.direccion,
+        diaPago: cliente.diaPago
+      },
+      cobrador: {
+        nombre: pago.cobrador?.name || 'N/A',
+        id: pago.cobradorId
+      },
+      pago: {
+        monto: pago.monto,
+        tipoPago: pago.tipoPago,
+        metodoPago: pago.metodoPago || 'efectivo',
+        concepto: pago.concepto || 'Pago de cuota',
+        fechaPago: typeof pago.fechaPago === 'string' ? pago.fechaPago : pago.fechaPago.toISOString()
+      },
+      saldos: {
+        anterior: pago.saldoAnterior,
+        nuevo: pago.saldoNuevo
+      },
+      empresa: {
+        nombre: 'MUEBLERIA LA ECONOMICA',
+        direccion: 'Dirección de la empresa',
+        telefono: 'Tel: (555) 123-4567'
+      }
+    };
+  };
+
   const handleReimprimirRecibo = async (pago: Pago) => {
-    if (!isOnline) {
-      toast.error('Se requiere conexión para reimprimir recibos');
+    if (!isPrinterConnected) {
+      toast.error('Impresora no conectada');
+      setShowPrinterConfig(true);
       return;
     }
 
     setPrintingRecibo(pago.id);
     
     try {
-      // Simular generación de recibo (aquí iría la lógica real de impresión)
-      const reciboData = {
-        fecha: format(new Date(pago.fechaPago), 'dd/MM/yyyy HH:mm', { locale: es }),
-        cliente: cliente.nombreCompleto,
-        monto: formatCurrency(pago.monto),
-        concepto: pago.concepto || 'Pago de cuota',
-        cobrador: pago.cobrador?.name || 'N/A',
-        numeroRecibo: pago.numeroRecibo || `REC-${pago.id.slice(-8)}`,
-        saldoAnterior: formatCurrency(pago.saldoAnterior),
-        saldoNuevo: formatCurrency(pago.saldoNuevo)
-      };
+      // Crear datos del ticket para reimpresión
+      const ticketData = createReimpresionTicketData(pago);
 
-      // Aquí iría la lógica real de impresión/descarga
-      // Por ahora, solo mostramos un mensaje de éxito
-      
-      toast.success('Recibo preparado para impresión', {
-        description: `Recibo #${reciboData.numeroRecibo} - ${reciboData.monto}`
-      });
+      // Imprimir usando la impresora Bluetooth
+      const success = await printTicket(ticketData);
 
-      // Marcar como impreso si no estaba marcado
-      if (!pago.ticketImpreso) {
-        // Actualizar estado del ticket como impreso
-        // Aquí iría una llamada API para actualizar el estado
+      if (success) {
+        // Marcar como reimpreso si no estaba marcado
+        if (!pago.ticketImpreso) {
+          // Aquí se podría actualizar el estado en el servidor
+          // pero para reimpresiones no es crítico
+        }
+        
+        toast.success('Ticket reimpreso exitosamente', {
+          description: `Recibo #${ticketData.numeroRecibo} - ${formatCurrency(pago.monto)}`
+        });
       }
 
     } catch (error) {
-      console.error('Error printing recibo:', error);
-      toast.error('Error al generar recibo para impresión');
+      console.error('Error reimprimiendo ticket:', error);
+      toast.error('Error al reimprimir el ticket');
     } finally {
       setPrintingRecibo(null);
     }
@@ -225,13 +257,29 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
               Historial de Pagos
             </DialogTitle>
             
-            <Badge variant={isOnline ? 'default' : 'secondary'} className="text-xs">
-              {isOnline ? (
-                <><Wifi className="w-3 h-3 mr-1" />Online</>
-              ) : (
-                <><WifiOff className="w-3 h-3 mr-1" />Offline</>
-              )}
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant={isOnline ? 'default' : 'secondary'} className="text-xs">
+                {isOnline ? (
+                  <><Wifi className="w-3 h-3 mr-1" />Online</>
+                ) : (
+                  <><WifiOff className="w-3 h-3 mr-1" />Offline</>
+                )}
+              </Badge>
+              
+              <Badge variant={isPrinterConnected ? 'default' : 'secondary'} className="text-xs">
+                <Printer className="w-3 h-3 mr-1" />
+                {isPrinterConnected ? 'Imp. OK' : 'Sin Imp.'}
+              </Badge>
+              
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowPrinterConfig(true)}
+                className="h-6 w-6 p-0"
+              >
+                <Settings className="w-3 h-3" />
+              </Button>
+            </div>
           </div>
         </DialogHeader>
 
@@ -441,7 +489,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                           size="sm"
                           variant="outline"
                           onClick={() => handleReimprimirRecibo(pago)}
-                          disabled={printingRecibo === pago.id || !isOnline}
+                          disabled={printingRecibo === pago.id || !isPrinterConnected}
                           className="flex-1 h-7 text-xs"
                         >
                           {printingRecibo === pago.id ? (
@@ -449,7 +497,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                           ) : (
                             <Printer className="w-3 h-3 mr-1" />
                           )}
-                          {printingRecibo === pago.id ? 'Generando...' : 'Reimprimir'}
+                          {printingRecibo === pago.id ? 'Imprimiendo...' : 'Reimprimir'}
                         </Button>
 
                         <Button
@@ -536,6 +584,12 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
             </div>
           </div>
         )}
+
+        {/* Modal de Configuración de Impresora */}
+        <PrinterConfigModal
+          isOpen={showPrinterConfig}
+          onClose={() => setShowPrinterConfig(false)}
+        />
       </DialogContent>
     </Dialog>
   );
