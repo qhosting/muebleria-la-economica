@@ -46,7 +46,12 @@ interface CobranzaMobileProps {
 export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileProps) {
   const { data: session } = useSession();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedDia, setSelectedDia] = useState('all');
+  // Filtro por defecto: día actual de la semana
+  const [selectedDia, setSelectedDia] = useState(() => {
+    const today = new Date().getDay(); // 0=domingo, 1=lunes, ..., 6=sábado
+    const diasMap = ['7', '1', '2', '3', '4', '5', '6']; // Ajustamos para que domingo=7
+    return diasMap[today];
+  });
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list');
   const [sortBy, setSortBy] = useState<'nombre' | 'saldo' | 'dia'>('nombre');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
@@ -75,13 +80,13 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
   ) || [];
 
   const diasSemana = [
-    { value: '1', label: 'Lunes' },
-    { value: '2', label: 'Martes' },
-    { value: '3', label: 'Miércoles' },
-    { value: '4', label: 'Jueves' },
-    { value: '5', label: 'Viernes' },
-    { value: '6', label: 'Sábado' },
-    { value: '7', label: 'Domingo' }
+    { value: '1', label: 'LUNES' },
+    { value: '2', label: 'MARTES' },
+    { value: '3', label: 'MIÉRCOLES' },
+    { value: '4', label: 'JUEVES' },
+    { value: '5', label: 'VIERNES' },
+    { value: '6', label: 'SÁBADO' },
+    { value: '7', label: 'DOMINGO' }
   ];
 
   useEffect(() => {
@@ -279,7 +284,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
                 <SelectValue placeholder="Día" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Todos los días</SelectItem>
+                <SelectItem value="all">TODOS</SelectItem>
                 {diasSemana.map((dia) => (
                   <SelectItem key={dia.value} value={dia.value}>
                     {dia.label}

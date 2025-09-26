@@ -201,8 +201,8 @@ export default function ClientesPage() {
     setSelectedCliente(null);
   };
 
-  // Verificar permisos
-  if (!['admin', 'gestor_cobranza'].includes(userRole)) {
+  // Verificar permisos - cobradores solo pueden ver, no crear
+  if (!['admin', 'gestor_cobranza', 'cobrador'].includes(userRole)) {
     return (
       <DashboardLayout>
         <div className="text-center py-12">
@@ -224,7 +224,9 @@ export default function ClientesPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Gestión de Clientes</h1>
+            <h1 className="text-3xl font-bold text-gray-900">
+              {userRole === 'cobrador' ? 'Mis Clientes Asignados' : 'Gestión de Clientes'}
+            </h1>
             <p className="text-gray-600 mt-1">
               {userRole === 'admin' ? 
                 'Administra la información y asignaciones de clientes' :
@@ -361,30 +363,28 @@ export default function ClientesPage() {
                         {getStatusBadge(cliente.statusCuenta)}
                       </CardDescription>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8">
-                          <MoreVertical className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
-                          <>
-                            <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Editar Cliente
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => handleDeleteCliente(cliente)}
-                              className="text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Desactivar Cliente
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                    {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Editar Cliente
+                          </DropdownMenuItem>
+                          <DropdownMenuItem 
+                            onClick={() => handleDeleteCliente(cliente)}
+                            className="text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Desactivar Cliente
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    )}
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -485,8 +485,8 @@ export default function ClientesPage() {
         )}
       </div>
 
-      {/* Modals - Solo para admin */}
-      {userRole === 'admin' && (
+      {/* Modals - Solo para admin y gestor */}
+      {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
         <>
           <ClienteModal
             open={clienteModalOpen}
@@ -496,11 +496,13 @@ export default function ClientesPage() {
             onSuccess={handleModalSuccess}
           />
 
-          <ImportarClientesModal
-            open={importModalOpen}
-            onOpenChange={setImportModalOpen}
-            onSuccess={handleModalSuccess}
-          />
+          {userRole === 'admin' && (
+            <ImportarClientesModal
+              open={importModalOpen}
+              onOpenChange={setImportModalOpen}
+              onSuccess={handleModalSuccess}
+            />
+          )}
         </>
       )}
     </DashboardLayout>

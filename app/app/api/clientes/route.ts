@@ -53,6 +53,13 @@ export async function GET(request: NextRequest) {
     // Solo cobradores tienen restricción de ver únicamente sus clientes asignados
     if (userRole === 'cobrador') {
       where.cobradorAsignadoId = userId;
+      
+      // Si no se especifica día de pago y es cobrador, mostrar día actual por defecto
+      if (!diaPago) {
+        const today = new Date().getDay(); // 0=domingo, 1=lunes, ..., 6=sábado
+        const diasMap = ['7', '1', '2', '3', '4', '5', '6']; // Ajustamos para que domingo=7
+        where.diaPago = diasMap[today];
+      }
     }
     // Admins y gestores pueden ver todos los clientes
 
