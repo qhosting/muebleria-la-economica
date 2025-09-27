@@ -64,8 +64,35 @@ export function LoginForm() {
           localStorage.removeItem('remember_me');
         }
 
-        alert('¡Bienvenido!');
-        router.replace('/dashboard');
+        // Obtener información del usuario para redireccionar según rol
+        try {
+          const sessionResponse = await fetch('/api/auth/session');
+          const sessionData = await sessionResponse.json();
+          const userRole = sessionData?.user?.role;
+
+          alert('¡Bienvenido!');
+          
+          // Redireccionar según el rol del usuario
+          switch (userRole) {
+            case 'admin':
+              router.replace('/dashboard');
+              break;
+            case 'gestor_cobranza':
+              router.replace('/dashboard/clientes'); // Los gestores van directo a clientes
+              break;
+            case 'reporte_cobranza':
+              router.replace('/dashboard/reportes'); // Los usuarios de reportes van a reportes
+              break;
+            case 'cobrador':
+              router.replace('/dashboard/cobranza'); // Los cobradores van a cobranza móvil
+              break;
+            default:
+              router.replace('/dashboard'); // Fallback al dashboard general
+          }
+        } catch (error) {
+          console.error('Error al obtener sesión:', error);
+          router.replace('/dashboard'); // Fallback en caso de error
+        }
       }
     } catch (error) {
       console.error('Error al iniciar sesión:', error);

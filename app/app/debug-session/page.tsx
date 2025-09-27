@@ -1,81 +1,110 @@
+
 'use client';
 
 import { useSession } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import Link from 'next/link';
+import { Button } from '@/components/ui/button';
 
 export default function DebugSessionPage() {
-  const { data: session, status } = useSession();
-  const [apiTest, setApiTest] = useState<any>(null);
-  
-  useEffect(() => {
-    if (session) {
-      testClientesAPI();
-    }
-  }, [session]);
-
-  const testClientesAPI = async () => {
-    try {
-      const response = await fetch('/api/clientes?limit=5');
-      if (response.ok) {
-        const data = await response.json();
-        setApiTest({ success: true, data });
-      } else {
-        const errorData = await response.json();
-        setApiTest({ success: false, error: errorData, status: response.status });
-      }
-    } catch (error) {
-      setApiTest({ success: false, error: error instanceof Error ? error.message : 'Error desconocido' });
-    }
-  };
-
-  if (status === 'loading') {
-    return <div className="p-8">Cargando sesión...</div>;
-  }
-
-  if (status === 'unauthenticated') {
-    return <div className="p-8">
-      <h1 className="text-2xl mb-4">Debug Session - No Autenticado</h1>
-      <p>Por favor inicia sesión primero.</p>
-      <a href="/login" className="text-blue-600 underline">Ir al login</a>
-    </div>;
-  }
+  const { data: session, status } = useSession() || {};
 
   return (
-    <div className="p-8 max-w-4xl mx-auto">
-      <h1 className="text-2xl font-bold mb-6">Debug Session</h1>
-      
-      <div className="space-y-6">
-        <div className="bg-gray-100 p-4 rounded-lg">
-          <h2 className="text-lg font-semibold mb-2">Información de Sesión</h2>
-          <pre className="text-sm overflow-x-auto">
-            {JSON.stringify(session, null, 2)}
-          </pre>
+    <div className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            🔍 Debug de Sesión
+          </h1>
+          <p className="text-gray-600">
+            Información detallada de la sesión actual
+          </p>
         </div>
 
-        <div className="bg-blue-50 p-4 rounded-lg">
-          <h2 className="text-lg font-semibold mb-2">Test API Clientes</h2>
-          {apiTest ? (
-            <pre className="text-sm overflow-x-auto">
-              {JSON.stringify(apiTest, null, 2)}
+        <Card>
+          <CardHeader>
+            <CardTitle>Estado de la Sesión</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <strong>Status:</strong>{' '}
+                <Badge variant={
+                  status === 'authenticated' ? 'default' : 
+                  status === 'loading' ? 'secondary' : 
+                  'destructive'
+                }>
+                  {status}
+                </Badge>
+              </div>
+              
+              {status === 'authenticated' && session && (
+                <>
+                  <div>
+                    <strong>User ID:</strong> {(session.user as any)?.id || 'No disponible'}
+                  </div>
+                  <div>
+                    <strong>Name:</strong> {session.user?.name || 'No disponible'}
+                  </div>
+                  <div>
+                    <strong>Email:</strong> {session.user?.email || 'No disponible'}
+                  </div>
+                  <div>
+                    <strong>Role:</strong>{' '}
+                    <Badge variant="outline" className="font-bold text-lg">
+                      {(session.user as any)?.role || 'No disponible'}
+                    </Badge>
+                  </div>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Objeto Sesión Completo</CardTitle>
+            <CardDescription>
+              Información completa de la sesión para debugging
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <pre className="bg-gray-100 p-4 rounded-lg text-sm overflow-auto">
+              {JSON.stringify(session, null, 2)}
             </pre>
-          ) : (
-            <p>Ejecutando test...</p>
-          )}
-        </div>
+          </CardContent>
+        </Card>
 
-        <div className="space-y-2">
-          <a href="/dashboard" className="block bg-blue-600 text-white px-4 py-2 rounded text-center">
-            Ir al Dashboard
-          </a>
-          <a href="/dashboard/clientes" className="block bg-green-600 text-white px-4 py-2 rounded text-center">
-            Ir a Clientes Directamente
-          </a>
-          <button 
-            onClick={() => testClientesAPI()} 
-            className="block w-full bg-orange-600 text-white px-4 py-2 rounded text-center"
-          >
-            Reprobar API Clientes
-          </button>
+        <Card>
+          <CardHeader>
+            <CardTitle>Navegación Permitida según Rol</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {(session?.user as any)?.role === 'admin' && (
+                <div>✅ Acceso completo (Admin): Dashboard, Usuarios, Clientes, Reportes, Configuración</div>
+              )}
+              {(session?.user as any)?.role === 'gestor_cobranza' && (
+                <div>✅ Gestor de Cobranza: Dashboard, Clientes, Reportes, Morosidad</div>
+              )}
+              {(session?.user as any)?.role === 'reporte_cobranza' && (
+                <div>✅ Reportes: Dashboard, Reportes, Morosidad (solo lectura)</div>
+              )}
+              {(session?.user as any)?.role === 'cobrador' && (
+                <div>✅ Cobrador: Dashboard, Cobranza Móvil, Rutas</div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="flex gap-4 justify-center">
+          <Link href="/dashboard">
+            <Button>Ir al Dashboard</Button>
+          </Link>
+          <Link href="/test-auth">
+            <Button variant="outline">Probar Otros Usuarios</Button>
+          </Link>
         </div>
       </div>
     </div>
