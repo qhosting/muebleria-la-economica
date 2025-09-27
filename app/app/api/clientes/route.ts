@@ -126,6 +126,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
     const {
+      codigoCliente: codigoClienteCustom,
       nombreCompleto,
       telefono,
       vendedor,
@@ -150,7 +151,40 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const codigoCliente = generarCodigoCliente();
+    // Generar código de cliente o usar el proporcionado
+    let codigoCliente = codigoClienteCustom?.trim() || generarCodigoCliente();
+    
+    // Validar que el código no exista ya
+    const existeCliente = await prisma.cliente.findUnique({
+      where: { codigoCliente },
+    });
+    
+    if (existeCliente) {
+      // Si es código personalizado, retornar error
+      if (codigoClienteCustom?.trim()) {
+        return NextResponse.json(
+          { error: 'El código de cliente ya existe. Por favor, use uno diferente.' },
+          { status: 400 }
+        );
+      }
+      // Si es código generado, intentar generar uno nuevo
+      let intentos = 0;
+      do {
+        codigoCliente = generarCodigoCliente();
+        const existe = await prisma.cliente.findUnique({
+          where: { codigoCliente },
+        });
+        if (!existe) break;
+        intentos++;
+      } while (intentos < 10);
+      
+      if (intentos >= 10) {
+        return NextResponse.json(
+          { error: 'Error al generar código único. Intente nuevamente.' },
+          { status: 500 }
+        );
+      }
+    }
 
     const cliente = await prisma.cliente.create({
       data: {

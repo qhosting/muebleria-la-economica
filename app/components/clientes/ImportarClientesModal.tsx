@@ -40,6 +40,7 @@ export function ImportarClientesModal({
     
     // Crear CSV template
     const headers = [
+      'codigoCliente',
       'nombreCompleto',
       'telefono',
       'vendedor',
@@ -57,6 +58,7 @@ export function ImportarClientesModal({
     ];
 
     const sampleData = [
+      'CLI25090949',
       'Juan Pérez García',
       '555-0123',
       'Carlos López',
@@ -76,11 +78,12 @@ export function ImportarClientesModal({
     const instructions = [
       '# INSTRUCCIONES PARA IMPORTAR CLIENTES',
       '# 1. Llene los datos en las filas siguientes',
-      '# 2. diaPago: 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 7=Domingo',
-      '# 3. periodicidad: diario, semanal, quincenal, mensual',
-      '# 4. fechaVenta: formato YYYY-MM-DD',
-      '# 5. Los campos nombreCompleto, direccionCompleta, descripcionProducto, diaPago, montoPago y periodicidad son obligatorios',
-      '# 6. Elimine estas líneas de instrucciones antes de importar',
+      '# 2. codigoCliente: Opcional. Si se deja vacío, se generará automáticamente. Ejemplo: CLI25090949',
+      '# 3. diaPago: 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 7=Domingo',
+      '# 4. periodicidad: diario, semanal, quincenal, mensual',
+      '# 5. fechaVenta: formato YYYY-MM-DD',
+      '# 6. Los campos nombreCompleto, direccionCompleta, descripcionProducto, diaPago, montoPago y periodicidad son obligatorios',
+      '# 7. Elimine estas líneas de instrucciones antes de importar',
       ''
     ];
 
@@ -203,6 +206,7 @@ export function ImportarClientesModal({
         
         try {
           const clienteData = {
+            codigoCliente: row.codigoCliente?.trim() || null,
             nombreCompleto: row.nombreCompleto,
             telefono: row.telefono || null,
             vendedor: row.vendedor || null,

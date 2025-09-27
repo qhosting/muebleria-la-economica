@@ -97,6 +97,7 @@ export async function PUT(
 
     const body = await request.json();
     const {
+      codigoCliente,
       nombreCompleto,
       telefono,
       vendedor,
@@ -115,9 +116,30 @@ export async function PUT(
       fechaVenta,
     } = body;
 
+    // Si se cambió el código de cliente, validar que no exista
+    if (codigoCliente) {
+      const clienteActual = await prisma.cliente.findUnique({
+        where: { id: params.id },
+      });
+      
+      if (clienteActual && clienteActual.codigoCliente !== codigoCliente.trim()) {
+        const existeCliente = await prisma.cliente.findUnique({
+          where: { codigoCliente: codigoCliente.trim() },
+        });
+        
+        if (existeCliente) {
+          return NextResponse.json(
+            { error: 'El código de cliente ya existe. Por favor, use uno diferente.' },
+            { status: 400 }
+          );
+        }
+      }
+    }
+
     const cliente = await prisma.cliente.update({
       where: { id: params.id },
       data: {
+        ...(codigoCliente && { codigoCliente: codigoCliente.trim() }),
         nombreCompleto,
         telefono,
         vendedor,

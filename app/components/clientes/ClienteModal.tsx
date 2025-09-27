@@ -31,6 +31,7 @@ export function ClienteModal({
 }: ClienteModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
+    codigoCliente: '',
     nombreCompleto: '',
     telefono: '',
     vendedor: '',
@@ -54,6 +55,7 @@ export function ClienteModal({
   useEffect(() => {
     if (cliente) {
       setFormData({
+        codigoCliente: cliente.codigoCliente || '',
         nombreCompleto: cliente.nombreCompleto || '',
         telefono: cliente.telefono || '',
         vendedor: cliente.vendedor || '',
@@ -73,6 +75,7 @@ export function ClienteModal({
       });
     } else {
       setFormData({
+        codigoCliente: '',
         nombreCompleto: '',
         telefono: '',
         vendedor: '',
@@ -162,6 +165,23 @@ export function ClienteModal({
         <form onSubmit={readOnly ? (e) => e.preventDefault() : handleSubmit} className="space-y-4">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
+              <Label htmlFor="codigoCliente">Código de Cliente {!isEditMode && '*'}</Label>
+              <Input
+                id="codigoCliente"
+                value={formData.codigoCliente}
+                onChange={(e) => setFormData({ ...formData, codigoCliente: e.target.value.toUpperCase() })}
+                required={!readOnly && !isEditMode}
+                placeholder="Ej: CLI25090949"
+                disabled={readOnly}
+              />
+              {!isEditMode && (
+                <p className="text-xs text-gray-500">
+                  Si se deja vacío, se generará automáticamente
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
               <Label htmlFor="nombreCompleto">Nombre Completo *</Label>
               <Input
                 id="nombreCompleto"
@@ -172,7 +192,9 @@ export function ClienteModal({
                 disabled={readOnly}
               />
             </div>
+          </div>
 
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="telefono">Teléfono</Label>
               <Input
@@ -183,9 +205,6 @@ export function ClienteModal({
                 disabled={readOnly}
               />
             </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="vendedor">Vendedor</Label>
               <Input
