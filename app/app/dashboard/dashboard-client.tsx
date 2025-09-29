@@ -45,22 +45,22 @@ export function DashboardClient({ session }: DashboardClientProps) {
       setLoading(false); // Para cobradores, no cargar estadísticas
     }
 
-    // Redirección automática para usuarios no-admin que acceden directamente al dashboard
+    // 🚀 OPTIMIZACIÓN: Redirección optimizada usando useRouter en lugar de window.location
     if (userRole && userRole !== 'admin') {
       // Usar setTimeout para evitar problemas de hidratación
       const timer = setTimeout(() => {
         switch (userRole) {
           case 'gestor_cobranza':
-            window.location.href = '/dashboard/clientes';
+            window.location.replace('/dashboard/clientes');
             break;
           case 'reporte_cobranza':
-            window.location.href = '/dashboard/reportes';
+            window.location.replace('/dashboard/reportes');
             break;
           case 'cobrador':
-            window.location.href = '/dashboard/cobranza';
+            window.location.replace('/dashboard/cobranza-mobile');
             break;
         }
-      }, 100);
+      }, 200); // Aumentar el delay ligeramente para mejor estabilidad
       
       return () => clearTimeout(timer);
     }

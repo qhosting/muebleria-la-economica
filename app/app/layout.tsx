@@ -12,12 +12,14 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
 };
 
+// 🚀 OPTIMIZACIÓN MÓVIL: Viewport optimizado para mejor rendimiento
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
-  userScalable: false,
+  maximumScale: 5, // Permitir zoom para accesibilidad
+  userScalable: true, // Permitir zoom para accesibilidad
   themeColor: '#0F172A',
+  viewportFit: 'cover', // Optimización para pantallas con notch
 };
 
 export default function RootLayout({

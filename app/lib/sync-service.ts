@@ -30,12 +30,21 @@ export class SyncService {
       clearInterval(this.autoSyncInterval);
     }
 
-    // Sincronizar cada 5 minutos cuando está online
+    // 🚀 OPTIMIZACIÓN MÓVIL: Sincronizar cada 15 minutos en lugar de 5 (menos agresivo)
+    // También verificar si realmente hay datos pendientes antes de sincronizar
     this.autoSyncInterval = setInterval(async () => {
       if (navigator.onLine && !this.syncInProgress) {
-        await this.syncAll(cobradorId, false); // silent sync
+        try {
+          // Solo sincronizar si hay datos pendientes
+          const pendingCount = await db.syncQueue.where('status').equals('pending').count();
+          if (pendingCount > 0) {
+            await this.syncAll(cobradorId, false); // silent sync
+          }
+        } catch (error) {
+          console.error('Error en auto-sync:', error);
+        }
       }
-    }, 5 * 60 * 1000);
+    }, 15 * 60 * 1000); // 15 minutos en lugar de 5
   }
 
   public stopAutoSync() {

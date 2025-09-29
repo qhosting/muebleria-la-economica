@@ -1,13 +1,14 @@
 
-// Hook personalizado para manejo de estado de conectividad
+// Hook personalizado para manejo de estado de conectividad - OPTIMIZADO PARA MÓVILES
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 
 export function useNetworkStatus() {
   const [isOnline, setIsOnline] = useState(true);
   const [wasOffline, setWasOffline] = useState(false);
+  const lastToastRef = useRef<number>(0); // Para evitar spam de toasts
 
   useEffect(() => {
     // Establecer estado inicial (solo en el cliente)
@@ -18,11 +19,14 @@ export function useNetworkStatus() {
     const handleOnline = () => {
       setIsOnline(true);
       
-      if (wasOffline) {
+      // 🚀 OPTIMIZACIÓN: Evitar spam de toasts con throttling
+      const now = Date.now();
+      if (wasOffline && now - lastToastRef.current > 5000) { // Mínimo 5 segundos entre toasts
         toast.success('Conexión restaurada', {
           description: 'Los datos se sincronizarán automáticamente',
-          duration: 3000
+          duration: 2000 // Reducir duración para menos distracción
         });
+        lastToastRef.current = now;
         setWasOffline(false);
       }
     };
@@ -31,10 +35,15 @@ export function useNetworkStatus() {
       setIsOnline(false);
       setWasOffline(true);
       
-      toast.info('Trabajando offline', {
-        description: 'Los datos se guardarán localmente hasta que tengas conexión',
-        duration: 4000
-      });
+      // 🚀 OPTIMIZACIÓN: Toast menos agresivo para modo offline
+      const now = Date.now();
+      if (now - lastToastRef.current > 5000) {
+        toast.info('Trabajando offline', {
+          description: 'Los datos se guardarán localmente',
+          duration: 2000 // Reducir duración
+        });
+        lastToastRef.current = now;
+      }
     };
 
     // Event listeners (solo en el cliente)
@@ -50,7 +59,7 @@ export function useNetworkStatus() {
         window.removeEventListener('offline', handleOffline);
       }
     };
-  }, [wasOffline]);
+  }, [wasOffline]); // Mantener dependencia para que funcione correctamente
 
   return { isOnline, wasOffline };
 }
