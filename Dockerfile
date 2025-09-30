@@ -25,10 +25,14 @@ COPY app/ .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build the application
-ENV NEXT_TELEMETRY_DISABLED 1
-ENV NEXT_OUTPUT_MODE standalone
-RUN yarn build
+# Copy and prepare the standalone build script
+COPY build-with-standalone.sh ./
+RUN chmod +x build-with-standalone.sh
+
+# Build the application with standalone output - GUARANTEED
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_OUTPUT_MODE=standalone
+RUN ./build-with-standalone.sh
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -64,8 +68,8 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT 3000
-ENV HOSTNAME "0.0.0.0"
+ENV PORT=3000
+ENV HOSTNAME=0.0.0.0
 
 # Start with our custom script
 CMD ["./start.sh"]
