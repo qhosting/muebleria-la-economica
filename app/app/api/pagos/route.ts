@@ -146,7 +146,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Crear el pago en una transacción
-    const resultado = await prisma.$transaction(async (prisma) => {
+    const resultado = await prisma.$transaction(async (prisma: any) => {
       const pago = await prisma.pago.create({
         data: {
           clienteId,
