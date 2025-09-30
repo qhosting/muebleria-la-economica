@@ -32,7 +32,7 @@ RUN chmod +x build-with-standalone.sh
 # Build the application with standalone output - FORCE REBUILD NO CACHE
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT_MODE=standalone
-ENV BUILD_TIMESTAMP=20250930_060500
+ENV BUILD_TIMESTAMP=20250930_065000_PERMISSIONS_FIX
 RUN echo "Force rebuild timestamp: $BUILD_TIMESTAMP" && ./build-with-standalone.sh
 
 # Production image, copy all the files and run next
@@ -56,15 +56,19 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma files
-COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
-COPY --from=builder /app/node_modules/.prisma/client ./node_modules/.prisma/client
+# Copy Prisma files with CORRECT PERMISSIONS - FIX EACCES ERROR
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma/client ./node_modules/@prisma/client
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma/client ./node_modules/.prisma/client
 
-# Copy start scripts
-COPY start.sh ./
-COPY emergency-start.sh ./
+# Copy start scripts with CORRECT PERMISSIONS
+COPY --chown=nextjs:nodejs start.sh ./
+COPY --chown=nextjs:nodejs emergency-start.sh ./
 RUN chmod +x start.sh emergency-start.sh
+
+# Create writable directory for Prisma with correct permissions
+RUN mkdir -p node_modules/.prisma && chown -R nextjs:nodejs node_modules/.prisma
+RUN mkdir -p node_modules/@prisma && chown -R nextjs:nodejs node_modules/@prisma
 
 USER nextjs
 

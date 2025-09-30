@@ -47,7 +47,23 @@ yarn build
 # Verify standalone directory was created
 if [ -d ".next/standalone" ]; then
     echo "✅ Standalone build successful! Directory created."
+    echo "📋 Contents of .next/standalone:"
     ls -la .next/standalone
+    
+    # Verify server.js exists specifically
+    if [ -f ".next/standalone/server.js" ]; then
+        echo "✅ server.js found in standalone directory!"
+        ls -la .next/standalone/server.js
+        echo "📋 File permissions and owner:"
+        stat .next/standalone/server.js
+    else
+        echo "❌ ERROR: server.js NOT FOUND in standalone directory!"
+        echo "📋 Searching for server.js anywhere in .next:"
+        find .next -name "server.js" -type f | head -5
+    fi
+    
+    echo "📋 Complete structure of .next/standalone:"
+    find .next/standalone -type f | head -20
 else
     echo "❌ ERROR: Standalone directory not created!"
     ls -la .next/
