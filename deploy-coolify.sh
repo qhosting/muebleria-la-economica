@@ -30,7 +30,7 @@ echo "NODE_ENV=production"
 echo "PORT=3000"
 echo ""
 
-echo -e "${YELLOW}👥 USUARIOS POR DEFECTO DEL SISTEMA:${NC}"
+echo -e "${YELLOW}👥 USUARIOS ESENCIALES DEL SISTEMA:${NC}"
 echo "Admin:    admin@economica.local / admin123"
 echo "Gestor:   gestor@economica.local / gestor123" 
 echo "Cobrador: cobrador@economica.local / cobrador123"

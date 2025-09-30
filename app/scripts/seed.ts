@@ -8,15 +8,23 @@ async function main() {
   console.log('🌱 Iniciando seeders...');
 
   try {
-    // Crear usuarios
-    console.log('👤 Creando usuarios...');
+    // Limpiar datos existentes
+    console.log('🧹 Limpiando datos existentes...');
+    await prisma.pago.deleteMany();
+    await prisma.rutaCobranza.deleteMany();
+    await prisma.cliente.deleteMany();
+    await prisma.plantillaTicket.deleteMany();
+    await prisma.user.deleteMany();
+
+    // Crear usuarios esenciales únicamente
+    console.log('👤 Creando usuarios esenciales...');
     
     // Usuario admin
     const adminUser = await prisma.user.upsert({
-      where: { email: 'admin@muebleria.com' },
+      where: { email: 'admin@economica.local' },
       update: {},
       create: {
-        email: 'admin@muebleria.com',
+        email: 'admin@economica.local',
         name: 'Administrador Sistema',
         password: await bcrypt.hash('admin123', 12),
         role: 'admin',
@@ -26,93 +34,44 @@ async function main() {
 
     // Usuario gestor de cobranza
     const gestorUser = await prisma.user.upsert({
-      where: { email: 'gestor@muebleria.com' },
+      where: { email: 'gestor@economica.local' },
       update: {},
       create: {
-        email: 'gestor@muebleria.com',
-        name: 'María González',
+        email: 'gestor@economica.local',
+        name: 'Gestor de Cobranza',
         password: await bcrypt.hash('gestor123', 12),
         role: 'gestor_cobranza',
         isActive: true,
       },
     });
 
-    // Usuario de reportes
-    const reporteUser = await prisma.user.upsert({
-      where: { email: 'reportes@muebleria.com' },
+    // Usuario cobrador
+    const cobradorUser = await prisma.user.upsert({
+      where: { email: 'cobrador@economica.local' },
       update: {},
       create: {
-        email: 'reportes@muebleria.com',
-        name: 'Carlos Méndez',
+        email: 'cobrador@economica.local',
+        name: 'Cobrador de Campo',
+        password: await bcrypt.hash('cobrador123', 12),
+        role: 'cobrador',
+        isActive: true,
+      },
+    });
+
+    // Usuario de reportes
+    const reporteUser = await prisma.user.upsert({
+      where: { email: 'reportes@economica.local' },
+      update: {},
+      create: {
+        email: 'reportes@economica.local',
+        name: 'Usuario de Reportes',
         password: await bcrypt.hash('reportes123', 12),
         role: 'reporte_cobranza',
         isActive: true,
       },
     });
 
-    // Cobradores
-    const cobrador1 = await prisma.user.upsert({
-      where: { email: 'cobrador1@muebleria.com' },
-      update: {},
-      create: {
-        email: 'cobrador1@muebleria.com',
-        name: 'Juan Pérez',
-        password: await bcrypt.hash('cobrador123', 12),
-        role: 'cobrador',
-        isActive: true,
-      },
-    });
-
-    const cobrador2 = await prisma.user.upsert({
-      where: { email: 'cobrador2@muebleria.com' },
-      update: {},
-      create: {
-        email: 'cobrador2@muebleria.com',
-        name: 'Ana Rodríguez',
-        password: await bcrypt.hash('cobrador123', 12),
-        role: 'cobrador',
-        isActive: true,
-      },
-    });
-
-    const cobrador3 = await prisma.user.upsert({
-      where: { email: 'cobrador3@muebleria.com' },
-      update: {},
-      create: {
-        email: 'cobrador3@muebleria.com',
-        name: 'Luis Martínez',
-        password: await bcrypt.hash('cobrador123', 12),
-        role: 'cobrador',
-        isActive: true,
-      },
-    });
-
-    const cobrador4 = await prisma.user.upsert({
-      where: { email: 'cobrador4@muebleria.com' },
-      update: {},
-      create: {
-        email: 'cobrador4@muebleria.com',
-        name: 'Patricia Herrera',
-        password: await bcrypt.hash('cobrador123', 12),
-        role: 'cobrador',
-        isActive: true,
-      },
-    });
-
-    // Usuario de prueba requerido
-    const testUser = await prisma.user.upsert({
-      where: { email: 'john@doe.com' },
-      update: {},
-      create: {
-        email: 'john@doe.com',
-        name: 'John Doe',
-        password: await bcrypt.hash('johndoe123', 12),
-        role: 'admin',
-        isActive: true,
-      },
-    });
-
-    const cobradores = [cobrador1, cobrador2, cobrador3, cobrador4];
+    const cobradores = [cobradorUser];
 
     console.log('✅ Usuarios creados exitosamente');
 
@@ -215,7 +174,7 @@ Cobrador: {{cobrador}}
         montoPago: 400,
         periodicidad: 'semanal' as const,
         saldoActual: 1600,
-        cobrador: cobrador1.id,
+        cobrador: cobradorUser.id,
         vendedor: 'Sandra Cruz'
       },
       {
@@ -227,7 +186,7 @@ Cobrador: {{cobrador}}
         montoPago: 800,
         periodicidad: 'quincenal' as const,
         saldoActual: 3200,
-        cobrador: cobrador2.id,
+        cobrador: cobradorUser.id,
         vendedor: 'Mario López'
       },
       {
@@ -239,7 +198,7 @@ Cobrador: {{cobrador}}
         montoPago: 350,
         periodicidad: 'semanal' as const,
         saldoActual: 1050,
-        cobrador: cobrador2.id,
+        cobrador: cobradorUser.id,
         vendedor: 'Sandra Cruz'
       },
       {
@@ -251,7 +210,7 @@ Cobrador: {{cobrador}}
         montoPago: 450,
         periodicidad: 'semanal' as const,
         saldoActual: 2250,
-        cobrador: cobrador3.id,
+        cobrador: cobradorUser.id,
         vendedor: 'Mario López'
       },
       {
@@ -263,7 +222,7 @@ Cobrador: {{cobrador}}
         montoPago: 550,
         periodicidad: 'quincenal' as const,
         saldoActual: 2750,
-        cobrador: cobrador3.id,
+        cobrador: cobradorUser.id,
         vendedor: 'Sandra Cruz'
       },
       {
@@ -275,7 +234,7 @@ Cobrador: {{cobrador}}
         montoPago: 700,
         periodicidad: 'semanal' as const,
         saldoActual: 0, // Cliente al corriente
-        cobrador: cobrador4.id,
+        cobrador: cobradorUser.id,
         vendedor: 'Mario López'
       },
       {
@@ -287,7 +246,7 @@ Cobrador: {{cobrador}}
         montoPago: 300,
         periodicidad: 'semanal' as const,
         saldoActual: 900,
-        cobrador: cobrador4.id,
+        cobrador: cobradorUser.id,
         vendedor: 'Sandra Cruz'
       },
     ];
@@ -404,7 +363,7 @@ Cobrador: {{cobrador}}
     const pagosEjemplo = [
       {
         clienteId: clientes[0].id,
-        cobradorId: cobrador1.id,
+        cobradorId: cobradorUser.id,
         monto: 500,
         tipoPago: 'regular' as const,
         concepto: 'Pago semanal',
@@ -414,7 +373,7 @@ Cobrador: {{cobrador}}
       },
       {
         clienteId: clientes[1].id,
-        cobradorId: cobrador1.id,
+        cobradorId: cobradorUser.id,
         monto: 750,
         tipoPago: 'regular' as const,
         concepto: 'Pago quincenal',
@@ -424,7 +383,7 @@ Cobrador: {{cobrador}}
       },
       {
         clienteId: clientes[2].id,
-        cobradorId: cobrador2.id,
+        cobradorId: cobradorUser.id,
         monto: 600,
         tipoPago: 'regular' as const,
         concepto: 'Pago semanal',
@@ -434,7 +393,7 @@ Cobrador: {{cobrador}}
       },
       {
         clienteId: clientes[0].id,
-        cobradorId: cobrador1.id,
+        cobradorId: cobradorUser.id,
         monto: 100,
         tipoPago: 'moratorio' as const,
         concepto: 'Recargo por atraso',
@@ -519,15 +478,11 @@ Cobrador: {{cobrador}}
     console.log(`- ${await prisma.plantillaTicket.count()} plantillas de ticket`);
     console.log(`- ${await prisma.rutaCobranza.count()} rutas de cobranza`);
 
-    console.log('\n🔑 Credenciales de acceso:');
-    console.log('👑 Admin: admin@muebleria.com / admin123');
-    console.log('👤 Gestor: gestor@muebleria.com / gestor123');
-    console.log('📊 Reportes: reportes@muebleria.com / reportes123');
-    console.log('🚚 Cobrador 1: cobrador1@muebleria.com / cobrador123');
-    console.log('🚚 Cobrador 2: cobrador2@muebleria.com / cobrador123');
-    console.log('🚚 Cobrador 3: cobrador3@muebleria.com / cobrador123');
-    console.log('🚚 Cobrador 4: cobrador4@muebleria.com / cobrador123');
-    console.log('🧪 Test: john@doe.com / johndoe123');
+    console.log('\n🔑 Credenciales de acceso (Solo usuarios esenciales):');
+    console.log('👑 Admin:    admin@economica.local / admin123');
+    console.log('👤 Gestor:   gestor@economica.local / gestor123');
+    console.log('🚚 Cobrador: cobrador@economica.local / cobrador123');
+    console.log('📊 Reportes: reportes@economica.local / reportes123');
 
   } catch (error) {
     console.error('❌ Error al ejecutar seeders:', error);

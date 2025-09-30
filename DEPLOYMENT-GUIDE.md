@@ -99,10 +99,10 @@ Formato: `postgresql://usuario:password@host:5432/database`
 - 📊 Verificar reportes
 - 📱 Probar PWA móvil
 
-### 3. Usuarios por Defecto
+### 3. Usuarios por Defecto (Solo usuarios esenciales)
 ```
-Admin: admin@economica.local / admin123
-Gestor: gestor@economica.local / gestor123
+Admin:    admin@economica.local / admin123
+Gestor:   gestor@economica.local / gestor123  
 Cobrador: cobrador@economica.local / cobrador123
 Reportes: reportes@economica.local / reportes123
 ```
