@@ -29,10 +29,11 @@ RUN npx prisma generate
 COPY build-with-standalone.sh ./
 RUN chmod +x build-with-standalone.sh
 
-# Build the application with standalone output - GUARANTEED
+# Build the application with standalone output - FORCE REBUILD NO CACHE
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT_MODE=standalone
-RUN ./build-with-standalone.sh
+ENV BUILD_TIMESTAMP=20250930_060500
+RUN echo "Force rebuild timestamp: $BUILD_TIMESTAMP" && ./build-with-standalone.sh
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -60,9 +61,10 @@ COPY --from=builder /app/prisma ./prisma
 COPY --from=builder /app/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY --from=builder /app/node_modules/.prisma/client ./node_modules/.prisma/client
 
-# Copy start script
+# Copy start scripts
 COPY start.sh ./
-RUN chmod +x start.sh
+COPY emergency-start.sh ./
+RUN chmod +x start.sh emergency-start.sh
 
 USER nextjs
 
