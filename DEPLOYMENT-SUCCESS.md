@@ -141,11 +141,11 @@ Una vez desplegado en Coolify:
 
 ## 🔐 Nota de Seguridad
 
-⚠️ **Token GitHub usado**: `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`
+⚠️ **Token GitHub**: Se utilizó un token personal de GitHub para el setup inicial.
 
 **Se recomienda**:
 1. Ir a GitHub → Settings → Developer settings → Personal access tokens
-2. Revocar el token usado
+2. Revocar cualquier token temporal usado
 3. Crear nuevo token si necesitas acceso futuro
 
 ---
