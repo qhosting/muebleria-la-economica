@@ -71,11 +71,11 @@ export async function GET(request: NextRequest) {
     // Organizar datos por cobrador
     const reportePorCobrador = cobradores.map((cobrador: any) => {
       const pagosRegulares = reporteGeneral.find(
-        r => r.cobradorId === cobrador.id && r.tipoPago === 'regular'
+        (r: any) => r.cobradorId === cobrador.id && r.tipoPago === 'regular'
       ) || { _sum: { monto: 0 }, _count: { _all: 0 } };
 
       const pagosMoratorios = reporteGeneral.find(
-        r => r.cobradorId === cobrador.id && r.tipoPago === 'moratorio'
+        (r: any) => r.cobradorId === cobrador.id && r.tipoPago === 'moratorio'
       ) || { _sum: { monto: 0 }, _count: { _all: 0 } };
 
       const totalCobrado = Number(pagosRegulares._sum.monto || 0) + Number(pagosMoratorios._sum.monto || 0);
@@ -89,7 +89,7 @@ export async function GET(request: NextRequest) {
         pagosMoratorios: Number(pagosMoratorios._sum.monto || 0),
         cantidadPagos,
       };
-    }).filter(cobrador => cobrador.totalCobrado > 0 || cobrador.cantidadPagos > 0);
+    }).filter((cobrador: any) => cobrador.totalCobrado > 0 || cobrador.cantidadPagos > 0);
 
     // Reporte por día
     let reportePorDia;
@@ -123,10 +123,10 @@ export async function GET(request: NextRequest) {
     }
 
     const totales = {
-      totalCobrado: reportePorCobrador.reduce((sum, r) => sum + r.totalCobrado, 0),
-      pagosRegulares: reportePorCobrador.reduce((sum, r) => sum + r.pagosRegulares, 0),
-      pagosMoratorios: reportePorCobrador.reduce((sum, r) => sum + r.pagosMoratorios, 0),
-      totalPagos: reportePorCobrador.reduce((sum, r) => sum + r.cantidadPagos, 0),
+      totalCobrado: reportePorCobrador.reduce((sum: any, r: any) => sum + r.totalCobrado, 0),
+      pagosRegulares: reportePorCobrador.reduce((sum: any, r: any) => sum + r.pagosRegulares, 0),
+      pagosMoratorios: reportePorCobrador.reduce((sum: any, r: any) => sum + r.pagosMoratorios, 0),
+      totalPagos: reportePorCobrador.reduce((sum: any, r: any) => sum + r.cantidadPagos, 0),
     };
 
     // Convertir BigInt a Number para serialización JSON

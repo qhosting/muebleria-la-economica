@@ -74,21 +74,21 @@ export async function GET(request: NextRequest) {
           cobradorId: cliente.cobradorAsignado?.id,
         };
       })
-      .filter(cliente => cliente.diasAtraso >= diasAtraso)
-      .sort((a, b) => b.diasAtraso - a.diasAtraso);
+      .filter((cliente: any) => cliente.diasAtraso >= diasAtraso)
+      .sort((a: any, b: any) => b.diasAtraso - a.diasAtraso);
 
     // Estadísticas de morosidad
     const stats = {
       totalMorosos: clientesMorosos.length,
-      montoTotalMoroso: clientesMorosos.reduce((sum, c) => sum + c.saldoActual, 0),
+      montoTotalMoroso: clientesMorosos.reduce((sum: any, c: any) => sum + c.saldoActual, 0),
       promedioAtraso: clientesMorosos.length > 0 
-        ? clientesMorosos.reduce((sum, c) => sum + c.diasAtraso, 0) / clientesMorosos.length 
+        ? clientesMorosos.reduce((sum: any, c: any) => sum + c.diasAtraso, 0) / clientesMorosos.length 
         : 0,
       rangosDiasAtraso: {
-        hasta7: clientesMorosos.filter(c => c.diasAtraso <= 7).length,
-        de8a15: clientesMorosos.filter(c => c.diasAtraso >= 8 && c.diasAtraso <= 15).length,
-        de16a30: clientesMorosos.filter(c => c.diasAtraso >= 16 && c.diasAtraso <= 30).length,
-        mas30: clientesMorosos.filter(c => c.diasAtraso > 30).length,
+        hasta7: clientesMorosos.filter((c: any) => c.diasAtraso <= 7).length,
+        de8a15: clientesMorosos.filter((c: any) => c.diasAtraso >= 8 && c.diasAtraso <= 15).length,
+        de16a30: clientesMorosos.filter((c: any) => c.diasAtraso >= 16 && c.diasAtraso <= 30).length,
+        mas30: clientesMorosos.filter((c: any) => c.diasAtraso > 30).length,
       },
     };
 

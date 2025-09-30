@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     // Agrupar por cobrador y día
     const rutasPorCobrador: any = {};
 
-    pagos.forEach(pago => {
+    pagos.forEach((pago: any) => {
       const cobradorId = pago.cobradorId;
       const fecha = format(pago.fechaPago, 'yyyy-MM-dd');
       
