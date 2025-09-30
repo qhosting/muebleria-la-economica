@@ -56,10 +56,25 @@ else
     echo "✅ NEXTAUTH_SECRET está configurada"
 fi
 
-# Verificar base de datos
+# Verificar y reparar cliente Prisma
+echo ""
+echo "🔧 Verificando instalación de Prisma..."
+if [ ! -d "node_modules/@prisma/client" ]; then
+    echo "❌ Cliente Prisma no encontrado, intentando reparar..."
+    npm install @prisma/client || echo "⚠️  Error instalando @prisma/client"
+    npx prisma generate || echo "⚠️  Error generando cliente"
+fi
+
+# Verificar archivos críticos de Prisma
+echo "🔍 Verificando archivos runtime de Prisma..."
+find node_modules/@prisma -name "*.wasm*" 2>/dev/null || echo "⚠️  Archivos WASM no encontrados"
+find node_modules/.prisma -name "*.js" 2>/dev/null | head -3 || echo "⚠️  Archivos JS no encontrados"
+
+# Verificar base de datos con manejo de P3005
 echo ""
 echo "📊 Probando conexión a la base de datos..."
-timeout 10 npx prisma db push --accept-data-loss || echo "⚠️  Timeout o error en conexión DB"
+echo "🔧 Usando db push para base de datos existente (evita P3005)..."
+timeout 15 npx prisma db push --accept-data-loss || echo "⚠️  Timeout o error en conexión DB - continuando..."
 
 # Intentar diferentes métodos de inicio
 echo ""

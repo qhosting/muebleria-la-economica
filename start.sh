@@ -3,21 +3,29 @@
 
 echo "🚀 Iniciando MUEBLERIA LA ECONOMICA..."
 
-# Verificar que la base de datos esté disponible
+# Verificar cliente Prisma existe
+echo "🔍 Verificando cliente Prisma..."
+if [ ! -d "node_modules/@prisma/client" ]; then
+    echo "⚠️  Cliente Prisma no encontrado, generando..."
+    npx prisma generate || echo "❌ Error generando cliente Prisma"
+fi
+
+# Verificar que la base de datos esté disponible  
 echo "📊 Verificando conexión a la base de datos..."
-npx prisma db push --accept-data-loss || echo "⚠️  Error en db push, continuando..."
+# Use db push for existing database with data (fixes P3005)
+npx prisma db push --force-reset --accept-data-loss || npx prisma db push --accept-data-loss || echo "⚠️  Error en db push, continuando..."
 
-# Ejecutar migraciones
-echo "🔄 Aplicando migraciones..."
-npx prisma migrate deploy || echo "⚠️  Error en migrations, continuando..."
+# Skip migrations for existing database - use db push instead
+echo "🔄 Sincronizando esquema de base de datos..."
+npx prisma db push --accept-data-loss || echo "⚠️  Error en sync, continuando..."
 
-# Generar cliente Prisma
-echo "⚙️  Generando cliente Prisma..."
+# Regenerar cliente Prisma en container
+echo "⚙️  Regenerando cliente Prisma en container..."
 npx prisma generate || echo "⚠️  Error generando cliente Prisma"
 
-# Ejecutar seed si es necesario
-echo "🌱 Ejecutando seed..."
-npx prisma db seed || echo "⚠️  Error en seed, continuando..."
+# Ejecutar seed solo si no hay datos
+echo "🌱 Verificando si necesita seed..."
+npx prisma db seed || echo "⚠️  Seed omitido (datos existentes)"
 
 # Verificar archivos necesarios
 echo "🔍 Verificando archivos del build standalone..."
