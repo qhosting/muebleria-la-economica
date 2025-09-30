@@ -1,84 +1,61 @@
 
 #!/bin/bash
-set -e
 
-echo "🚀 Script de despliegue para Coolify - MUEBLERIA LA ECONOMICA"
-echo "=================================================="
+echo "🚀 MUEBLERIA LA ECONOMICA - Deployment Script"
+echo "=============================================="
 
-# Verificar que estamos en el directorio correcto
-if [ ! -f "Dockerfile" ]; then
-    echo "❌ Error: Dockerfile no encontrado. Ejecuta este script desde el directorio raíz del proyecto."
-    exit 1
-fi
+# Colores para output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
-# Verificar que git esté inicializado
-if [ ! -d ".git" ]; then
-    echo "🔧 Inicializando repositorio Git..."
-    git init
-fi
-
-# Verificar archivos necesarios
-echo "🔍 Verificando archivos necesarios..."
-required_files=("Dockerfile" "docker-compose.yml" "app/package.json" "app/prisma/schema.prisma")
-for file in "${required_files[@]}"; do
-    if [ ! -f "$file" ]; then
-        echo "❌ Error: Archivo requerido no encontrado: $file"
-        exit 1
-    fi
-done
-
-echo "✅ Todos los archivos necesarios están presentes."
-
-# Mostrar estructura de archivos
-echo "📁 Estructura del proyecto:"
-echo "├── Dockerfile"
-echo "├── docker-compose.yml"
-echo "├── .coolify/"
-echo "│   └── docker-compose.yml"
-echo "├── app/"
-echo "│   ├── package.json"
-echo "│   ├── prisma/"
-echo "│   │   └── schema.prisma"
-echo "│   └── start.sh"
-echo "└── README-COOLIFY.md"
-
-# Verificar variables de entorno
-echo ""
-echo "🔑 Variables de entorno requeridas para Coolify:"
-echo "   DATABASE_URL - URL de conexión a PostgreSQL"
-echo "   NEXTAUTH_URL - URL pública de tu aplicación"
-echo "   NEXTAUTH_SECRET - Secreto para NextAuth"
+echo -e "${YELLOW}📋 INFORMACIÓN DEL DEPLOYMENT:${NC}"
+echo "Repositorio: https://github.com/qhosting/muebleria-la-economica.git"
+echo "Rama: main"
+echo "Build Pack: Docker"
 echo ""
 
-# Generar secreto si es necesario
-if command -v openssl > /dev/null; then
-    echo "🔐 Secreto sugerido para NEXTAUTH_SECRET:"
-    openssl rand -base64 32
-    echo ""
-fi
+echo -e "${YELLOW}🔑 VARIABLES DE ENTORNO REQUERIDAS:${NC}"
+echo ""
+echo "# Base de datos (Coolify la generará automáticamente)"
+echo "DATABASE_URL=postgresql://usuario:password@postgres:5432/muebleria_db"
+echo ""
+echo "# NextAuth (CRÍTICO - actualizar con URL real después del deploy)"
+echo "NEXTAUTH_URL=https://tu-app.coolify.com"
+echo "NEXTAUTH_SECRET=$(openssl rand -base64 32 2>/dev/null || echo 'genera-un-secreto-de-32-caracteres-aqui')"
+echo ""
+echo "# Configuración"
+echo "NODE_ENV=production"
+echo "PORT=3000"
+echo ""
 
-# Preparar para commit
-echo "📝 Preparando archivos para commit..."
-git add .
+echo -e "${YELLOW}👥 USUARIOS POR DEFECTO DEL SISTEMA:${NC}"
+echo "Admin:    admin@economica.local / admin123"
+echo "Gestor:   gestor@economica.local / gestor123" 
+echo "Cobrador: cobrador@economica.local / cobrador123"
+echo "Reportes: reportes@economica.local / reportes123"
+echo ""
 
-# Mostrar status
-echo "📊 Estado del repositorio:"
-git status --short
+echo -e "${GREEN}✅ PASOS PARA DEPLOYMENT EN COOLIFY:${NC}"
+echo ""
+echo "1️⃣  Ir al panel de Coolify"
+echo "2️⃣  Crear 'New Application'"
+echo "3️⃣  Seleccionar 'Public Repository'"
+echo "4️⃣  URL: https://github.com/qhosting/muebleria-la-economica.git"
+echo "5️⃣  Rama: main"
+echo "6️⃣  Build Pack: Docker"
+echo "7️⃣  Agregar PostgreSQL 15 como servicio"
+echo "8️⃣  Configurar variables de entorno (mostradas arriba)"
+echo "9️⃣  Hacer clic en 'Deploy'"
+echo "🔟 Actualizar NEXTAUTH_URL con la URL real asignada"
+echo ""
 
+echo -e "${YELLOW}⚠️  IMPORTANTE DESPUÉS DEL DEPLOYMENT:${NC}"
+echo "- Cambiar passwords por defecto"
+echo "- Actualizar NEXTAUTH_URL con dominio real"
+echo "- Probar funcionalidades en móvil"
+echo "- Verificar sincronización de datos"
 echo ""
-echo "✅ Preparación completada!"
-echo ""
-echo "📋 Próximos pasos:"
-echo "1. Revisar y ajustar las variables en .env.example"
-echo "2. Commit y push a tu repositorio:"
-echo "   git commit -m 'Configuración inicial para Coolify'"
-echo "   git remote add origin https://github.com/tu-usuario/muebleria-la-economica.git"
-echo "   git push -u origin main"
-echo ""
-echo "3. En Coolify:"
-echo "   - Crear nueva aplicación"
-echo "   - Usar repositorio Git"
-echo "   - Configurar variables de entorno"
-echo "   - Deploy!"
-echo ""
-echo "📖 Lee README-COOLIFY.md para instrucciones detalladas."
+
+echo -e "${GREEN}🎯 ¡Tu aplicación está lista para producción!${NC}"
