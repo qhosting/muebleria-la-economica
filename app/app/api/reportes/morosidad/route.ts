@@ -111,13 +111,13 @@ export async function GET(request: NextRequest) {
     });
 
     const reporteCobrador = morosidadPorCobrador.map((cobrador: any) => {
-      const clientesMorososCobrador = clientesMorosos.filter(c => c.cobradorId === cobrador.id);
+      const clientesMorososCobrador = clientesMorosos.filter((c: any) => c.cobradorId === cobrador.id);
       return {
         cobrador: cobrador.name,
         totalMorosos: clientesMorososCobrador.length,
-        montoMoroso: clientesMorososCobrador.reduce((sum, c) => sum + c.saldoActual, 0),
+        montoMoroso: clientesMorososCobrador.reduce((sum: any, c: any) => sum + c.saldoActual, 0),
         promedioAtraso: clientesMorososCobrador.length > 0 
-          ? clientesMorososCobrador.reduce((sum, c) => sum + c.diasAtraso, 0) / clientesMorososCobrador.length 
+          ? clientesMorososCobrador.reduce((sum: any, c: any) => sum + c.diasAtraso, 0) / clientesMorososCobrador.length 
           : 0,
       };
     });

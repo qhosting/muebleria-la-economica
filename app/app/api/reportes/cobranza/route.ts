@@ -130,7 +130,7 @@ export async function GET(request: NextRequest) {
     };
 
     // Convertir BigInt a Number para serialización JSON
-    const reportePorDiaFormatted = (reportePorDia as any[]).map(row => ({
+    const reportePorDiaFormatted = (reportePorDia as any[]).map((row: any) => ({
       fecha: row.fecha,
       pagos_regulares: Number(row.pagos_regulares),
       pagos_moratorios: Number(row.pagos_moratorios),

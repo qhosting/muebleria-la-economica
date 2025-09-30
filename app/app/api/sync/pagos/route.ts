@@ -115,9 +115,9 @@ export async function POST(request: NextRequest) {
       message: 'Sincronización completada',
       resultados,
       total: pagos.length,
-      sincronizados: resultados.filter(r => r.status === 'sincronizado').length,
-      duplicados: resultados.filter(r => r.status === 'duplicado').length,
-      errores: resultados.filter(r => r.status === 'error').length,
+      sincronizados: resultados.filter((r: any) => r.status === 'sincronizado').length,
+      duplicados: resultados.filter((r: any) => r.status === 'duplicado').length,
+      errores: resultados.filter((r: any) => r.status === 'error').length,
     });
   } catch (error) {
     console.error('Error en sincronización de pagos:', error);
