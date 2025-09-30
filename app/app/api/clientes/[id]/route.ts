@@ -63,7 +63,7 @@ export async function GET(
       importe2: cliente.importe2 ? parseFloat(cliente.importe2.toString()) : null,
       importe3: cliente.importe3 ? parseFloat(cliente.importe3.toString()) : null,
       importe4: cliente.importe4 ? parseFloat(cliente.importe4.toString()) : null,
-      pagos: cliente.pagos?.map(pago => ({
+      pagos: cliente.pagos?.map((pago: any) => ({
         ...pago,
         monto: parseFloat(pago.monto.toString())
       })) || []
