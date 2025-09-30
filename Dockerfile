@@ -32,7 +32,7 @@ RUN chmod +x build-with-standalone.sh
 # Build the application with standalone output - FORCE REBUILD NO CACHE
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT_MODE=standalone
-ENV BUILD_TIMESTAMP=20250930_071000_PRISMA_CLIENT_FIX
+ENV BUILD_TIMESTAMP=20250930_072500_PRISMA_PERMISSIONS_FIX
 RUN echo "Force rebuild timestamp: $BUILD_TIMESTAMP" && ./build-with-standalone.sh
 
 # Production image, copy all the files and run next
@@ -71,12 +71,13 @@ RUN chmod +x start.sh emergency-start.sh
 RUN mkdir -p node_modules/.prisma && chown -R nextjs:nodejs node_modules/.prisma
 RUN mkdir -p node_modules/@prisma && chown -R nextjs:nodejs node_modules/@prisma
 
-# Install prisma globally in container to fix npx issues
-RUN npm install -g prisma@6.16.3
-
 # Verify Prisma client installation
 RUN ls -la node_modules/@prisma/ || echo "⚠️  @prisma directory missing"
 RUN ls -la node_modules/.prisma/ || echo "⚠️  .prisma directory missing"
+RUN ls -la node_modules/prisma/ || echo "⚠️  prisma directory missing"
+
+# Verify Prisma CLI is available in node_modules/.bin
+RUN ls -la node_modules/.bin/prisma || echo "⚠️  prisma CLI not found in .bin"
 
 USER nextjs
 

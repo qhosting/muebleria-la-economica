@@ -3,29 +3,36 @@
 
 echo "🚀 Iniciando MUEBLERIA LA ECONOMICA..."
 
+# Configure PATH to include node_modules/.bin for Prisma CLI
+export PATH="$PATH:/app/node_modules/.bin"
+echo "📍 PATH configurado: $PATH"
+
+# Use local Prisma installation instead of npx (fixes permission errors)
+PRISMA_CMD="node_modules/.bin/prisma"
+
 # Verificar cliente Prisma existe
 echo "🔍 Verificando cliente Prisma..."
 if [ ! -d "node_modules/@prisma/client" ]; then
     echo "⚠️  Cliente Prisma no encontrado, generando..."
-    npx prisma generate || echo "❌ Error generando cliente Prisma"
+    $PRISMA_CMD generate || echo "❌ Error generando cliente Prisma"
 fi
 
 # Verificar que la base de datos esté disponible  
 echo "📊 Verificando conexión a la base de datos..."
 # Use db push for existing database with data (fixes P3005)
-npx prisma db push --force-reset --accept-data-loss || npx prisma db push --accept-data-loss || echo "⚠️  Error en db push, continuando..."
+$PRISMA_CMD db push --force-reset --accept-data-loss || $PRISMA_CMD db push --accept-data-loss || echo "⚠️  Error en db push, continuando..."
 
 # Skip migrations for existing database - use db push instead
 echo "🔄 Sincronizando esquema de base de datos..."
-npx prisma db push --accept-data-loss || echo "⚠️  Error en sync, continuando..."
+$PRISMA_CMD db push --accept-data-loss || echo "⚠️  Error en sync, continuando..."
 
 # Regenerar cliente Prisma en container
 echo "⚙️  Regenerando cliente Prisma en container..."
-npx prisma generate || echo "⚠️  Error generando cliente Prisma"
+$PRISMA_CMD generate || echo "⚠️  Error generando cliente Prisma"
 
 # Ejecutar seed solo si no hay datos
 echo "🌱 Verificando si necesita seed..."
-npx prisma db seed || echo "⚠️  Seed omitido (datos existentes)"
+$PRISMA_CMD db seed || echo "⚠️  Seed omitido (datos existentes)"
 
 # Verificar archivos necesarios
 echo "🔍 Verificando archivos del build standalone..."
