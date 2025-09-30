@@ -34,7 +34,7 @@ PORT=3000
 
 ### Paso 3: Configurar Base de Datos
 
-1. En Coolify, agregar **PostgreSQL 15**
+1. En Coolify, agregar **PostgreSQL 17** (Recomendado) o **PostgreSQL 15**
 2. Conectar con la aplicación
 3. Coolify generará automáticamente DATABASE_URL
 
