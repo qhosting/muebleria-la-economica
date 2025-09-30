@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
 
     // Calcular días de atraso para cada cliente
     const clientesMorosos = clientes
-      .map(cliente => {
+      .map((cliente: any) => {
         const ultimoPago = cliente.pagos[0];
         const fechaUltimoPago = ultimoPago ? ultimoPago.fechaPago : cliente.fechaVenta;
         const diasAtrasoCalculados = calcularDiasAtraso(fechaUltimoPago, cliente.periodicidad);
@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    const reporteCobrador = morosidadPorCobrador.map(cobrador => {
+    const reporteCobrador = morosidadPorCobrador.map((cobrador: any) => {
       const clientesMorososCobrador = clientesMorosos.filter(c => c.cobradorId === cobrador.id);
       return {
         cobrador: cobrador.name,

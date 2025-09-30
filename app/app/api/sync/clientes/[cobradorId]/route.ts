@@ -84,7 +84,7 @@ export async function GET(
     });
 
     // Transformar datos para formato offline
-    const clientesOffline = clientes.map(cliente => ({
+    const clientesOffline = clientes.map((cliente: any) => ({
       id: cliente.id,
       nombreCompleto: cliente.nombreCompleto,
       telefono: cliente.telefono,

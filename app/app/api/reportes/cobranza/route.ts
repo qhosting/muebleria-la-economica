@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
     });
 
     // Organizar datos por cobrador
-    const reportePorCobrador = cobradores.map(cobrador => {
+    const reportePorCobrador = cobradores.map((cobrador: any) => {
       const pagosRegulares = reporteGeneral.find(
         r => r.cobradorId === cobrador.id && r.tipoPago === 'regular'
       ) || { _sum: { monto: 0 }, _count: { _all: 0 } };

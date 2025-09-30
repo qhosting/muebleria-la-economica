@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Convert Decimal fields to numbers for JSON serialization
-    const pagosSerializados = pagos.map(pago => ({
+    const pagosSerializados = pagos.map((pago: any) => ({
       ...pago,
       monto: parseFloat(pago.monto.toString()),
       saldoAnterior: parseFloat(pago.saldoAnterior.toString()),
