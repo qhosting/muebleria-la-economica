@@ -37,6 +37,7 @@ export function DashboardClient({ session }: DashboardClientProps) {
 
   const userRole = session?.user?.role;
 
+  // 🚀 OPTIMIZACIÓN CRÍTICA: Separar efectos para evitar loops
   useEffect(() => {
     // Solo cargar estadísticas si el usuario tiene permisos
     if (['admin', 'gestor_cobranza', 'reporte_cobranza'].includes(userRole)) {
@@ -44,25 +45,33 @@ export function DashboardClient({ session }: DashboardClientProps) {
     } else {
       setLoading(false); // Para cobradores, no cargar estadísticas
     }
+  }, [userRole]);
 
-    // 🚀 OPTIMIZACIÓN: Redirección optimizada usando useRouter en lugar de window.location
-    if (userRole && userRole !== 'admin') {
-      // Usar setTimeout para evitar problemas de hidratación
-      const timer = setTimeout(() => {
-        switch (userRole) {
-          case 'gestor_cobranza':
-            window.location.replace('/dashboard/clientes');
-            break;
-          case 'reporte_cobranza':
-            window.location.replace('/dashboard/reportes');
-            break;
-          case 'cobrador':
-            window.location.replace('/dashboard/cobranza-mobile');
-            break;
-        }
-      }, 200); // Aumentar el delay ligeramente para mejor estabilidad
+  // 🚀 OPTIMIZACIÓN: Redirección en un efecto separado sin dependencias circulares
+  useEffect(() => {
+    if (!userRole) return;
+
+    const redirectUser = () => {
+      switch (userRole) {
+        case 'gestor_cobranza':
+          window.location.href = '/dashboard/clientes';
+          break;
+        case 'reporte_cobranza':
+          window.location.href = '/dashboard/reportes';
+          break;
+        case 'cobrador':
+          window.location.href = '/dashboard/cobranza-mobile';
+          break;
+      }
+    };
+
+    if (userRole !== 'admin') {
+      // Usar requestAnimationFrame para mejor rendimiento
+      const frame = requestAnimationFrame(() => {
+        setTimeout(redirectUser, 100);
+      });
       
-      return () => clearTimeout(timer);
+      return () => cancelAnimationFrame(frame);
     }
   }, [userRole]);
 

@@ -75,17 +75,27 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     { value: '7', label: 'DOMINGO' }
   ];
 
-  // 🚀 OPTIMIZACIÓN: Memoizar funciones para evitar re-renders
-  const handleOnline = useCallback(() => {
-    setIsOnline(true);
+  // 🚀 OPTIMIZACIÓN CRÍTICA: Simplificar gestión de conectividad
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // Establecer estado inicial
+    setIsOnline(navigator.onLine);
+
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
-  const handleOffline = useCallback(() => {
-    setIsOnline(false);
-  }, []);
-
-  // 🚀 OPTIMIZACIÓN: Cargar clientes de IndexedDB con debounce
-  const loadClientesOffline = useCallback(async () => {
+  // 🚀 OPTIMIZACIÓN: Cargar clientes de forma simple
+  const loadClientesOffline = async () => {
     if (!userId) return;
     
     try {
@@ -98,78 +108,54 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
       setClientesOffline(clientes);
     } catch (error) {
       console.error('Error loading clientes offline:', error);
+      setClientesOffline([]);
     }
-  }, [userId]);
+  };
 
-  // 🚀 OPTIMIZACIÓN: Event listeners optimizados (solo se ejecuta una vez)
+  // 🚀 OPTIMIZACIÓN: Un solo useEffect para carga inicial
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (!userId || userRole !== 'cobrador') return;
 
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Cargar clientes inicial
-    loadClientesOffline();
+    const initializeData = async () => {
+      setLoading(true);
 
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, [handleOnline, handleOffline, loadClientesOffline]);
+      try {
+        // Cargar estadísticas básicas
+        const stats = await getSyncStats(userId);
+        setStats(stats);
 
-  // 🚀 OPTIMIZACIÓN: Cargar datos solo cuando es necesario
-  useEffect(() => {
-    if (userId && userRole === 'cobrador' && clientesOffline.length === 0) {
-      loadInitialData();
-    }
-  }, [userId, userRole, clientesOffline.length]);
-
-  // 🚀 OPTIMIZACIÓN: Memoizar loadInitialData para evitar ejecuciones múltiples
-  const loadInitialData = useCallback(async () => {
-    if (!userId || loading) return;
-
-    setLoading(true);
-
-    try {
-      // Cargar estadísticas (operación ligera)
-      const stats = await getSyncStats(userId);
-      setStats(stats);
-
-      // 🚀 OPTIMIZACIÓN: Solo procesar clientes iniciales si realmente los necesitamos
-      if (initialClientes.length > 0 && clientesOffline.length === 0) {
-        // Usar transaction optimizada para mejor rendimiento
-        await db.transaction('rw', db.clientes, async () => {
-          for (const cliente of initialClientes) {
-            await db.clientes.put({
-              ...cliente,
-              lastSync: Date.now(),
-              syncStatus: 'synced' as const
-            });
-          }
-        });
-        
-        // Recargar clientes después de la inserción
+        // Cargar clientes de IndexedDB
         await loadClientesOffline();
-      }
 
-      // 🚀 OPTIMIZACIÓN: Sincronización más conservadora (solo si es crítico)
-      if (isOnline && clientesOffline.length === 0 && !stats?.clientesOffline) {
-        // Usar timeout para no bloquear el UI
-        setTimeout(() => {
-          syncService.syncAll(userId, false);
-        }, 1000);
-      }
+        // Procesar clientes iniciales si los hay
+        if (initialClientes.length > 0) {
+          try {
+            await db.transaction('rw', db.clientes, async () => {
+              for (const cliente of initialClientes) {
+                await db.clientes.put({
+                  ...cliente,
+                  lastSync: Date.now(),
+                  syncStatus: 'synced' as const
+                });
+              }
+            });
+            
+            // Recargar después de insertar
+            await loadClientesOffline();
+          } catch (dbError) {
+            console.error('Error saving initial clientes:', dbError);
+          }
+        }
 
-    } catch (error) {
-      console.error('Error loading initial data:', error);
-      // 🚀 OPTIMIZACIÓN: Toast menos agresivo
-      if (error instanceof Error && !error.message.includes('offline')) {
-        toast.error('Error cargando datos');
+      } catch (error) {
+        console.error('Error in initialization:', error);
+      } finally {
+        setLoading(false);
       }
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, loading, initialClientes, clientesOffline.length, isOnline, loadClientesOffline]);
+    };
+
+    initializeData();
+  }, [userId, userRole, initialClientes.length]); // Dependencias mínimas
 
   // 🚀 OPTIMIZACIÓN CRÍTICA: Memoizar filtrado para evitar re-cálculos constantes
   const filteredClientes = useMemo(() => {
@@ -219,30 +205,35 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     return { totalSaldoPendiente, clientesConDeuda, clientesAlDia };
   }, [filteredClientes]);
 
-  // 🚀 OPTIMIZACIÓN: Memoizar handlers para evitar re-renders de componentes hijos
-  const handleCobrar = useCallback((cliente: OfflineCliente) => {
+  // 🚀 OPTIMIZACIÓN: Handlers simplificados sin memoización compleja
+  const handleCobrar = (cliente: OfflineCliente) => {
     setSelectedCliente(cliente);
     setShowCobroModal(true);
-  }, []);
+  };
 
-  const handleVerPagos = useCallback((cliente: OfflineCliente) => {
+  const handleVerPagos = (cliente: OfflineCliente) => {
     setSelectedCliente(cliente);
     setShowPagosModal(true);
-  }, []);
+  };
 
-  const handleModalSuccess = useCallback(() => {
-    // 🚀 OPTIMIZACIÓN: Solo recargar clientes en lugar de toda la data
-    loadClientesOffline();
+  const handleModalSuccess = async () => {
+    // Recargar clientes después de un pago exitoso
+    await loadClientesOffline();
     
-    // Recargar estadísticas ligeras
+    // Recargar estadísticas básicas
     if (userId) {
-      getSyncStats(userId).then(setStats);
+      try {
+        const stats = await getSyncStats(userId);
+        setStats(stats);
+      } catch (error) {
+        console.error('Error updating stats:', error);
+      }
     }
-  }, [loadClientesOffline, userId]);
+  };
 
-  const toggleSort = useCallback(() => {
+  const toggleSort = () => {
     setSortOrder(prevOrder => prevOrder === 'asc' ? 'desc' : 'asc');
-  }, []);
+  };
 
   if (userRole !== 'cobrador') {
     return (
