@@ -51,74 +51,40 @@ echo "🔍 Verificando archivos del build standalone..."
 echo "📁 Contenido directorio actual:"
 ls -la . || echo "Error listando directorio actual"
 
-echo "📁 Buscando server.js en múltiples ubicaciones:"
+echo "📁 Verificando archivos de Next.js standalone..."
 
-# CRITICAL: Verificar estructura completa del directorio
-echo "📋 Estructura completa de /app:"
-ls -laR /app/ | head -100
-
-# Buscar server.js en el orden correcto (raíz primero)
-if [ -f "/app/server.js" ]; then
-    echo "✅ server.js encontrado en /app/ (CORRECTO)"
-    SERVER_PATH="/app/server.js"
-    WORK_DIR="/app"
-elif [ -f "server.js" ]; then
-    echo "✅ server.js encontrado en directorio actual"
-    SERVER_PATH="./server.js"
-    WORK_DIR="$(pwd)"
-elif [ -f ".next/standalone/server.js" ]; then
-    echo "✅ server.js encontrado en .next/standalone/"
-    SERVER_PATH=".next/standalone/server.js"
-    WORK_DIR=".next/standalone"
-elif [ -f "app/server.js" ]; then
-    echo "⚠️  server.js encontrado en app/ (POSIBLEMENTE INCORRECTO)"
-    echo "🔍 Verificando contenido de app/:"
-    ls -la app/ | head -20
-    SERVER_PATH="app/server.js"
-    WORK_DIR="app"
-else
-    echo "❌ ERROR: server.js NO ENCONTRADO en ninguna ubicación"
-    echo "📋 Verificando estructura de directorios:"
-    echo "=== /app/ ==="
-    ls -la /app/ 2>/dev/null || echo "/app directory issue"
-    echo "=== /app/.next/ ==="
-    ls -la /app/.next/ 2>/dev/null || echo ".next directory no existe"
-    echo "=== /app/app/ ==="
-    ls -la /app/app/ 2>/dev/null || echo "app subdirectory no existe"
-    echo "🔄 Intentando con next start como fallback..."
+# Verify server.js exists in the correct location (/app/server.js)
+if [ ! -f "/app/server.js" ]; then
+    echo "❌ ERROR CRÍTICO: server.js NO ENCONTRADO en /app/server.js"
+    echo "📋 Estructura del directorio /app:"
+    ls -la /app/ | head -30
+    echo ""
+    echo "🔍 Buscando server.js en todo el filesystem:"
+    find /app -name "server.js" -type f 2>/dev/null | head -10
+    echo ""
+    echo "❌ El Dockerfile no copió correctamente el standalone build"
+    echo "🔄 Intentando fallback con next start..."
     exec npx next start
     exit 1
 fi
 
-# Iniciar la aplicación
-echo "🎯 Iniciando servidor Next.js standalone"
-echo "   📂 Working directory: $WORK_DIR"
-echo "   📄 Server path: $SERVER_PATH"
-echo "   🔧 Verificando permisos:"
-ls -la "$SERVER_PATH"
+echo "✅ server.js encontrado en /app/server.js (CORRECTO)"
+echo "📋 Contenido del directorio /app:"
+ls -la /app/ | head -20
 
-# CRITICAL: Always use absolute path and correct working directory
-echo "🚀 Cambiando a working directory: $WORK_DIR"
-cd "$WORK_DIR" || {
-    echo "❌ ERROR: No se puede cambiar a $WORK_DIR"
+# Iniciar la aplicación desde /app con server.js
+echo ""
+echo "🎯 Iniciando servidor Next.js standalone..."
+echo "   📂 Working directory: /app"
+echo "   📄 Server: /app/server.js"
+echo "   🌐 Hostname: 0.0.0.0"
+echo "   🔌 Port: 3000"
+echo ""
+
+cd /app || {
+    echo "❌ ERROR: No se puede cambiar a /app"
     exit 1
 }
 
-echo "📍 PWD actual: $(pwd)"
-echo "📁 Contenido del directorio actual:"
-ls -la . | head -20
-
-# Verificar que podemos acceder al server.js desde aquí
-if [ -f "server.js" ]; then
-    echo "✅ server.js accesible desde working directory"
-    echo "🎯 EJECUTANDO: node server.js"
-    exec node server.js
-elif [ -f "$SERVER_PATH" ]; then
-    echo "✅ server.js accesible desde path absoluto"
-    echo "🎯 EJECUTANDO: node $SERVER_PATH"
-    exec node "$SERVER_PATH"
-else
-    echo "❌ ERROR: server.js no accesible"
-    echo "🔄 Intentando fallback..."
-    exec npx next start
-fi
+echo "🚀 EJECUTANDO: node server.js"
+exec node server.js

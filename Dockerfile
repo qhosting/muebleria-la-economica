@@ -53,7 +53,8 @@ RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
 # Automatically leverage output traces to reduce image size
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# CRITICAL: Copy from standalone/app/* because outputFileTracingRoot creates nested structure
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/app ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Copy Prisma files with CORRECT PERMISSIONS - COMPLETE RUNTIME + CLI
