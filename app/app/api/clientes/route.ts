@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Convert Decimal fields to numbers for JSON serialization
-    const clientesSerializados = clientes.map(cliente => ({
+    const clientesSerializados = clientes.map((cliente: any) => ({
       ...cliente,
       montoPago: parseFloat(cliente.montoPago.toString()),
       saldoActual: parseFloat(cliente.saldoActual.toString()),
