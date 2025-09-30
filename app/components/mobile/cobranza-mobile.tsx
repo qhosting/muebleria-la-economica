@@ -94,8 +94,8 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     };
   }, []);
 
-  // 🚀 OPTIMIZACIÓN: Cargar clientes de forma simple
-  const loadClientesOffline = async () => {
+  // 🚀 OPTIMIZACIÓN CRÍTICA: Cargar clientes con useCallback para evitar re-creaciones
+  const loadClientesOffline = useCallback(async () => {
     if (!userId) return;
     
     try {
@@ -105,43 +105,77 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
         .and(cliente => cliente.statusCuenta === 'activo')
         .toArray();
       
-      setClientesOffline(clientes);
+      // Solo actualizar si hay cambios para evitar re-renders innecesarios
+      setClientesOffline(prevClientes => {
+        // Comparación simple por longitud y algunos IDs
+        if (prevClientes.length !== clientes.length) {
+          return clientes;
+        }
+        
+        // Verificar algunos IDs para detectar cambios
+        const prevIds = prevClientes.slice(0, 5).map(c => c.id).sort();
+        const newIds = clientes.slice(0, 5).map(c => c.id).sort();
+        
+        if (JSON.stringify(prevIds) !== JSON.stringify(newIds)) {
+          return clientes;
+        }
+        
+        // Si no hay cambios significativos, mantener el estado anterior
+        return prevClientes;
+      });
     } catch (error) {
       console.error('Error loading clientes offline:', error);
       setClientesOffline([]);
     }
-  };
+  }, [userId]); // Solo depende del userId
 
-  // 🚀 OPTIMIZACIÓN: Un solo useEffect para carga inicial
+  // 🚀 OPTIMIZACIÓN CRÍTICA: Un solo useEffect sin bucles para carga inicial
   useEffect(() => {
-    if (!userId || userRole !== 'cobrador') return;
+    if (!userId || userRole !== 'cobrador') {
+      setLoading(false);
+      return;
+    }
 
+    let mounted = true; // Flag para evitar actualizaciones si el componente se desmonta
+    
     const initializeData = async () => {
+      if (!mounted) return;
       setLoading(true);
 
       try {
         // Cargar estadísticas básicas
         const stats = await getSyncStats(userId);
-        setStats(stats);
+        if (mounted) setStats(stats);
 
         // Cargar clientes de IndexedDB
         await loadClientesOffline();
 
-        // Procesar clientes iniciales si los hay
+        // Procesar clientes iniciales solo si los hay y no se han procesado antes
         if (initialClientes.length > 0) {
           try {
-            await db.transaction('rw', db.clientes, async () => {
-              for (const cliente of initialClientes) {
-                await db.clientes.put({
-                  ...cliente,
-                  lastSync: Date.now(),
-                  syncStatus: 'synced' as const
-                });
-              }
-            });
+            // Verificar si ya existen clientes en IndexedDB para evitar duplicados
+            const existingClientes = await db.clientes
+              .where('cobradorAsignadoId')
+              .equals(userId)
+              .count();
             
-            // Recargar después de insertar
-            await loadClientesOffline();
+            // Solo insertar si no hay clientes existentes
+            if (existingClientes === 0) {
+              await db.transaction('rw', db.clientes, async () => {
+                for (const cliente of initialClientes) {
+                  await db.clientes.put({
+                    ...cliente,
+                    lastSync: Date.now(),
+                    syncStatus: 'synced' as const
+                  });
+                }
+              });
+              
+              // Recargar después de insertar solo si el componente sigue montado
+              if (mounted) {
+                await loadClientesOffline();
+              }
+            }
           } catch (dbError) {
             console.error('Error saving initial clientes:', dbError);
           }
@@ -150,12 +184,61 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
       } catch (error) {
         console.error('Error in initialization:', error);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     };
 
     initializeData();
-  }, [userId, userRole, initialClientes.length]); // Dependencias mínimas
+
+    // Cleanup function
+    return () => {
+      mounted = false;
+    };
+  }, [userId, userRole]); // Solo dependencias estables, removemos initialClientes.length
+
+  // 🚀 OPTIMIZACIÓN: Procesar clientes iniciales en un useEffect separado y controlado
+  useEffect(() => {
+    if (!userId || userRole !== 'cobrador' || initialClientes.length === 0) return;
+    if (loading) return; // No procesar si aún está cargando
+    
+    let mounted = true;
+    
+    const processInitialClientes = async () => {
+      try {
+        // Solo procesar si hay clientes y no se han guardado antes
+        const existingCount = await db.clientes
+          .where('cobradorAsignadoId')
+          .equals(userId)
+          .count();
+        
+        if (existingCount === 0 && mounted) {
+          await db.transaction('rw', db.clientes, async () => {
+            for (const cliente of initialClientes) {
+              await db.clientes.put({
+                ...cliente,
+                lastSync: Date.now(),
+                syncStatus: 'synced' as const
+              });
+            }
+          });
+          
+          if (mounted) {
+            await loadClientesOffline();
+          }
+        }
+      } catch (error) {
+        console.error('Error processing initial clientes:', error);
+      }
+    };
+
+    processInitialClientes();
+
+    return () => {
+      mounted = false;
+    };
+  }, [initialClientes, userId, userRole, loading]); // Controlado con flag de loading
 
   // 🚀 OPTIMIZACIÓN CRÍTICA: Memoizar filtrado para evitar re-cálculos constantes
   const filteredClientes = useMemo(() => {
@@ -216,20 +299,21 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     setShowPagosModal(true);
   };
 
-  const handleModalSuccess = async () => {
-    // Recargar clientes después de un pago exitoso
-    await loadClientesOffline();
-    
-    // Recargar estadísticas básicas
-    if (userId) {
-      try {
+  // 🚀 OPTIMIZACIÓN: Handler optimizado con useCallback
+  const handleModalSuccess = useCallback(async () => {
+    try {
+      // Recargar clientes después de un pago exitoso
+      await loadClientesOffline();
+      
+      // Recargar estadísticas básicas
+      if (userId) {
         const stats = await getSyncStats(userId);
         setStats(stats);
-      } catch (error) {
-        console.error('Error updating stats:', error);
       }
+    } catch (error) {
+      console.error('Error in modal success handler:', error);
     }
-  };
+  }, [loadClientesOffline, userId]); // Dependencias claras
 
   const toggleSort = () => {
     setSortOrder(prevOrder => prevOrder === 'asc' ? 'desc' : 'asc');

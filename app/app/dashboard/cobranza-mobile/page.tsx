@@ -1,65 +1,78 @@
 
-// Página principal de cobranza móvil PWA - VERSIÓN SIMPLIFICADA
+// Página principal de cobranza móvil PWA - VERSIÓN OPTIMIZADA SIN BUCLES
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { redirect } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import CobranzaMobile from '@/components/mobile/cobranza-mobile';
 import { OfflineCliente } from '@/lib/offline-db';
 
 export default function CobranzaMobilePage() {
   const { data: session, status } = useSession();
+  const router = useRouter();
   const [initialClientes, setInitialClientes] = useState<OfflineCliente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
+  const dataLoadedRef = useRef(false);
 
   const userRole = (session?.user as any)?.role;
   const userId = (session?.user as any)?.id;
 
-  // 🚀 OPTIMIZACIÓN CRÍTICA: Simplificar lógica de carga
+  // 🚀 OPTIMIZACIÓN CRÍTICA: Un solo useEffect para autenticación sin bucles
   useEffect(() => {
     if (status === 'loading') return;
-    
+    if (authChecked) return; // Evitar múltiples verificaciones
+
+    setAuthChecked(true);
+
+    // Verificar autenticación sin redirect múltiple
     if (!session) {
-      redirect('/login');
+      router.replace('/login');
       return;
     }
 
     if (userRole !== 'cobrador') {
-      redirect('/dashboard');
+      router.replace('/dashboard');
       return;
     }
 
-    // Cargar datos de forma simple sin dependencias complejas
-    loadInitialData();
-  }, [session, status, userRole, userId]);
+    // Solo cargar datos una vez
+    if (!dataLoadedRef.current && userId) {
+      loadInitialData();
+      dataLoadedRef.current = true;
+    } else {
+      setLoading(false);
+    }
+  }, [status, session, userRole, userId, router, authChecked]);
 
   const loadInitialData = async () => {
     try {
-      if (!userId) {
-        setLoading(false);
-        return;
-      }
-
       // Intentar cargar clientes solo si hay conexión
-      if (typeof window !== 'undefined' && navigator.onLine) {
-        const response = await fetch(`/api/sync/clientes/${userId}?full=true`);
+      if (typeof window !== 'undefined' && navigator.onLine && userId) {
+        const response = await fetch(`/api/sync/clientes/${userId}?full=true`, {
+          headers: {
+            'Cache-Control': 'no-cache'
+          }
+        });
+        
         if (response.ok) {
           const clientes = await response.json();
-          setInitialClientes(clientes || []);
+          if (Array.isArray(clientes)) {
+            setInitialClientes(clientes);
+          }
         }
       }
     } catch (error) {
       console.error('Error loading initial data:', error);
       // En caso de error, continuar con array vacío
-      setInitialClientes([]);
     } finally {
       setLoading(false);
     }
   };
 
-  // Estados de carga simplificados
-  if (status === 'loading') {
+  // Estados de carga simplificados con mejores condiciones
+  if (status === 'loading' || !authChecked) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
@@ -70,14 +83,15 @@ export default function CobranzaMobilePage() {
     );
   }
 
-  if (!session) {
-    redirect('/login');
-    return null;
-  }
-
-  if (userRole !== 'cobrador') {
-    redirect('/dashboard');
-    return null;
+  if (!session || userRole !== 'cobrador') {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Redirigiendo...</p>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
