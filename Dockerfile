@@ -14,7 +14,7 @@ ENV YARN_CACHE_FOLDER=/app/.yarn-cache
 FROM base AS deps
 COPY app/package.json app/yarn.lock* ./
 RUN --mount=type=cache,target=/app/.yarn-cache \
-    yarn install --frozen-lockfile --production=false
+    yarn install --production=false
 
 # Rebuild the source code only when needed
 FROM base AS builder
