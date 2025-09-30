@@ -7,8 +7,20 @@ echo "🚀 Iniciando MUEBLERIA LA ECONOMICA..."
 export PATH="$PATH:/app/node_modules/.bin"
 echo "📍 PATH configurado: $PATH"
 
-# Use local Prisma installation instead of npx (fixes permission errors)
-PRISMA_CMD="node_modules/.bin/prisma"
+# Verify .bin directory and Prisma CLI exist
+echo "🔍 Verificando Prisma CLI..."
+if [ -f "node_modules/.bin/prisma" ]; then
+    echo "✅ Prisma CLI encontrado en node_modules/.bin/prisma"
+    PRISMA_CMD="node_modules/.bin/prisma"
+elif [ -f "node_modules/prisma/build/index.js" ]; then
+    echo "⚠️  Usando Prisma directamente desde build/index.js"
+    PRISMA_CMD="node node_modules/prisma/build/index.js"
+else
+    echo "❌ Prisma CLI no encontrado - intentando con npx"
+    PRISMA_CMD="npx prisma"
+fi
+
+echo "🎯 Comando Prisma: $PRISMA_CMD"
 
 # Verificar cliente Prisma existe
 echo "🔍 Verificando cliente Prisma..."

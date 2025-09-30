@@ -58,8 +58,22 @@ fi
 
 # Configure PATH to include node_modules/.bin for Prisma CLI
 export PATH="$PATH:/app/node_modules/.bin"
-PRISMA_CMD="node_modules/.bin/prisma"
 echo "📍 PATH configurado con Prisma local: $PATH"
+
+# Verify .bin directory and Prisma CLI exist with fallbacks
+echo "🔍 Verificando Prisma CLI disponible..."
+if [ -f "node_modules/.bin/prisma" ]; then
+    echo "✅ Prisma CLI encontrado en node_modules/.bin/prisma"
+    PRISMA_CMD="node_modules/.bin/prisma"
+elif [ -f "node_modules/prisma/build/index.js" ]; then
+    echo "⚠️  Usando Prisma directamente desde build/index.js"
+    PRISMA_CMD="node node_modules/prisma/build/index.js"
+else
+    echo "❌ Prisma CLI no encontrado - intentando con npx (puede causar permission errors)"
+    PRISMA_CMD="npx prisma"
+fi
+
+echo "🎯 Comando Prisma configurado: $PRISMA_CMD"
 
 # Verificar y reparar cliente Prisma
 echo ""

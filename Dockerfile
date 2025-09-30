@@ -32,7 +32,7 @@ RUN chmod +x build-with-standalone.sh
 # Build the application with standalone output - FORCE REBUILD NO CACHE
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT_MODE=standalone
-ENV BUILD_TIMESTAMP=20250930_072500_PRISMA_PERMISSIONS_FIX
+ENV BUILD_TIMESTAMP=20250930_073500_PRISMA_BIN_FIX
 RUN echo "Force rebuild timestamp: $BUILD_TIMESTAMP" && ./build-with-standalone.sh
 
 # Production image, copy all the files and run next
@@ -56,11 +56,12 @@ RUN chown nextjs:nodejs .next
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
-# Copy Prisma files with CORRECT PERMISSIONS - COMPLETE RUNTIME
+# Copy Prisma files with CORRECT PERMISSIONS - COMPLETE RUNTIME + CLI
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/@prisma ./node_modules/@prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules/.bin ./node_modules/.bin
 
 # Copy start scripts with CORRECT PERMISSIONS
 COPY --chown=nextjs:nodejs start.sh ./
@@ -70,14 +71,16 @@ RUN chmod +x start.sh emergency-start.sh
 # Create writable directory for Prisma with correct permissions
 RUN mkdir -p node_modules/.prisma && chown -R nextjs:nodejs node_modules/.prisma
 RUN mkdir -p node_modules/@prisma && chown -R nextjs:nodejs node_modules/@prisma
+RUN mkdir -p node_modules/.bin && chown -R nextjs:nodejs node_modules/.bin
 
-# Verify Prisma client installation
+# Verify Prisma client installation - CRITICAL CHECKS
 RUN ls -la node_modules/@prisma/ || echo "⚠️  @prisma directory missing"
 RUN ls -la node_modules/.prisma/ || echo "⚠️  .prisma directory missing"
 RUN ls -la node_modules/prisma/ || echo "⚠️  prisma directory missing"
 
-# Verify Prisma CLI is available in node_modules/.bin
-RUN ls -la node_modules/.bin/prisma || echo "⚠️  prisma CLI not found in .bin"
+# Verify Prisma CLI is available in node_modules/.bin - MUST EXIST
+RUN ls -la node_modules/.bin/ || echo "⚠️  .bin directory missing"
+RUN ls -la node_modules/.bin/prisma && echo "✅ Prisma CLI found in .bin" || echo "❌ CRITICAL: prisma CLI not found in .bin"
 
 USER nextjs
 
