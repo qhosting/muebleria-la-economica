@@ -25,23 +25,36 @@ COPY app/ .
 # Generate Prisma client with complete runtime
 RUN npx prisma generate --generator client
 
-# Build the application with standalone output - FORCED BUILD
+# Build the application with standalone output
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-ENV BUILD_TIMESTAMP=20251009_025500_FORCED_STANDALONE
+ENV BUILD_TIMESTAMP=20251009_030000_STANDALONE_HARDCODED
 
-# Force standalone output and build
+# Build Next.js with standalone output (configured in next.config.js)
 RUN echo "🏗️ Building Next.js with standalone output..." && \
-    node -e "const fs=require('fs');const cfg=fs.readFileSync('next.config.js','utf8').replace(/output:.*,/,'output:\"standalone\",');fs.writeFileSync('next.config.js',cfg);" && \
-    echo "📋 Verifying next.config.js:" && \
-    grep -A2 "output:" next.config.js && \
-    echo "\n🔨 Running build..." && \
+    echo "📋 Verifying next.config.js has standalone output:" && \
+    grep "output:" next.config.js && \
+    echo "" && \
+    echo "🔨 Running build..." && \
     yarn build && \
-    echo "\n✅ Build completed!" && \
-    echo "\n📁 Checking .next structure:" && \
+    echo "" && \
+    echo "✅ Build completed!" && \
+    echo "" && \
+    echo "📁 Checking .next structure:" && \
     ls -la .next/ && \
-    echo "\n📁 Checking .next/standalone:" && \
-    find .next/standalone -type f -o -type d | head -30 || echo "⚠️  No standalone directory found"
+    echo "" && \
+    echo "📁 Checking .next/standalone directory:" && \
+    if [ -d ".next/standalone" ]; then \
+        echo "✅ Standalone directory found!"; \
+        ls -la .next/standalone/ | head -20; \
+        echo ""; \
+        echo "📄 Checking for server.js:"; \
+        find .next/standalone -name "server.js" -type f; \
+    else \
+        echo "❌ ERROR: Standalone directory NOT found!"; \
+        echo "This means Next.js did not generate standalone output."; \
+        exit 1; \
+    fi
 
 # Production image, copy all the files and run next
 FROM base AS runner

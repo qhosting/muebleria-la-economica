@@ -3,7 +3,8 @@ const path = require('path');
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   distDir: process.env.NEXT_DIST_DIR || '.next',
-  output: process.env.NEXT_OUTPUT_MODE,
+  // Always use standalone for production, respect NEXT_OUTPUT_MODE for development
+  output: 'standalone',
   experimental: {
     outputFileTracingRoot: path.join(__dirname, '../'),
   },
