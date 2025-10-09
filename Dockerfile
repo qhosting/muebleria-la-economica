@@ -25,15 +25,17 @@ COPY app/ .
 # Generate Prisma client with complete runtime
 RUN npx prisma generate --generator client
 
-# Copy and prepare the standalone build script
-COPY build-with-standalone.sh ./
-RUN chmod +x build-with-standalone.sh
-
-# Build the application with standalone output - FORCE REBUILD NO CACHE
+# Build the application with standalone output - DIRECT BUILD
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NEXT_OUTPUT_MODE=standalone
-ENV BUILD_TIMESTAMP=20250930_073500_PRISMA_BIN_FIX
-RUN echo "Force rebuild timestamp: $BUILD_TIMESTAMP" && ./build-with-standalone.sh
+ENV BUILD_TIMESTAMP=20251009_013500_SIMPLIFIED_BUILD
+
+# Build Next.js directly without intermediate script
+RUN echo "🏗️ Building Next.js with standalone output..." && \
+    yarn build && \
+    echo "✅ Build completed!" && \
+    ls -la .next/ && \
+    ls -la .next/standalone/ || echo "⚠️  Standalone directory not found"
 
 # Production image, copy all the files and run next
 FROM base AS runner
