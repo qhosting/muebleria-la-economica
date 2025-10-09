@@ -25,17 +25,23 @@ COPY app/ .
 # Generate Prisma client with complete runtime
 RUN npx prisma generate --generator client
 
-# Build the application with standalone output - DIRECT BUILD
+# Build the application with standalone output - FORCED BUILD
 ENV NEXT_TELEMETRY_DISABLED=1
-ENV NEXT_OUTPUT_MODE=standalone
-ENV BUILD_TIMESTAMP=20251009_013500_SIMPLIFIED_BUILD
+ENV NODE_ENV=production
+ENV BUILD_TIMESTAMP=20251009_025500_FORCED_STANDALONE
 
-# Build Next.js directly without intermediate script
+# Force standalone output and build
 RUN echo "🏗️ Building Next.js with standalone output..." && \
+    node -e "const fs=require('fs');const cfg=fs.readFileSync('next.config.js','utf8').replace(/output:.*,/,'output:\"standalone\",');fs.writeFileSync('next.config.js',cfg);" && \
+    echo "📋 Verifying next.config.js:" && \
+    grep -A2 "output:" next.config.js && \
+    echo "\n🔨 Running build..." && \
     yarn build && \
-    echo "✅ Build completed!" && \
+    echo "\n✅ Build completed!" && \
+    echo "\n📁 Checking .next structure:" && \
     ls -la .next/ && \
-    ls -la .next/standalone/ || echo "⚠️  Standalone directory not found"
+    echo "\n📁 Checking .next/standalone:" && \
+    find .next/standalone -type f -o -type d | head -30 || echo "⚠️  No standalone directory found"
 
 # Production image, copy all the files and run next
 FROM base AS runner
@@ -55,9 +61,22 @@ RUN mkdir .next
 RUN chown nextjs:nodejs .next
 
 # Automatically leverage output traces to reduce image size
-# CRITICAL: Copy from standalone/app/* because outputFileTracingRoot creates nested structure
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/app ./
+# Copy standalone output - flexible approach for different structures
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+
+# Move nested app directory to root if it exists (due to outputFileTracingRoot)
+RUN if [ -f "app/server.js" ]; then \
+      echo "📦 Found nested app structure, moving to root..."; \
+      cp -r app/* . && rm -rf app; \
+    elif [ -f "server.js" ]; then \
+      echo "✅ server.js already in root"; \
+    else \
+      echo "❌ ERROR: server.js not found!"; \
+      echo "📋 Current directory contents:"; \
+      ls -laR; \
+      exit 1; \
+    fi
 
 # Copy Prisma files with CORRECT PERMISSIONS - COMPLETE RUNTIME + CLI
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
