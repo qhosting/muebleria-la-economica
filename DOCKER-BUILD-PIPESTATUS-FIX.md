@@ -23,9 +23,13 @@ RUN if [ -f ".next/BUILD_ID" ]; then ...
 
 ## ✅ Solución Implementada
 
-### Usar PIPESTATUS para Capturar el Exit Code Real
+### Cambiar Shell a Bash y Usar PIPESTATUS
 
 ```dockerfile
+# Change shell to bash for PIPESTATUS support
+SHELL ["/bin/bash", "-c"]
+
+# Build Next.js with proper error handling using bash
 RUN echo "🔨 Building Next.js application..." && \
     npm run build 2>&1 | tee build.log; \
     BUILD_EXIT_CODE=${PIPESTATUS[0]}; \
@@ -47,14 +51,25 @@ RUN echo "🔨 Building Next.js application..." && \
 ```
 
 **Mejoras:**
-1. ✅ Usa `${PIPESTATUS[0]}` para capturar el exit code de `npm run build`
-2. ✅ Verifica explícitamente si el build falló antes de continuar
-3. ✅ Consolida build y verificación en un solo RUN command
-4. ✅ Muestra contenido de .next/ si BUILD_ID no existe
+1. ✅ Cambia el SHELL a `/bin/bash` para soportar `PIPESTATUS` (por defecto usa `/bin/sh`)
+2. ✅ Usa `${PIPESTATUS[0]}` para capturar el exit code de `npm run build`
+3. ✅ Verifica explícitamente si el build falló antes de continuar
+4. ✅ Consolida build y verificación en un solo RUN command
+5. ✅ Muestra contenido de .next/ si BUILD_ID no existe
 
 ---
 
 ## 🎯 Cómo Funciona
+
+### Por Qué Cambiar el Shell
+
+Por defecto, `RUN` en Dockerfile usa `/bin/sh`, que puede ser:
+- **dash** (en Debian/Ubuntu)
+- **ash** (en Alpine Linux)
+
+Ninguno de estos shells soporta `PIPESTATUS`, que es una **característica exclusiva de Bash**.
+
+Solución: Usar `SHELL ["/bin/bash", "-c"]` para cambiar el shell por defecto.
 
 ### PIPESTATUS en Bash
 
@@ -126,6 +141,7 @@ drwxr-xr-x 2 root root 4096 Oct 11 18:00 cache
 | v1 | BUILD_ID en .build/ | `ENV NEXT_DIST_DIR=".next"` |
 | v2 | String vacío rechazado | No establecer `NEXT_OUTPUT_MODE` |
 | v3 | Exit code no capturado | `PIPESTATUS[0]` + consolidar RUN |
+| v4 | PIPESTATUS no existe en /bin/sh | `SHELL ["/bin/bash", "-c"]` |
 
 ---
 

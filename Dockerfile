@@ -54,7 +54,10 @@ RUN echo "📦 Generating Prisma client..." && \
     npx prisma generate && \
     echo "✅ Prisma client generated"
 
-# Build Next.js with proper error handling
+# Change shell to bash for PIPESTATUS support
+SHELL ["/bin/bash", "-c"]
+
+# Build Next.js with proper error handling using bash
 RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
     npm run build 2>&1 | tee build.log; \
     BUILD_EXIT_CODE=${PIPESTATUS[0]}; \
