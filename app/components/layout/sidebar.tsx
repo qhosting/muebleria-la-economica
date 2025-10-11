@@ -23,6 +23,7 @@ import {
   Route,
   Receipt,
   AlertTriangle,
+  Upload,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -72,6 +73,12 @@ const navigation = [
     href: '/dashboard/morosidad',
     icon: AlertTriangle,
     roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+  },
+  {
+    name: 'Importar Saldos',
+    href: '/dashboard/saldos',
+    icon: Upload,
+    roles: ['admin', 'gestor_cobranza'],
   },
   {
     name: 'Rutas',

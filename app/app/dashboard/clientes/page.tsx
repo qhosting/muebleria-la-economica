@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ClienteModal } from '@/components/clientes/ClienteModal';
 import { ImportarClientesModal } from '@/components/clientes/ImportarClientesModal';
+import { ExportButton } from '@/components/export-button';
 import { 
   Users, 
   Search, 
@@ -243,6 +244,11 @@ export default function ClientesPage() {
           </div>
           {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
             <div className="flex space-x-2 mt-4 sm:mt-0">
+              <ExportButton 
+                endpoint="/api/exportar/clientes"
+                filename={`clientes-${new Date().toISOString().split('T')[0]}`}
+                label="Exportar"
+              />
               {userRole === 'admin' && (
                 <Button variant="outline" onClick={() => setImportModalOpen(true)}>
                   <Upload className="h-4 w-4 mr-2" />
