@@ -115,7 +115,6 @@ Firma: _______________
       Gracias por su pago
 ================================`,
         isActive: true,
-        createdBy: adminUser.id,
       },
     });
     console.log('✅ Plantilla estándar verificada');
@@ -134,7 +133,6 @@ Saldo: {{saldo_nuevo}}
 Cobrador: {{cobrador}}
 ================`,
         isActive: true,
-        createdBy: adminUser.id,
       },
     });
     console.log('✅ Plantilla compacta verificada');

@@ -10,7 +10,7 @@ async function seedAdmin() {
   try {
     // Verificar si ya existe un admin
     const existingAdmin = await prisma.user.findFirst({
-      where: { role: UserRole.ADMIN }
+      where: { role: 'admin' }
     });
 
     if (existingAdmin) {
@@ -26,7 +26,7 @@ async function seedAdmin() {
         email: 'admin@laeconomica.com',
         password: hashedPassword,
         name: 'Administrador',
-        role: UserRole.ADMIN,
+        role: 'admin',
       }
     });
 
