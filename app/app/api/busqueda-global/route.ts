@@ -69,7 +69,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      clientes: clientes.map(c => ({
+      clientes: clientes.map((c: any) => ({
         id: c.id,
         codigoCliente: c.codigoCliente,
         nombreCompleto: c.nombreCompleto,

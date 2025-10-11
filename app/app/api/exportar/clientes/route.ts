@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
     if (formato === 'json') {
       return NextResponse.json({
         success: true,
-        clientes: clientes.map(c => ({
+        clientes: clientes.map((c: any) => ({
           codigoCliente: c.codigoCliente,
           nombreCompleto: c.nombreCompleto,
           telefono: c.telefono,
@@ -66,7 +66,7 @@ export async function GET(request: NextRequest) {
       'Vendedor'
     ];
 
-    const rows = clientes.map(c => [
+    const rows = clientes.map((c: any) => [
       c.codigoCliente,
       c.nombreCompleto,
       c.telefono || '',
