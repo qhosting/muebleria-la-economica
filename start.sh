@@ -46,37 +46,23 @@ $PRISMA_CMD generate || echo "⚠️  Error generando cliente Prisma"
 echo "🌱 Verificando si necesita seed..."
 $PRISMA_CMD db seed || echo "⚠️  Seed omitido (datos existentes)"
 
-# Verificar archivos necesarios
-echo "🔍 Verificando archivos del build standalone..."
-echo "📁 Contenido directorio actual:"
-ls -la . || echo "Error listando directorio actual"
-
-echo "📁 Verificando archivos de Next.js standalone..."
-
-# Verify server.js exists in the correct location (/app/server.js)
-if [ ! -f "/app/server.js" ]; then
-    echo "❌ ERROR CRÍTICO: server.js NO ENCONTRADO en /app/server.js"
-    echo "📋 Estructura del directorio /app:"
-    ls -la /app/ | head -30
-    echo ""
-    echo "🔍 Buscando server.js en todo el filesystem:"
-    find /app -name "server.js" -type f 2>/dev/null | head -10
-    echo ""
-    echo "❌ El Dockerfile no copió correctamente el standalone build"
-    echo "🔄 Intentando fallback con next start..."
-    exec npx next start
-    exit 1
+# Crear usuario admin si no existe
+echo "👤 Verificando usuario admin..."
+if [ -f "/app/seed-admin.sh" ]; then
+    sh /app/seed-admin.sh || echo "⚠️  Seed admin omitido"
+else
+    echo "⚠️  Script seed-admin.sh no encontrado"
 fi
 
-echo "✅ server.js encontrado en /app/server.js (CORRECTO)"
-echo "📋 Contenido del directorio /app:"
-ls -la /app/ | head -20
+# Verificar archivos necesarios
+echo "🔍 Verificando archivos de Next.js..."
+echo "📁 Contenido directorio actual:"
+ls -la . | head -20 || echo "Error listando directorio actual"
 
-# Iniciar la aplicación desde /app con server.js
+# Iniciar la aplicación con next start
 echo ""
-echo "🎯 Iniciando servidor Next.js standalone..."
+echo "🎯 Iniciando servidor Next.js..."
 echo "   📂 Working directory: /app"
-echo "   📄 Server: /app/server.js"
 echo "   🌐 Hostname: 0.0.0.0"
 echo "   🔌 Port: 3000"
 echo ""
@@ -86,5 +72,5 @@ cd /app || {
     exit 1
 }
 
-echo "🚀 EJECUTANDO: node server.js"
-exec node server.js
+echo "🚀 EJECUTANDO: yarn start (next start)"
+exec yarn start
