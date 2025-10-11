@@ -54,9 +54,11 @@ RUN echo "📦 Generating Prisma client..." && \
     npx prisma generate && \
     echo "✅ Prisma client generated"
 
-# Build Next.js (simplified - let npm handle errors)
+# Build Next.js (with verbose error logging)
 RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
-    npm run build && \
+    echo "📍 PWD: $(pwd)" && \
+    echo "📍 NEXT_DIST_DIR: $NEXT_DIST_DIR" && \
+    npm run build 2>&1 || (echo "❌ Build failed! Checking for TypeScript errors..." && npx tsc --noEmit && exit 1) && \
     echo "✅ Build completed successfully!"
 
 # Verify build output
