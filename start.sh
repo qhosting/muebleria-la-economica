@@ -43,17 +43,21 @@ else
     echo "✅ Cliente Prisma ya generado"
 fi
 
-# NO ejecutar seed automáticamente en producción
-# El seed debe ejecutarse manualmente si es necesario
-echo "ℹ️  Seed omitido (debe ejecutarse manualmente si es necesario)"
+# ============================================
+# PRODUCCIÓN: NO EJECUTAR SEED AUTOMÁTICAMENTE
+# ============================================
+# Los datos deben ser persistentes.
+# El seed solo debe ejecutarse manualmente si es necesario.
+# En producción, los datos se mantienen entre deploys.
+# ============================================
 
-# Crear usuario admin si no existe (solo en primera ejecución)
-echo "👤 Verificando usuario admin..."
-if [ -f "/app/seed-admin.sh" ]; then
-    sh /app/seed-admin.sh || echo "⚠️  Seed admin omitido (usuario ya existe)"
-else
-    echo "⚠️  Script seed-admin.sh no encontrado"
-fi
+echo "🚫 Seed automático DESACTIVADO (modo producción)"
+echo "ℹ️  Los datos existentes serán preservados"
+echo "ℹ️  Para limpiar datos demo: ejecuta clean-demo-data.sh manualmente"
+
+# NO crear usuario admin automáticamente en producción
+# Esto debe hacerse manualmente la primera vez
+echo "ℹ️  Usuario admin debe existir (creado manualmente en primera configuración)"
 
 # Verificar archivos necesarios
 echo "🔍 Verificando archivos de Next.js..."
