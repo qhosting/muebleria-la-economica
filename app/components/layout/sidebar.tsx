@@ -51,6 +51,12 @@ const navigation = [
     roles: ['admin'],
   },
   {
+    name: 'Importar Saldos',
+    href: '/dashboard/saldos',
+    icon: Upload,
+    roles: ['admin'], // Solo admin
+  },
+  {
     name: 'Cobranza Móvil',
     href: '/dashboard/cobranza',
     icon: CreditCard,
@@ -73,12 +79,6 @@ const navigation = [
     href: '/dashboard/morosidad',
     icon: AlertTriangle,
     roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
-  },
-  {
-    name: 'Importar Saldos',
-    href: '/dashboard/saldos',
-    icon: Upload,
-    roles: ['admin', 'gestor_cobranza'],
   },
   {
     name: 'Rutas',

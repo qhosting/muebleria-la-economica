@@ -29,16 +29,16 @@ export default function ImportarSaldosPage() {
   // Importación masiva
   const [csvData, setCsvData] = useState('');
 
-  // Verificar permisos
+  // Verificar permisos - Solo Admin
   const userRole = (session?.user as any)?.role;
   
-  if (userRole !== 'admin' && userRole !== 'gestor_cobranza') {
+  if (userRole !== 'admin') {
     return (
       <div className="p-6">
         <Alert variant="destructive">
           <AlertCircle className="h-4 w-4" />
           <AlertDescription>
-            No tienes permisos para acceder a esta página.
+            Solo los administradores tienen acceso a esta función.
           </AlertDescription>
         </Alert>
       </div>
