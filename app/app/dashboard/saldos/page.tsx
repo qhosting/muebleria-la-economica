@@ -1,9 +1,10 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import toast from 'react-hot-toast';
 
 export default function ImportarSaldosPage() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   
   const [loading, setLoading] = useState(false);
@@ -31,17 +32,41 @@ export default function ImportarSaldosPage() {
 
   // Verificar permisos - Solo Admin
   const userRole = (session?.user as any)?.role;
-  
+
+  // Redirigir si no hay sesión
+  useEffect(() => {
+    if (status === 'unauthenticated') {
+      router.push('/login');
+    }
+  }, [status, router]);
+
+  // Mostrar loading mientras se verifica la sesión
+  if (status === 'loading') {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <div className="spinner mx-auto mb-4" />
+            <p className="text-muted-foreground">Cargando...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  // Mostrar mensaje de acceso denegado si no es admin
   if (userRole !== 'admin') {
     return (
-      <div className="p-6">
-        <Alert variant="destructive">
-          <AlertCircle className="h-4 w-4" />
-          <AlertDescription>
-            Solo los administradores tienen acceso a esta función.
-          </AlertDescription>
-        </Alert>
-      </div>
+      <DashboardLayout>
+        <div className="p-6">
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              Solo los administradores tienen acceso a esta función.
+            </AlertDescription>
+          </Alert>
+        </div>
+      </DashboardLayout>
     );
   }
 
@@ -168,13 +193,14 @@ export default function ImportarSaldosPage() {
   };
 
   return (
-    <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Importación de Saldos</h1>
-        <p className="text-muted-foreground">
-          Actualiza los saldos de clientes de forma individual o masiva
-        </p>
-      </div>
+    <DashboardLayout>
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Importación de Saldos</h1>
+          <p className="text-muted-foreground">
+            Actualiza los saldos de clientes de forma individual o masiva
+          </p>
+        </div>
 
       <div className="grid md:grid-cols-2 gap-6">
         {/* Importación Individual */}
@@ -417,6 +443,7 @@ export default function ImportarSaldosPage() {
           </CardContent>
         </Card>
       )}
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }

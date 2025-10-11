@@ -52,7 +52,11 @@ export function LoginForm() {
 
       if (result?.error) {
         alert('Credenciales incorrectas');
-      } else {
+        setIsLoading(false);
+        return;
+      }
+
+      if (result?.ok) {
         // Manejar recordar credenciales
         if (rememberMe) {
           localStorage.setItem('remembered_email', email);
@@ -64,40 +68,49 @@ export function LoginForm() {
           localStorage.removeItem('remember_me');
         }
 
+        // Esperar un poco para que la sesión se establezca
+        await new Promise(resolve => setTimeout(resolve, 500));
+
         // Obtener información del usuario para redireccionar según rol
         try {
           const sessionResponse = await fetch('/api/auth/session');
           const sessionData = await sessionResponse.json();
-          const userRole = sessionData?.user?.role;
-
-          alert('¡Bienvenido!');
           
-          // Redireccionar según el rol del usuario
-          switch (userRole) {
-            case 'admin':
-              router.replace('/dashboard');
-              break;
-            case 'gestor_cobranza':
-              router.replace('/dashboard/clientes'); // Los gestores van directo a clientes
-              break;
-            case 'reporte_cobranza':
-              router.replace('/dashboard/reportes'); // Los usuarios de reportes van a reportes
-              break;
-            case 'cobrador':
-              router.replace('/dashboard/cobranza'); // Los cobradores van a cobranza móvil
-              break;
-            default:
-              router.replace('/dashboard'); // Fallback al dashboard general
+          if (sessionData && sessionData.user) {
+            const userRole = sessionData.user.role;
+            
+            // Redireccionar según el rol del usuario
+            let redirectUrl = '/dashboard';
+            
+            switch (userRole) {
+              case 'admin':
+                redirectUrl = '/dashboard';
+                break;
+              case 'gestor_cobranza':
+                redirectUrl = '/dashboard/clientes';
+                break;
+              case 'reporte_cobranza':
+                redirectUrl = '/dashboard/reportes';
+                break;
+              case 'cobrador':
+                redirectUrl = '/dashboard/cobranza-mobile';
+                break;
+            }
+            
+            // Usar window.location.href para forzar navegación completa
+            window.location.href = redirectUrl;
+          } else {
+            throw new Error('No se pudo obtener la sesión');
           }
         } catch (error) {
           console.error('Error al obtener sesión:', error);
-          router.replace('/dashboard'); // Fallback en caso de error
+          // Fallback: ir al dashboard general
+          window.location.href = '/dashboard';
         }
       }
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
       alert('Error al iniciar sesión');
-    } finally {
       setIsLoading(false);
     }
   };
