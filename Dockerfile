@@ -43,16 +43,18 @@ COPY app/public ./public
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV SKIP_ENV_VALIDATION=1
+ENV NODE_OPTIONS="--max-old-space-size=4096"
 
 # Generate Prisma client first
 RUN echo "📦 Generating Prisma client..." && \
     npx prisma generate && \
     echo "✅ Prisma client generated"
 
-# Build Next.js
+# Build Next.js with increased memory and error handling
 RUN echo "🔨 Building Next.js application..." && \
-    npm run build && \
-    echo "✅ Build completed successfully!"
+    npm run build 2>&1 | tee build.log && \
+    echo "✅ Build completed successfully!" || \
+    (echo "❌ Build failed! Last 50 lines:" && tail -50 build.log && exit 1)
 
 # Production image - Keep it simple, copy everything
 FROM base AS runner
