@@ -24,10 +24,15 @@ COPY app/ .
 # Generate Prisma client
 RUN npx prisma generate
 
-# Build Next.js - SIN verificar standalone
+# Build Next.js
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
-RUN yarn build || (echo "Build failed but continuing..." && exit 0)
+
+# Build the application - MUST succeed
+RUN echo "🔨 Building Next.js application..." && \
+    yarn build && \
+    echo "✅ Build completed successfully!" && \
+    ls -la .next/
 
 # Production image
 FROM base AS runner
