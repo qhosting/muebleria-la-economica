@@ -31,12 +31,9 @@ fi
 
 # Verificar que la base de datos esté disponible  
 echo "📊 Verificando conexión a la base de datos..."
-# Use db push for existing database with data (fixes P3005)
-$PRISMA_CMD db push --force-reset --accept-data-loss || $PRISMA_CMD db push --accept-data-loss || echo "⚠️  Error en db push, continuando..."
-
-# Skip migrations for existing database - use db push instead
+# Use db push for schema sync (without resetting data)
 echo "🔄 Sincronizando esquema de base de datos..."
-$PRISMA_CMD db push --accept-data-loss || echo "⚠️  Error en sync, continuando..."
+$PRISMA_CMD db push --skip-generate || echo "⚠️  Error en db push, continuando..."
 
 # Regenerar cliente Prisma en container
 echo "⚙️  Regenerando cliente Prisma en container..."
@@ -72,5 +69,5 @@ cd /app || {
     exit 1
 }
 
-echo "🚀 EJECUTANDO: yarn start (next start)"
-exec yarn start
+echo "🚀 EJECUTANDO: npm start (next start)"
+exec npm start

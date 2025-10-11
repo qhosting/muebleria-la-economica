@@ -8,46 +8,74 @@ WORKDIR /app
 
 # Instalar dependencias
 FROM base AS deps
+WORKDIR /app
 COPY app/package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --legacy-peer-deps
+RUN npm ci --legacy-peer-deps --no-audit --no-fund
 
 # Rebuild the source code only when needed
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY app/ .
 
-# Generate Prisma client
-RUN npx prisma generate
+# Accept build-time environment variables
+ARG DATABASE_URL
+ARG NEXTAUTH_URL
+ARG NEXTAUTH_SECRET
+
+# Copy node_modules from deps
+COPY --from=deps /app/node_modules ./node_modules
+
+# Copy app source
+COPY app/package*.json ./
+COPY app/next.config.js ./
+COPY app/next-env.d.ts* ./
+COPY app/tsconfig.json ./
+COPY app/postcss.config.js ./
+COPY app/tailwind.config.ts ./
+COPY app/components.json ./
+COPY app/.env* ./
+COPY app/app ./app
+COPY app/components ./components
+COPY app/hooks ./hooks
+COPY app/lib ./lib
+COPY app/prisma ./prisma
+COPY app/public ./public
+
+# Set environment variables for build
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV SKIP_ENV_VALIDATION=1
+
+# Generate Prisma client first
+RUN echo "📦 Generating Prisma client..." && \
+    npx prisma generate && \
+    echo "✅ Prisma client generated"
 
 # Build Next.js
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
-
-# Build the application - MUST succeed
 RUN echo "🔨 Building Next.js application..." && \
     npm run build && \
-    echo "✅ Build completed successfully!" && \
-    ls -la .next/
+    echo "✅ Build completed successfully!"
 
-# Production image
+# Production image - Keep it simple, copy everything
 FROM base AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV PORT=3000
+ENV HOSTNAME="0.0.0.0"
 
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 nextjs
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nextjs
 
-# Copy everything from builder
-COPY --from=builder --chown=nextjs:nodejs /app ./
+# Copy built application
+COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./
+COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# Copy backup and admin scripts
+# Copy scripts
 COPY --chown=nextjs:nodejs seed-admin.sh backup-manual.sh restore-backup.sh start.sh ./
-
-# Ensure scripts are executable
 RUN chmod +x seed-admin.sh backup-manual.sh restore-backup.sh start.sh
 
 # Create backup directory
@@ -57,8 +85,5 @@ USER nextjs
 
 EXPOSE 3000
 
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-# Use custom start script that handles admin seed
+# Use custom start script
 CMD ["sh", "start.sh"]
