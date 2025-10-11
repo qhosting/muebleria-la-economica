@@ -35,10 +35,12 @@ Si `NEXT_OUTPUT_MODE` se configuraba como `"standalone"`, Next.js generaba una e
 
 **Cambios clave:**
 
-1. **Forzar build normal (no standalone):**
+1. **Forzar build normal (no standalone) y directorio estándar:**
 ```dockerfile
 # CRITICAL: Do NOT use standalone output
 ENV NEXT_OUTPUT_MODE=""
+# CRITICAL: Use standard .next directory (not .build)
+ENV NEXT_DIST_DIR=".next"
 ```
 
 2. **Verificar build en etapa builder:**

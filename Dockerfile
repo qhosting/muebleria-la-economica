@@ -47,6 +47,8 @@ ENV SKIP_ENV_VALIDATION=1
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 # CRITICAL: Do NOT use standalone output
 ENV NEXT_OUTPUT_MODE=""
+# CRITICAL: Use standard .next directory (not .build)
+ENV NEXT_DIST_DIR=".next"
 
 # Generate Prisma client first
 RUN echo "📦 Generating Prisma client..." && \
