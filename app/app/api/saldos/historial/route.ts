@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
         nombreCompleto: cliente.nombreCompleto,
         saldoActual: cliente.saldoActual.toString()
       },
-      historial: historial.map(h => ({
+      historial: historial.map((h: any) => ({
         id: h.id,
         fecha: h.fechaPago,
         saldoAnterior: h.saldoAnterior.toString(),
