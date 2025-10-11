@@ -6,14 +6,11 @@ RUN apk add --no-cache libc6-compat openssl
 
 WORKDIR /app
 
-# Configurar yarn para usar cache
-ENV YARN_CACHE_FOLDER=/app/.yarn-cache
-
 # Instalar dependencias
 FROM base AS deps
-COPY app/package.json app/yarn.lock* ./
-RUN --mount=type=cache,target=/app/.yarn-cache \
-    yarn install --production=false
+COPY app/package*.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --legacy-peer-deps
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -30,7 +27,7 @@ ENV NODE_ENV=production
 
 # Build the application - MUST succeed
 RUN echo "🔨 Building Next.js application..." && \
-    yarn build && \
+    npm run build && \
     echo "✅ Build completed successfully!" && \
     ls -la .next/
 
