@@ -22,10 +22,18 @@ cd /app || cd app || {
 
 # Ejecutar seed
 echo "🔨 Ejecutando seed..."
-node --require ts-node/register scripts/seed-admin.ts || npx tsx scripts/seed-admin.ts || {
-    echo "⚠️  Intentando con node directamente..."
+
+# Intentar primero con la versión JavaScript (más confiable)
+if [ -f "scripts/seed-admin.js" ]; then
+    echo "📄 Usando versión JavaScript compilada..."
+    node scripts/seed-admin.js
+elif command -v tsx >/dev/null 2>&1; then
+    echo "📄 Usando tsx para ejecutar TypeScript..."
+    npx tsx scripts/seed-admin.ts
+else
+    echo "📄 Usando ts-node para ejecutar TypeScript..."
     npx ts-node scripts/seed-admin.ts
-}
+fi
 
 echo ""
 echo "========================================"
