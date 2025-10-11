@@ -35,18 +35,22 @@ echo "📊 Verificando conexión a la base de datos..."
 echo "🔄 Sincronizando esquema de base de datos..."
 $PRISMA_CMD db push --skip-generate || echo "⚠️  Error en db push, continuando..."
 
-# Regenerar cliente Prisma en container
-echo "⚙️  Regenerando cliente Prisma en container..."
-$PRISMA_CMD generate || echo "⚠️  Error generando cliente Prisma"
+# Regenerar cliente Prisma en container (si es necesario)
+if [ ! -d "node_modules/@prisma/client" ] || [ ! -f "node_modules/.prisma/client/index.js" ]; then
+    echo "⚙️  Regenerando cliente Prisma en container..."
+    $PRISMA_CMD generate || echo "⚠️  Error generando cliente Prisma"
+else
+    echo "✅ Cliente Prisma ya generado"
+fi
 
-# Ejecutar seed solo si no hay datos
-echo "🌱 Verificando si necesita seed..."
-$PRISMA_CMD db seed || echo "⚠️  Seed omitido (datos existentes)"
+# NO ejecutar seed automáticamente en producción
+# El seed debe ejecutarse manualmente si es necesario
+echo "ℹ️  Seed omitido (debe ejecutarse manualmente si es necesario)"
 
-# Crear usuario admin si no existe
+# Crear usuario admin si no existe (solo en primera ejecución)
 echo "👤 Verificando usuario admin..."
 if [ -f "/app/seed-admin.sh" ]; then
-    sh /app/seed-admin.sh || echo "⚠️  Seed admin omitido"
+    sh /app/seed-admin.sh || echo "⚠️  Seed admin omitido (usuario ya existe)"
 else
     echo "⚠️  Script seed-admin.sh no encontrado"
 fi

@@ -39,6 +39,7 @@ COPY app/hooks ./hooks
 COPY app/lib ./lib
 COPY app/prisma ./prisma
 COPY app/public ./public
+COPY app/scripts ./scripts
 
 # Set environment variables for build
 ENV NEXT_TELEMETRY_DISABLED=1
@@ -65,8 +66,16 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
+# Prisma configuration - avoid permission errors
+ENV PRISMA_QUERY_ENGINE_LIBRARY=/app/node_modules/.prisma/client/libquery_engine-linux-musl-openssl-3.0.x.so.node
+ENV PRISMA_ENGINES_MIRROR=https://binaries.prismacdn.com
+
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs
+
+# Create home directory for nextjs user to avoid permission errors
+RUN mkdir -p /home/nextjs/.cache && \
+    chown -R nextjs:nodejs /home/nextjs
 
 # Copy built application
 COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
@@ -76,7 +85,10 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# Copy scripts
+# Copy scripts directory for seed-admin from builder
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
+
+# Copy shell scripts
 COPY --chown=nextjs:nodejs seed-admin.sh backup-manual.sh restore-backup.sh start.sh ./
 RUN chmod +x seed-admin.sh backup-manual.sh restore-backup.sh start.sh
 
