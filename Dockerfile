@@ -2,7 +2,7 @@
 FROM node:18-alpine AS base
 
 # Instalar dependencias necesarias para Prisma y Alpine
-RUN apk add --no-cache libc6-compat openssl
+RUN apk add --no-cache libc6-compat openssl bash
 
 WORKDIR /app
 
@@ -41,10 +41,12 @@ COPY app/prisma ./prisma
 COPY app/public ./public
 COPY app/scripts ./scripts
 
-# Set environment variables for build
+# Set environment variables for build - FORCE NORMAL BUILD (no standalone)
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV SKIP_ENV_VALIDATION=1
 ENV NODE_OPTIONS="--max-old-space-size=4096"
+# CRITICAL: Do NOT use standalone output
+ENV NEXT_OUTPUT_MODE=""
 
 # Generate Prisma client first
 RUN echo "📦 Generating Prisma client..." && \
@@ -52,12 +54,23 @@ RUN echo "📦 Generating Prisma client..." && \
     echo "✅ Prisma client generated"
 
 # Build Next.js with increased memory and error handling
-RUN echo "🔨 Building Next.js application..." && \
+RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
     npm run build 2>&1 | tee build.log && \
     echo "✅ Build completed successfully!" || \
     (echo "❌ Build failed! Last 50 lines:" && tail -50 build.log && exit 1)
 
-# Production image - Keep it simple, copy everything
+# Verify build output exists
+RUN echo "🔍 Verifying build output..." && \
+    if [ -f ".next/BUILD_ID" ]; then \
+        echo "✅ Build ID found: $(cat .next/BUILD_ID)"; \
+    else \
+        echo "❌ BUILD_ID not found - build may have failed!"; \
+        echo "Contents of .next directory:"; \
+        ls -la .next/ || echo "No .next directory!"; \
+        exit 1; \
+    fi
+
+# Production image
 FROM base AS runner
 WORKDIR /app
 
@@ -77,15 +90,19 @@ RUN addgroup --system --gid 1001 nodejs && \
 RUN mkdir -p /home/nextjs/.cache && \
     chown -R nextjs:nodejs /home/nextjs
 
-# Copy built application
+# Copy package files and dependencies
 COPY --from=builder --chown=nextjs:nodejs /app/package*.json ./
 COPY --from=builder --chown=nextjs:nodejs /app/next.config.js ./
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules ./node_modules
+
+# Copy built application - CRITICAL: Complete .next directory
 COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+
+# Copy public files and Prisma schema
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/prisma ./prisma
 
-# Copy scripts directory for seed-admin from builder
+# Copy scripts directory for seed-admin
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 # Copy shell scripts
@@ -94,6 +111,16 @@ RUN chmod +x seed-admin.sh backup-manual.sh restore-backup.sh start.sh
 
 # Create backup directory
 RUN mkdir -p /backup && chown nextjs:nodejs /backup
+
+# Verify all necessary files are present
+RUN echo "🔍 Verifying production files..." && \
+    ls -la /app/.next/ && \
+    if [ -f "/app/.next/BUILD_ID" ]; then \
+        echo "✅ Production build verified: $(cat /app/.next/BUILD_ID)"; \
+    else \
+        echo "❌ BUILD_ID missing in production image!"; \
+        exit 1; \
+    fi
 
 USER nextjs
 
