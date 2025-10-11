@@ -22,10 +22,17 @@ El `next.config.js` tenía:
 output: process.env.NEXT_OUTPUT_MODE,
 ```
 
-Si `NEXT_OUTPUT_MODE` se configuraba como `"standalone"`, Next.js generaba una estructura diferente:
-- `.next/standalone/` con `server.js`
-- Pero el Dockerfile copiaba `.next/` normalmente
-- El servidor no encontraba los archivos necesarios
+**Problemas identificados:**
+
+1. **Problema con modo standalone:**
+   - Si `NEXT_OUTPUT_MODE="standalone"`, Next.js generaba `.next/standalone/` con `server.js`
+   - El Dockerfile copiaba `.next/` normalmente
+   - El servidor no encontraba los archivos
+
+2. **Problema con string vacío:**
+   - Intentamos `NEXT_OUTPUT_MODE=""` para forzar modo normal
+   - ❌ Next.js rechaza string vacío: "Expected 'standalone' | 'export', received ''"
+   - ✅ Solución: NO establecer la variable (undefined = modo normal)
 
 ---
 
@@ -37,10 +44,10 @@ Si `NEXT_OUTPUT_MODE` se configuraba como `"standalone"`, Next.js generaba una e
 
 1. **Forzar build normal (no standalone) y directorio estándar:**
 ```dockerfile
-# CRITICAL: Do NOT use standalone output
-ENV NEXT_OUTPUT_MODE=""
 # CRITICAL: Use standard .next directory (not .build)
 ENV NEXT_DIST_DIR=".next"
+# NOTE: NEXT_OUTPUT_MODE is NOT set = normal build mode
+# (Setting it to empty string "" causes validation error)
 ```
 
 2. **Verificar build en etapa builder:**

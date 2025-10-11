@@ -45,10 +45,9 @@ COPY app/scripts ./scripts
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV SKIP_ENV_VALIDATION=1
 ENV NODE_OPTIONS="--max-old-space-size=4096"
-# CRITICAL: Do NOT use standalone output
-ENV NEXT_OUTPUT_MODE=""
 # CRITICAL: Use standard .next directory (not .build)
 ENV NEXT_DIST_DIR=".next"
+# NOTE: NEXT_OUTPUT_MODE is NOT set, which means normal build mode (no standalone, no export)
 
 # Generate Prisma client first
 RUN echo "📦 Generating Prisma client..." && \
