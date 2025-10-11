@@ -54,26 +54,19 @@ RUN echo "📦 Generating Prisma client..." && \
     npx prisma generate && \
     echo "✅ Prisma client generated"
 
-# Change shell to bash for PIPESTATUS support
-SHELL ["/bin/bash", "-c"]
-
-# Build Next.js with proper error handling using bash
+# Build Next.js (simplified - let npm handle errors)
 RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
-    npm run build 2>&1 | tee build.log; \
-    BUILD_EXIT_CODE=${PIPESTATUS[0]}; \
-    if [ $BUILD_EXIT_CODE -ne 0 ]; then \
-        echo "❌ Build failed with exit code $BUILD_EXIT_CODE!"; \
-        echo "Last 50 lines of build log:"; \
-        tail -50 build.log; \
-        exit 1; \
-    fi && \
-    echo "✅ Build completed successfully!" && \
+    npm run build && \
+    echo "✅ Build completed successfully!"
+
+# Verify build output
+RUN echo "🔍 Verifying build output..." && \
     if [ -f ".next/BUILD_ID" ]; then \
         echo "✅ Build ID found: $(cat .next/BUILD_ID)"; \
     else \
         echo "❌ BUILD_ID not found!"; \
         echo "Contents of .next directory:"; \
-        ls -la .next/; \
+        ls -la .next/ || echo "No .next directory!"; \
         exit 1; \
     fi
 
