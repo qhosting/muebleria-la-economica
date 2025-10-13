@@ -34,7 +34,9 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
     isBluetoothAvailable,
     wasConnectedBefore,
     previousDeviceName,
+    canReconnect,
     connectToPrinter,
+    reconnectToPrinter,
     disconnectFromPrinter,
     printTestPage
   } = useBluetoothPrinter();
@@ -43,6 +45,10 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
 
   const handleConnect = async () => {
     await connectToPrinter();
+  };
+
+  const handleReconnect = async () => {
+    await reconnectToPrinter();
   };
 
   const handleDisconnect = async () => {
@@ -155,23 +161,46 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
                 {/* Botones de conexión */}
                 <div className="space-y-2">
                   {!isConnected ? (
-                    <Button
-                      onClick={handleConnect}
-                      disabled={isConnecting}
-                      className="w-full"
-                    >
-                      {isConnecting ? (
-                        <>
-                          <BluetoothSearching className="w-4 h-4 mr-2 animate-pulse" />
-                          Conectando...
-                        </>
-                      ) : (
-                        <>
-                          <Bluetooth className="w-4 h-4 mr-2" />
-                          Conectar Impresora
-                        </>
+                    <>
+                      {canReconnect && (
+                        <Button
+                          onClick={handleReconnect}
+                          disabled={isConnecting}
+                          className="w-full"
+                          variant="default"
+                        >
+                          {isConnecting ? (
+                            <>
+                              <BluetoothSearching className="w-4 h-4 mr-2 animate-pulse" />
+                              Reconectando...
+                            </>
+                          ) : (
+                            <>
+                              <BluetoothConnected className="w-4 h-4 mr-2" />
+                              Reconectar {previousDeviceName || 'Impresora'}
+                            </>
+                          )}
+                        </Button>
                       )}
-                    </Button>
+                      <Button
+                        onClick={handleConnect}
+                        disabled={isConnecting}
+                        className="w-full"
+                        variant={canReconnect ? "outline" : "default"}
+                      >
+                        {isConnecting ? (
+                          <>
+                            <BluetoothSearching className="w-4 h-4 mr-2 animate-pulse" />
+                            Conectando...
+                          </>
+                        ) : (
+                          <>
+                            <Bluetooth className="w-4 h-4 mr-2" />
+                            {canReconnect ? 'Conectar Otra Impresora' : 'Conectar Impresora'}
+                          </>
+                        )}
+                      </Button>
+                    </>
                   ) : (
                     <div className="space-y-2">
                       <Button

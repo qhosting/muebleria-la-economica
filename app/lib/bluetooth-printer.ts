@@ -105,9 +105,13 @@ class BluetoothPrinterService {
   private readonly SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
   private readonly CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
   
-  // 🔧 NUEVO: Storage keys para persistencia
+  // 🔧 Storage keys para persistencia
   private readonly STORAGE_KEY_CONNECTED = 'bluetooth_printer_connected';
   private readonly STORAGE_KEY_DEVICE_NAME = 'bluetooth_printer_device_name';
+  private readonly STORAGE_KEY_DEVICE_ID = 'bluetooth_printer_device_id';
+  
+  // 🆕 Variable para reconexión automática
+  private lastConnectedDeviceId: string | null = null;
 
   // Comandos ESC/POS básicos
   private readonly ESC = '\x1b';
@@ -134,35 +138,49 @@ class BluetoothPrinterService {
     return 'bluetooth' in navigator && 'requestDevice' in (navigator.bluetooth as any);
   }
 
-  // 🔧 NUEVO: Guardar estado de conexión en localStorage
-  private saveConnectionState(connected: boolean, deviceName?: string): void {
+  // 🔧 Guardar estado de conexión en localStorage
+  private saveConnectionState(connected: boolean, deviceName?: string, deviceId?: string): void {
     if (typeof window === 'undefined') return;
     
     try {
       localStorage.setItem(this.STORAGE_KEY_CONNECTED, connected.toString());
-      if (deviceName) {
+      if (connected && deviceName) {
         localStorage.setItem(this.STORAGE_KEY_DEVICE_NAME, deviceName);
-      } else {
-        localStorage.removeItem(this.STORAGE_KEY_DEVICE_NAME);
+      }
+      if (connected && deviceId) {
+        localStorage.setItem(this.STORAGE_KEY_DEVICE_ID, deviceId);
+        this.lastConnectedDeviceId = deviceId;
+      }
+      
+      if (!connected) {
+        // No borrar el nombre del dispositivo, solo marcarlo como desconectado
+        // Así el usuario sabe qué impresora reconectar
+        localStorage.setItem(this.STORAGE_KEY_CONNECTED, 'false');
       }
     } catch (error) {
       console.error('Error guardando estado de conexión:', error);
     }
   }
 
-  // 🔧 NUEVO: Cargar estado de conexión desde localStorage
-  private loadConnectionState(): { wasConnected: boolean; deviceName: string | null } {
+  // 🔧 Cargar estado de conexión desde localStorage
+  private loadConnectionState(): { wasConnected: boolean; deviceName: string | null; deviceId: string | null } {
     if (typeof window === 'undefined') {
-      return { wasConnected: false, deviceName: null };
+      return { wasConnected: false, deviceName: null, deviceId: null };
     }
     
     try {
       const wasConnected = localStorage.getItem(this.STORAGE_KEY_CONNECTED) === 'true';
       const deviceName = localStorage.getItem(this.STORAGE_KEY_DEVICE_NAME);
-      return { wasConnected, deviceName };
+      const deviceId = localStorage.getItem(this.STORAGE_KEY_DEVICE_ID);
+      
+      if (deviceId) {
+        this.lastConnectedDeviceId = deviceId;
+      }
+      
+      return { wasConnected, deviceName, deviceId };
     } catch (error) {
       console.error('Error cargando estado de conexión:', error);
-      return { wasConnected: false, deviceName: null };
+      return { wasConnected: false, deviceName: null, deviceId: null };
     }
   }
 
@@ -217,8 +235,8 @@ class BluetoothPrinterService {
 
       this.connection.isConnected = true;
 
-      // 🔧 MEJORADO: Guardar estado y configurar listener de desconexión
-      this.saveConnectionState(true, this.connection.device.name);
+      // 🔧 MEJORADO: Guardar estado con ID y nombre del dispositivo
+      this.saveConnectionState(true, this.connection.device.name, this.connection.device.id);
       
       // Listener para desconexión
       this.connection.device.addEventListener('gattserverdisconnected', () => {
@@ -231,6 +249,44 @@ class BluetoothPrinterService {
       return true;
     } catch (error) {
       console.error('❌ Error conectando a impresora:', error);
+      this.connection.isConnected = false;
+      this.saveConnectionState(false);
+      throw error;
+    }
+  }
+
+  // 🆕 NUEVO: Reconectar a la última impresora guardada
+  async reconnectToPrinter(): Promise<boolean> {
+    try {
+      // Si ya hay un dispositivo conectado, solo reconectar GATT
+      if (this.connection.device && !this.connection.isConnected) {
+        console.log('🔄 Intentando reconectar a:', this.connection.device.name);
+        
+        if (!this.connection.device.gatt) {
+          throw new Error('GATT no disponible en el dispositivo');
+        }
+        
+        this.connection.server = await this.connection.device.gatt.connect();
+        
+        if (!this.connection.server) {
+          throw new Error('No se pudo conectar al servidor GATT');
+        }
+
+        this.connection.service = await this.connection.server.getPrimaryService(this.SERVICE_UUID);
+        this.connection.characteristic = await this.connection.service.getCharacteristic(this.CHARACTERISTIC_UUID);
+        this.connection.isConnected = true;
+
+        this.saveConnectionState(true, this.connection.device.name, this.connection.device.id);
+        
+        console.log('✅ Impresora reconectada:', this.connection.device.name);
+        return true;
+      }
+      
+      // Si no hay dispositivo guardado, hacer conexión normal
+      return await this.connectToPrinter();
+      
+    } catch (error) {
+      console.error('❌ Error reconectando a impresora:', error);
       this.connection.isConnected = false;
       this.saveConnectionState(false);
       throw error;
@@ -274,9 +330,14 @@ class BluetoothPrinterService {
     return this.connection.device?.name || null;
   }
 
-  // 🔧 NUEVO: Método para obtener información del estado guardado
-  getStoredConnectionInfo(): { wasConnected: boolean; deviceName: string | null } {
+  // 🔧 Método para obtener información del estado guardado
+  getStoredConnectionInfo(): { wasConnected: boolean; deviceName: string | null; deviceId: string | null } {
     return this.loadConnectionState();
+  }
+
+  // 🆕 NUEVO: Verificar si hay un dispositivo guardado para reconexión
+  hasDeviceForReconnection(): boolean {
+    return this.connection.device !== null || this.lastConnectedDeviceId !== null;
   }
 
   private async sendData(data: string): Promise<void> {
