@@ -88,7 +88,32 @@ export default function ConfiguracionPage() {
   });
   
   const [loading, setLoading] = useState(false);
+  const [loadingData, setLoadingData] = useState(true);
   const [saved, setSaved] = useState(false);
+
+  // Cargar configuración al montar el componente
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await fetch('/api/configuracion');
+        if (response.ok) {
+          const data = await response.json();
+          setConfig(data);
+        }
+      } catch (error) {
+        console.error('Error al cargar configuración:', error);
+        toast.error('Error al cargar la configuración');
+      } finally {
+        setLoadingData(false);
+      }
+    };
+
+    if (session?.user && (session.user as any)?.role === 'admin') {
+      loadConfig();
+    } else {
+      setLoadingData(false);
+    }
+  }, [session]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -145,6 +170,19 @@ export default function ConfiguracionPage() {
           <Shield className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Acceso Denegado</h2>
           <p className="text-gray-600">No tiene permisos para acceder a esta página.</p>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (loadingData) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center py-12">
+          <div className="text-center">
+            <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-primary border-r-transparent mb-4"></div>
+            <p className="text-gray-600">Cargando configuración...</p>
+          </div>
         </div>
       </DashboardLayout>
     );

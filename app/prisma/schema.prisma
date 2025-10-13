@@ -196,3 +196,17 @@ model VerificationToken {
 
   @@unique([identifier, token])
 }
+
+model ConfiguracionSistema {
+  id            String   @id @default(cuid())
+  clave         String   @unique // Siempre será "sistema" para tener solo 1 registro
+  empresa       Json
+  cobranza      Json
+  notificaciones Json
+  sincronizacion Json
+  impresion     Json
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("configuracion_sistema")
+}
