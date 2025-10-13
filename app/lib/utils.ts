@@ -101,7 +101,7 @@ export function calcularDiasAtraso(fechaUltimoPago: Date | string | null | undef
   }
   
   const hoy = new Date();
-  const diasPorPeriodicidad = {
+  const diasPorPeriodicidad: Record<Periodicidad, number> = {
     semanal: 7,
     quincenal: 15,
     mensual: 30,

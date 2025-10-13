@@ -26,7 +26,7 @@ async function main() {
 
   console.log(`✅ Se encontraron ${users.length} usuarios:\n`);
   
-  users.forEach((user, index) => {
+  users.forEach((user: typeof users[0], index: number) => {
     console.log(`${index + 1}. 👤 ${user.name}`);
     console.log(`   📧 Email: ${user.email}`);
     console.log(`   👔 Rol: ${user.role}`);
