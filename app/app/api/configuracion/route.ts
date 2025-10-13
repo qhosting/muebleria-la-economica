@@ -83,9 +83,29 @@ export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
     
-    if (!session || (session.user as any)?.role !== 'admin') {
+    // Debug de sesión
+    console.log('POST /api/configuracion - Session:', {
+      hasSession: !!session,
+      user: session?.user,
+      role: (session?.user as any)?.role
+    });
+    
+    if (!session) {
       return NextResponse.json(
-        { error: 'No autorizado' },
+        { 
+          error: 'No autorizado',
+          details: 'No hay sesión activa'
+        },
+        { status: 401 }
+      );
+    }
+    
+    if ((session.user as any)?.role !== 'admin') {
+      return NextResponse.json(
+        { 
+          error: 'No autorizado',
+          details: `Rol actual: ${(session.user as any)?.role}. Se requiere rol: admin`
+        },
         { status: 403 }
       );
     }
@@ -95,8 +115,18 @@ export async function POST(request: NextRequest) {
 
     // Validar que todos los campos requeridos estén presentes
     if (!empresa || !cobranza || !notificaciones || !sincronizacion || !impresion) {
+      const missingFields = [];
+      if (!empresa) missingFields.push('empresa');
+      if (!cobranza) missingFields.push('cobranza');
+      if (!notificaciones) missingFields.push('notificaciones');
+      if (!sincronizacion) missingFields.push('sincronizacion');
+      if (!impresion) missingFields.push('impresion');
+      
       return NextResponse.json(
-        { error: 'Faltan campos requeridos' },
+        { 
+          error: 'Faltan campos requeridos',
+          missingFields
+        },
         { status: 400 }
       );
     }

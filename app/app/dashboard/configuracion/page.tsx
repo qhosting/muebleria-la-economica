@@ -118,6 +118,8 @@ export default function ConfiguracionPage() {
   const handleSave = async () => {
     setLoading(true);
     try {
+      console.log('Guardando configuración...', config);
+      
       const response = await fetch('/api/configuracion', {
         method: 'POST',
         headers: {
@@ -126,15 +128,22 @@ export default function ConfiguracionPage() {
         body: JSON.stringify(config),
       });
 
+      const data = await response.json();
+      console.log('Respuesta del servidor:', { status: response.status, data });
+
       if (response.ok) {
         setSaved(true);
         toast.success('Configuración guardada exitosamente');
         setTimeout(() => setSaved(false), 2000);
       } else {
-        throw new Error('Error al guardar');
+        // Mostrar error específico del servidor
+        const errorMsg = data.details || data.error || 'Error al guardar';
+        const missingFields = data.missingFields ? ` (Faltan: ${data.missingFields.join(', ')})` : '';
+        throw new Error(errorMsg + missingFields);
       }
-    } catch (error) {
-      toast.error('Error al guardar la configuración');
+    } catch (error: any) {
+      console.error('Error al guardar configuración:', error);
+      toast.error(error.message || 'Error al guardar la configuración');
     } finally {
       setLoading(false);
     }
