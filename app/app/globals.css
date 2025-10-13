@@ -176,3 +176,71 @@
     min-width: 44px;
   }
 }
+
+/* 🚀 PWA MOBILE OPTIMIZATIONS - Prevent content overflow */
+@layer base {
+  html, body {
+    overflow-x: hidden;
+    width: 100%;
+    position: relative;
+  }
+  
+  /* Prevenir zoom no deseado en inputs en iOS */
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+  
+  /* Safe area insets para dispositivos con notch */
+  @supports (padding: max(0px)) {
+    body {
+      padding-left: max(0px, env(safe-area-inset-left));
+      padding-right: max(0px, env(safe-area-inset-right));
+      padding-bottom: max(0px, env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* Asegurar que todos los modales y dialogs se ajusten en móviles */
+@media (max-width: 640px) {
+  [role="dialog"],
+  .dialog-content,
+  .modal-content {
+    max-width: calc(100vw - 2rem) !important;
+    max-height: calc(100vh - 4rem) !important;
+    margin: 1rem !important;
+    overflow-y: auto;
+  }
+  
+  /* Prevenir scroll horizontal en cualquier elemento */
+  * {
+    max-width: 100%;
+  }
+  
+  /* Ajustar tablas para móviles */
+  table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* PWA fullscreen mode - Ajustar para standalone display */
+@media (display-mode: standalone) {
+  body {
+    padding-top: env(safe-area-inset-top);
+  }
+  
+  /* Agregar padding extra en iOS PWA */
+  @supports (-webkit-touch-callout: none) {
+    body {
+      padding-top: max(20px, env(safe-area-inset-top));
+    }
+  }
+}

@@ -11,15 +11,37 @@ export function useBluetoothPrinter() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectedDevice, setConnectedDevice] = useState<string | null>(null);
   const [isBluetoothAvailable, setIsBluetoothAvailable] = useState(false);
+  const [wasConnectedBefore, setWasConnectedBefore] = useState(false);
+  const [previousDeviceName, setPreviousDeviceName] = useState<string | null>(null);
 
   useEffect(() => {
     checkBluetoothAvailability();
+    loadPreviousConnectionState();
     updateConnectionStatus();
+    
+    // 🔧 NUEVO: Verificar estado cada 5 segundos
+    const intervalId = setInterval(() => {
+      updateConnectionStatus();
+    }, 5000);
+    
+    return () => clearInterval(intervalId);
   }, []);
 
   const checkBluetoothAvailability = async () => {
     const available = await bluetoothPrinter.isBluetoothAvailable();
     setIsBluetoothAvailable(available);
+  };
+
+  // 🔧 NUEVO: Cargar estado previo de conexión
+  const loadPreviousConnectionState = () => {
+    const stored = bluetoothPrinter.getStoredConnectionInfo();
+    setWasConnectedBefore(stored.wasConnected);
+    setPreviousDeviceName(stored.deviceName);
+    
+    if (stored.wasConnected && stored.deviceName) {
+      console.log(`ℹ️ Impresora estaba conectada: ${stored.deviceName}`);
+      console.log('💡 Presiona "Conectar Impresora" para reconectar');
+    }
   };
 
   const updateConnectionStatus = () => {
@@ -105,6 +127,8 @@ export function useBluetoothPrinter() {
     isConnecting,
     connectedDevice,
     isBluetoothAvailable,
+    wasConnectedBefore,
+    previousDeviceName,
     connectToPrinter,
     disconnectFromPrinter,
     printTicket,

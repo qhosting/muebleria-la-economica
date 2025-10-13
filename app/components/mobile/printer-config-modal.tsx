@@ -32,6 +32,8 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
     isConnecting,
     connectedDevice,
     isBluetoothAvailable,
+    wasConnectedBefore,
+    previousDeviceName,
     connectToPrinter,
     disconnectFromPrinter,
     printTestPage
@@ -96,6 +98,19 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
                 <div className="font-medium">Bluetooth no disponible</div>
                 <div className="text-xs mt-1">
                   Asegúrate de que tu dispositivo tenga Bluetooth y que el navegador lo soporte.
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 🔧 NUEVO: Mensaje de conexión previa */}
+          {!isConnected && wasConnectedBefore && previousDeviceName && (
+            <div className="flex items-start gap-2 p-3 bg-blue-50 rounded-lg border-l-2 border-blue-400">
+              <AlertTriangle className="w-4 h-4 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-800">
+                <div className="font-medium">Impresora desconectada</div>
+                <div className="text-xs mt-1">
+                  Última conexión: <strong>{previousDeviceName}</strong>. Presiona "Conectar Impresora" para reconectar.
                 </div>
               </div>
             </div>

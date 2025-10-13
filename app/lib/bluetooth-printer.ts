@@ -104,6 +104,10 @@ class BluetoothPrinterService {
 
   private readonly SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
   private readonly CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
+  
+  // 🔧 NUEVO: Storage keys para persistencia
+  private readonly STORAGE_KEY_CONNECTED = 'bluetooth_printer_connected';
+  private readonly STORAGE_KEY_DEVICE_NAME = 'bluetooth_printer_device_name';
 
   // Comandos ESC/POS básicos
   private readonly ESC = '\x1b';
@@ -128,6 +132,48 @@ class BluetoothPrinterService {
 
   async isBluetoothAvailable(): Promise<boolean> {
     return 'bluetooth' in navigator && 'requestDevice' in (navigator.bluetooth as any);
+  }
+
+  // 🔧 NUEVO: Guardar estado de conexión en localStorage
+  private saveConnectionState(connected: boolean, deviceName?: string): void {
+    if (typeof window === 'undefined') return;
+    
+    try {
+      localStorage.setItem(this.STORAGE_KEY_CONNECTED, connected.toString());
+      if (deviceName) {
+        localStorage.setItem(this.STORAGE_KEY_DEVICE_NAME, deviceName);
+      } else {
+        localStorage.removeItem(this.STORAGE_KEY_DEVICE_NAME);
+      }
+    } catch (error) {
+      console.error('Error guardando estado de conexión:', error);
+    }
+  }
+
+  // 🔧 NUEVO: Cargar estado de conexión desde localStorage
+  private loadConnectionState(): { wasConnected: boolean; deviceName: string | null } {
+    if (typeof window === 'undefined') {
+      return { wasConnected: false, deviceName: null };
+    }
+    
+    try {
+      const wasConnected = localStorage.getItem(this.STORAGE_KEY_CONNECTED) === 'true';
+      const deviceName = localStorage.getItem(this.STORAGE_KEY_DEVICE_NAME);
+      return { wasConnected, deviceName };
+    } catch (error) {
+      console.error('Error cargando estado de conexión:', error);
+      return { wasConnected: false, deviceName: null };
+    }
+  }
+
+  // 🔧 NUEVO: Verificar estado real de conexión GATT
+  private checkRealConnectionStatus(): boolean {
+    if (!this.connection.device || !this.connection.server) {
+      return false;
+    }
+    
+    // Verificar si el servidor GATT está realmente conectado
+    return this.connection.server.connected === true;
   }
 
   async connectToPrinter(): Promise<boolean> {
@@ -171,16 +217,22 @@ class BluetoothPrinterService {
 
       this.connection.isConnected = true;
 
+      // 🔧 MEJORADO: Guardar estado y configurar listener de desconexión
+      this.saveConnectionState(true, this.connection.device.name);
+      
       // Listener para desconexión
       this.connection.device.addEventListener('gattserverdisconnected', () => {
+        console.log('⚠️ Impresora desconectada (evento GATT)');
         this.connection.isConnected = false;
-        console.log('Impresora desconectada');
+        this.saveConnectionState(false);
       });
 
+      console.log('✅ Impresora conectada:', this.connection.device.name);
       return true;
     } catch (error) {
-      console.error('Error conectando a impresora:', error);
+      console.error('❌ Error conectando a impresora:', error);
       this.connection.isConnected = false;
+      this.saveConnectionState(false);
       throw error;
     }
   }
@@ -189,15 +241,42 @@ class BluetoothPrinterService {
     if (this.connection.device && this.connection.isConnected) {
       this.connection.server?.disconnect();
       this.connection.isConnected = false;
+      this.saveConnectionState(false);
+      console.log('🔌 Impresora desconectada manualmente');
     }
   }
 
+  // 🔧 MEJORADO: Verificar estado real de conexión
   isConnected(): boolean {
+    // Primero verificar el estado local
+    if (!this.connection.isConnected) {
+      return false;
+    }
+    
+    // Verificar el estado real del servidor GATT
+    const realStatus = this.checkRealConnectionStatus();
+    
+    // Si hay discrepancia, actualizar el estado
+    if (realStatus !== this.connection.isConnected) {
+      console.log('⚠️ Estado de conexión actualizado:', realStatus);
+      this.connection.isConnected = realStatus;
+      this.saveConnectionState(realStatus, realStatus ? this.connection.device?.name : undefined);
+    }
+    
     return this.connection.isConnected;
   }
 
   getConnectedDevice(): string | null {
+    // Verificar estado real antes de retornar el dispositivo
+    if (!this.isConnected()) {
+      return null;
+    }
     return this.connection.device?.name || null;
+  }
+
+  // 🔧 NUEVO: Método para obtener información del estado guardado
+  getStoredConnectionInfo(): { wasConnected: boolean; deviceName: string | null } {
+    return this.loadConnectionState();
   }
 
   private async sendData(data: string): Promise<void> {
