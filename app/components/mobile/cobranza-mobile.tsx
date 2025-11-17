@@ -37,6 +37,7 @@ import { PagosModal } from './pagos-modal';
 import { formatCurrency, getDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FooterVersion } from '@/components/version-info';
+import { PWAInstallButton } from '@/components/pwa/pwa-install-button';
 
 interface CobranzaMobileProps {
   initialClientes?: OfflineCliente[];
@@ -356,6 +357,11 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
 
         {/* Estado de sincronización */}
         <SyncStatus />
+
+        {/* Botón de instalación PWA */}
+        <div className="mb-4">
+          <PWAInstallButton />
+        </div>
 
         {/* Estadísticas rápidas */}
         <div className="grid grid-cols-3 gap-2">
