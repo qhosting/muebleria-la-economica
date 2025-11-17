@@ -14,12 +14,13 @@ export async function GET() {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
+    // Obtener TODAS las plantillas (activas e inactivas) para gestión completa
     const plantillas = await prisma.plantillaTicket.findMany({
-      where: { isActive: true },
       orderBy: { createdAt: 'desc' },
     });
 
-    return NextResponse.json(plantillas);
+    // Devolver en el formato esperado por el frontend
+    return NextResponse.json({ plantillas });
   } catch (error) {
     console.error('Error al obtener plantillas:', error);
     return NextResponse.json(
