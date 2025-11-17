@@ -10,7 +10,9 @@ WORKDIR /app
 FROM base AS deps
 WORKDIR /app
 COPY app/package*.json ./
-RUN npm ci --legacy-peer-deps --no-audit --no-fund
+RUN npm ci --legacy-peer-deps --no-audit --no-fund && \
+    echo "📦 Dependencies installed" && \
+    ls -la node_modules/@prisma/ 2>/dev/null || echo "⚠️ @prisma not found in node_modules"
 
 # Rebuild the source code only when needed
 FROM base AS builder
@@ -51,8 +53,22 @@ ENV NEXT_DIST_DIR=".next"
 
 # Generate Prisma client first
 RUN echo "📦 Generating Prisma client..." && \
-    npx prisma generate && \
-    echo "✅ Prisma client generated"
+    echo "📍 PWD: $(pwd)" && \
+    echo "📂 Checking prisma/schema.prisma..." && \
+    ls -la prisma/ && \
+    echo "" && \
+    echo "🔍 Schema preview (first 30 lines):" && \
+    cat prisma/schema.prisma | head -30 && \
+    echo "" && \
+    echo "🔨 Running prisma generate..." && \
+    ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma && \
+    echo "" && \
+    echo "📂 Verifying generated client..." && \
+    ls -la node_modules/.prisma/client/ && \
+    echo "" && \
+    echo "📂 Checking index.d.ts..." && \
+    grep -c "export type UserRole" node_modules/.prisma/client/index.d.ts && \
+    echo "✅ Prisma client generated successfully with enums!"
 
 # Build Next.js (with verbose error logging)
 RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
