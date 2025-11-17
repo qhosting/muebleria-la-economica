@@ -78,13 +78,12 @@ RUN echo "📦 Generating Prisma client..." && \
     ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma && \
     echo "" && \
     echo "📂 Verifying generated client..." && \
-    ls -la node_modules/.prisma/client/ && \
-    echo "" && \
-    echo "📂 Checking index.d.ts for enums..." && \
-    if grep -q "export type UserRole" node_modules/.prisma/client/index.d.ts 2>/dev/null; then \
-        echo "✅ UserRole enum found in generated client"; \
+    if [ -d "node_modules/.prisma/client/" ]; then \
+        ls -la node_modules/.prisma/client/ | head -10; \
+        echo "✅ Prisma client directory exists"; \
     else \
-        echo "⚠️  UserRole enum not found, but client was generated"; \
+        echo "❌ ERROR: Prisma client directory not found!"; \
+        exit 1; \
     fi && \
     echo "✅ Prisma client generated successfully!"
 
