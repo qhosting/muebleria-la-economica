@@ -64,37 +64,9 @@ export default function RootLayout({
                     .then(function(registration) {
                       console.log('✅ Service Worker registrado:', registration.scope);
                       
-                      // Detectar si es instalable
-                      let deferredPrompt;
-                      window.addEventListener('beforeinstallprompt', (e) => {
-                        e.preventDefault();
-                        deferredPrompt = e;
-                        console.log('🚀 PWA instalable detectada');
-                        
-                        // Opcional: Mostrar banner personalizado
-                        const installBanner = document.createElement('div');
-                        installBanner.id = 'pwa-install-banner';
-                        installBanner.style.cssText = 'position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#0F172A;color:white;padding:16px 24px;border-radius:12px;box-shadow:0 4px 12px rgba(0,0,0,0.3);z-index:9999;display:flex;gap:12px;align-items:center;';
-                        installBanner.innerHTML = '<span>📱 Instala LaEconomica en tu dispositivo</span><button id="pwa-install-btn" style="background:white;color:#0F172A;border:none;padding:8px 16px;border-radius:8px;font-weight:600;cursor:pointer;">Instalar</button><button id="pwa-dismiss-btn" style="background:transparent;color:white;border:1px solid white;padding:8px 16px;border-radius:8px;cursor:pointer;">Más tarde</button>';
-                        document.body.appendChild(installBanner);
-                        
-                        document.getElementById('pwa-install-btn').addEventListener('click', async () => {
-                          installBanner.remove();
-                          deferredPrompt.prompt();
-                          const { outcome } = await deferredPrompt.userChoice;
-                          console.log('🎯 Resultado de instalación:', outcome);
-                          deferredPrompt = null;
-                        });
-                        
-                        document.getElementById('pwa-dismiss-btn').addEventListener('click', () => {
-                          installBanner.remove();
-                        });
-                      });
-                      
                       // Detectar cuando se instala
                       window.addEventListener('appinstalled', () => {
                         console.log('✅ PWA instalada exitosamente');
-                        deferredPrompt = null;
                       });
                     })
                     .catch(function(err) {

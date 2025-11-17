@@ -10,6 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Checkbox } from '@/components/ui/checkbox';
 import { Building2, LogIn, Loader2, Download } from 'lucide-react';
 import { VersionInfo } from '@/components/version-info';
+import { toast } from 'sonner';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -19,6 +20,7 @@ export function LoginForm() {
   const [mounted, setMounted] = useState(false);
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
+  const [installMethod, setInstallMethod] = useState<'native' | 'manual'>('native');
   const router = useRouter();
 
   useEffect(() => {
@@ -36,56 +38,111 @@ export function LoginForm() {
 
     // Detectar si la PWA puede instalarse
     const handleBeforeInstallPrompt = (e: Event) => {
+      console.log('✅ [PWA] Evento beforeinstallprompt detectado');
       e.preventDefault();
       setDeferredPrompt(e);
       setShowInstallButton(true);
+      setInstallMethod('native');
     };
 
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // Detectar si es Android y no está instalada la PWA
+    // Verificar si ya está instalada
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true ||
+                         document.referrer.includes('android-app://');
+    
     const isAndroid = /Android/i.test(navigator.userAgent);
     const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                         (window.navigator as any).standalone === true;
     
-    // Mostrar el botón siempre en dispositivos móviles que no tengan la PWA instalada
-    if ((isAndroid || isMobile) && !isStandalone) {
-      setShowInstallButton(true);
+    console.log('[PWA] Detección:', {
+      isStandalone,
+      isAndroid,
+      isMobile,
+      userAgent: navigator.userAgent
+    });
+
+    if (isStandalone) {
+      console.log('✅ [PWA] App ya instalada - ocultando botón');
+      setShowInstallButton(false);
+      return;
     }
+
+    // Agregar listener para el evento
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // Timeout de espera para el evento beforeinstallprompt
+    const timeout = setTimeout(() => {
+      if (!deferredPrompt && (isAndroid || isMobile)) {
+        console.log('⚠️ [PWA] beforeinstallprompt no detectado, usando método manual');
+        setShowInstallButton(true);
+        setInstallMethod('manual');
+      }
+    }, 2000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      clearTimeout(timeout);
     };
   }, []);
 
   const handleInstallPWA = async () => {
-    if (deferredPrompt) {
-      // Mostrar el prompt de instalación
-      deferredPrompt.prompt();
-      
-      // Esperar a que el usuario responda
-      const { outcome } = await deferredPrompt.userChoice;
-      
-      if (outcome === 'accepted') {
-        console.log('Usuario aceptó instalar la PWA');
-      } else {
-        console.log('Usuario rechazó instalar la PWA');
+    console.log('[PWA] Intento de instalación:', { 
+      hasDeferredPrompt: !!deferredPrompt, 
+      installMethod 
+    });
+
+    if (deferredPrompt && installMethod === 'native') {
+      try {
+        console.log('🚀 [PWA] Mostrando prompt nativo...');
+        // Mostrar el prompt de instalación
+        await deferredPrompt.prompt();
+        
+        // Esperar a que el usuario responda
+        const { outcome } = await deferredPrompt.userChoice;
+        
+        console.log('✅ [PWA] Resultado:', outcome);
+        
+        if (outcome === 'accepted') {
+          toast.success('¡Aplicación instalada correctamente!');
+        }
+        
+        // Limpiar el prompt
+        setDeferredPrompt(null);
+        setShowInstallButton(false);
+      } catch (error) {
+        console.error('❌ [PWA] Error en instalación nativa:', error);
+        // Fallback a método manual
+        setInstallMethod('manual');
+        showManualInstructions();
       }
-      
-      // Limpiar el prompt
-      setDeferredPrompt(null);
-      setShowInstallButton(false);
     } else {
-      // Para navegadores que no soportan beforeinstallprompt
-      // Mostrar instrucciones manuales
-      alert(
-        'Para instalar la aplicación:\n\n' +
-        '1. Toca el menú del navegador (⋮)\n' +
-        '2. Selecciona "Agregar a pantalla de inicio"\n' +
-        '3. Confirma la instalación'
-      );
+      // Método manual para Chrome 142 Android 13 y otros
+      showManualInstructions();
     }
+  };
+
+  const showManualInstructions = () => {
+    console.log('📱 [PWA] Mostrando instrucciones manuales');
+    
+    const isChrome = /Chrome/i.test(navigator.userAgent);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    
+    let instructions = 'Para instalar la aplicación:\n\n';
+    
+    if (isAndroid && isChrome) {
+      instructions += '1. Toca el menú (⋮) en la esquina superior derecha\n';
+      instructions += '2. Busca la opción "Agregar a pantalla de inicio" o "Instalar app"\n';
+      instructions += '3. Toca "Agregar" o "Instalar" para confirmar\n\n';
+      instructions += '💡 Si no ves la opción, asegúrate de:\n';
+      instructions += '   • Estar usando la última versión de Chrome\n';
+      instructions += '   • Tener conexión HTTPS activa\n';
+      instructions += '   • No haber rechazado la instalación previamente';
+    } else {
+      instructions += '1. Toca el menú del navegador (⋮ o ⋯)\n';
+      instructions += '2. Selecciona "Agregar a pantalla de inicio"\n';
+      instructions += '3. Confirma la instalación';
+    }
+    
+    alert(instructions);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
