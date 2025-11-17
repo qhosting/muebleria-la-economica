@@ -56,18 +56,21 @@ export default function UsuariosPage() {
   const fetchUsuarios = async () => {
     try {
       setLoading(true);
+      console.log('📥 Cargando usuarios...');
       const response = await fetch('/api/users');
       
       if (!response.ok) {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || `Error ${response.status}: ${response.statusText}`);
       }
       
       const data = await response.json();
+      console.log('✅ Usuarios cargados:', data.length, 'usuarios');
       // El API retorna los usuarios directamente, no dentro de un objeto data.users
       setUsuarios(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error al cargar usuarios:', error);
-      toast.error('Error al cargar usuarios');
+      console.error('❌ Error al cargar usuarios:', error);
+      toast.error(error instanceof Error ? error.message : 'Error al cargar usuarios');
     } finally {
       setLoading(false);
     }
@@ -79,6 +82,8 @@ export default function UsuariosPage() {
       const url = editingUser ? `/api/users/${editingUser.id}` : '/api/users';
       const method = editingUser ? 'PUT' : 'POST';
       
+      console.log('📤 Enviando datos:', { url, method, formData });
+      
       const response = await fetch(url, {
         method,
         headers: {
@@ -87,17 +92,26 @@ export default function UsuariosPage() {
         body: JSON.stringify(formData),
       });
 
+      console.log('📥 Respuesta recibida:', { status: response.status, ok: response.ok });
+
       if (response.ok) {
-        toast.success(editingUser ? 'Usuario actualizado' : 'Usuario creado');
+        const result = await response.json();
+        console.log('✅ Usuario guardado:', result);
+        toast.success(editingUser ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente');
         setIsDialogOpen(false);
         setEditingUser(null);
         setFormData({ name: '', email: '', password: '', role: 'cobrador', codigoGestor: '', isActive: true });
         fetchUsuarios();
       } else {
-        throw new Error('Error al guardar usuario');
+        // Obtener el mensaje de error del servidor
+        const errorData = await response.json();
+        const errorMessage = errorData.error || 'Error al guardar usuario';
+        console.error('❌ Error del servidor:', errorData);
+        toast.error(errorMessage);
       }
     } catch (error) {
-      toast.error('Error al guardar usuario');
+      console.error('❌ Error en handleSubmit:', error);
+      toast.error('Error de conexión. Verifica tu conexión a internet.');
     }
   };
 
@@ -118,18 +132,24 @@ export default function UsuariosPage() {
     if (!confirm('¿Está seguro de eliminar este usuario?')) return;
 
     try {
+      console.log('🗑️ Eliminando usuario:', userId);
       const response = await fetch(`/api/users/${userId}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        toast.success('Usuario eliminado');
+        console.log('✅ Usuario eliminado correctamente');
+        toast.success('Usuario eliminado correctamente');
         fetchUsuarios();
       } else {
-        throw new Error('Error al eliminar usuario');
+        const errorData = await response.json();
+        const errorMessage = errorData.error || 'Error al eliminar usuario';
+        console.error('❌ Error del servidor:', errorData);
+        toast.error(errorMessage);
       }
     } catch (error) {
-      toast.error('Error al eliminar usuario');
+      console.error('❌ Error en handleDelete:', error);
+      toast.error('Error de conexión al eliminar usuario');
     }
   };
 
