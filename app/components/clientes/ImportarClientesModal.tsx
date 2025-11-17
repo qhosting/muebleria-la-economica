@@ -19,6 +19,8 @@ interface ImportarClientesModalProps {
 
 interface ImportResult {
   success: number;
+  created: number;
+  updated: number;
   errors: { row: number; error: string }[];
   total: number;
 }
@@ -86,7 +88,10 @@ export function ImportarClientesModal({
       '# 5. periodicidad: diario, semanal, quincenal, mensual',
       '# 6. fechaVenta: formato YYYY-MM-DD',
       '# 7. Los campos nombreCompleto, direccionCompleta, descripcionProducto, diaPago, montoPago y periodicidad son obligatorios',
-      '# 8. Elimine estas líneas de instrucciones antes de importar',
+      '# 8. PARA CREAR NUEVOS CLIENTES: Deje codigoCliente vacío o use uno nuevo',
+      '# 9. PARA ACTUALIZAR CLIENTES EXISTENTES: Use el mismo codigoCliente del cliente que desea actualizar',
+      '# 10. El sistema detecta automáticamente si debe crear o actualizar según el codigoCliente',
+      '# 11. Elimine estas líneas de instrucciones antes de importar',
       ''
     ];
 
@@ -193,6 +198,8 @@ export function ImportarClientesModal({
       
       const result: ImportResult = {
         success: 0,
+        created: 0,
+        updated: 0,
         errors: [],
         total: data.length
       };
@@ -227,22 +234,64 @@ export function ImportarClientesModal({
             importe4: row.importe4 ? parseFloat(row.importe4) : null,
           };
           
-          const response = await fetch('/api/clientes', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(clienteData),
-          });
+          // Si tiene codigoCliente, verificar si existe para decidir crear o actualizar
+          let shouldUpdate = false;
+          if (clienteData.codigoCliente) {
+            // Verificar si el cliente existe
+            const checkResponse = await fetch(`/api/clientes?search=${clienteData.codigoCliente}&limit=1`);
+            if (checkResponse.ok) {
+              const checkData = await checkResponse.json();
+              const existingClient = checkData.clientes?.find(
+                (c: any) => c.codigoCliente === clienteData.codigoCliente
+              );
+              shouldUpdate = !!existingClient;
+            }
+          }
           
-          if (response.ok) {
-            result.success++;
-          } else {
-            const errorData = await response.json();
-            result.errors.push({ 
-              row: i + 2, 
-              error: errorData.error || 'Error desconocido' 
+          let response;
+          if (shouldUpdate && clienteData.codigoCliente) {
+            // Actualizar cliente existente
+            response = await fetch('/api/clientes/bulk-update', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                codigoCliente: clienteData.codigoCliente,
+                updateData: clienteData,
+              }),
             });
+            
+            if (response.ok) {
+              result.success++;
+              result.updated++;
+            } else {
+              const errorData = await response.json();
+              result.errors.push({ 
+                row: i + 2, 
+                error: `Error al actualizar: ${errorData.error || 'Error desconocido'}` 
+              });
+            }
+          } else {
+            // Crear nuevo cliente
+            response = await fetch('/api/clientes', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(clienteData),
+            });
+            
+            if (response.ok) {
+              result.success++;
+              result.created++;
+            } else {
+              const errorData = await response.json();
+              result.errors.push({ 
+                row: i + 2, 
+                error: `Error al crear: ${errorData.error || 'Error desconocido'}` 
+              });
+            }
           }
         } catch (error) {
           result.errors.push({ 
@@ -306,7 +355,10 @@ export function ImportarClientesModal({
               <span>1. Descargar Plantilla</span>
             </h3>
             <p className="text-sm text-gray-600 mb-3">
-              Descarga la plantilla CSV con el formato correcto para importar clientes.
+              Descarga la plantilla CSV con el formato correcto para importar/actualizar clientes. 
+              <span className="block mt-1 font-medium">
+                💡 El sistema detecta automáticamente si debe crear o actualizar según el código de cliente.
+              </span>
             </p>
             <Button
               onClick={downloadTemplate}
@@ -369,8 +421,20 @@ export function ImportarClientesModal({
               <div className="space-y-2">
                 <div className="flex items-center space-x-2 text-green-600">
                   <CheckCircle className="h-4 w-4" />
-                  <span>{result.success} clientes importados exitosamente</span>
+                  <span>{result.success} clientes procesados exitosamente</span>
                 </div>
+                
+                {result.created > 0 && (
+                  <div className="flex items-center space-x-2 text-blue-600 text-sm">
+                    <span className="ml-6">→ {result.created} clientes creados</span>
+                  </div>
+                )}
+                
+                {result.updated > 0 && (
+                  <div className="flex items-center space-x-2 text-purple-600 text-sm">
+                    <span className="ml-6">→ {result.updated} clientes actualizados</span>
+                  </div>
+                )}
                 
                 {result.errors.length > 0 && (
                   <div className="space-y-2">
