@@ -26,6 +26,7 @@ export async function GET() {
         email: true,
         name: true,
         role: true,
+        codigoGestor: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, password, name, role, isActive = true } = body;
+    const { email, password, name, role, codigoGestor, isActive = true } = body;
 
     if (!email || !password || !name || !role) {
       return NextResponse.json(
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest) {
         name,
         password: hashedPassword,
         role,
+        codigoGestor: codigoGestor?.trim() || null,
         isActive,
       },
       select: {
@@ -98,6 +100,7 @@ export async function POST(request: NextRequest) {
         email: true,
         name: true,
         role: true,
+        codigoGestor: true,
         isActive: true,
         createdAt: true,
       },

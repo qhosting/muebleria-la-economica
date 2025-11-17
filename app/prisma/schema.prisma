@@ -49,6 +49,7 @@ model User {
   name          String
   password      String?
   role          UserRole   @default(cobrador)
+  codigoGestor  String?    // Código de gestor/cobrador para importación
   isActive      Boolean    @default(true)
   createdAt     DateTime   @default(now())
   updatedAt     DateTime   @updatedAt

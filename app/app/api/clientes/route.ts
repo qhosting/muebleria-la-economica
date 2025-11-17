@@ -130,6 +130,7 @@ export async function POST(request: NextRequest) {
       nombreCompleto,
       telefono,
       vendedor,
+      codigoGestor,
       cobradorAsignadoId,
       direccionCompleta,
       descripcionProducto,
@@ -149,6 +150,20 @@ export async function POST(request: NextRequest) {
         { error: 'Faltan campos requeridos' },
         { status: 400 }
       );
+    }
+
+    // Si se proporciona codigoGestor, buscar el cobrador correspondiente
+    let cobradorId = cobradorAsignadoId;
+    if (codigoGestor?.trim() && !cobradorAsignadoId) {
+      const cobrador = await prisma.user.findFirst({
+        where: {
+          codigoGestor: codigoGestor.trim(),
+          isActive: true,
+        },
+      });
+      if (cobrador) {
+        cobradorId = cobrador.id;
+      }
     }
 
     // Generar código de cliente o usar el proporcionado
@@ -193,7 +208,7 @@ export async function POST(request: NextRequest) {
         nombreCompleto,
         telefono,
         vendedor,
-        cobradorAsignadoId: cobradorAsignadoId || null,
+        cobradorAsignadoId: cobradorId || null,
         direccionCompleta,
         descripcionProducto,
         diaPago: diaPago,

@@ -45,6 +45,7 @@ export default function UsuariosPage() {
     email: '',
     password: '',
     role: 'cobrador',
+    codigoGestor: '',
     isActive: true
   });
 
@@ -90,7 +91,7 @@ export default function UsuariosPage() {
         toast.success(editingUser ? 'Usuario actualizado' : 'Usuario creado');
         setIsDialogOpen(false);
         setEditingUser(null);
-        setFormData({ name: '', email: '', password: '', role: 'cobrador', isActive: true });
+        setFormData({ name: '', email: '', password: '', role: 'cobrador', codigoGestor: '', isActive: true });
         fetchUsuarios();
       } else {
         throw new Error('Error al guardar usuario');
@@ -107,6 +108,7 @@ export default function UsuariosPage() {
       email: user.email || '',
       password: '',
       role: user.role || 'cobrador',
+      codigoGestor: (user as any).codigoGestor || '',
       isActive: user.isActive ?? true
     });
     setIsDialogOpen(true);
@@ -163,7 +165,7 @@ export default function UsuariosPage() {
             <DialogTrigger asChild>
               <Button onClick={() => {
                 setEditingUser(null);
-                setFormData({ name: '', email: '', password: '', role: 'cobrador', isActive: true });
+                setFormData({ name: '', email: '', password: '', role: 'cobrador', codigoGestor: '', isActive: true });
               }}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nuevo Usuario
@@ -223,6 +225,19 @@ export default function UsuariosPage() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+                <div>
+                  <Label htmlFor="codigoGestor">Código de Gestor/Cobrador (opcional)</Label>
+                  <Input
+                    id="codigoGestor"
+                    type="text"
+                    placeholder="Ej: G001, COB-01, etc."
+                    value={formData.codigoGestor}
+                    onChange={(e) => setFormData({ ...formData, codigoGestor: e.target.value })}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Utilizado para asignar clientes automáticamente al importar
+                  </p>
                 </div>
                 <div className="flex justify-end gap-3">
                   <Button 
@@ -302,6 +317,12 @@ export default function UsuariosPage() {
                       <Shield className="h-4 w-4 text-gray-400" />
                       <span className="text-sm">{ROLES[usuario.role as keyof typeof ROLES]}</span>
                     </div>
+                    {(usuario as any).codigoGestor && (
+                      <div className="flex items-center gap-2">
+                        <UserCheck className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm font-mono text-blue-600">{(usuario as any).codigoGestor}</span>
+                      </div>
+                    )}
                     <div className="flex gap-2">
                       <Button
                         size="sm"

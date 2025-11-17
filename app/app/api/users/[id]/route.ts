@@ -24,12 +24,13 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { email, name, role, isActive, password } = body;
+    const { email, name, role, codigoGestor, isActive, password } = body;
 
     const updateData: any = {
       email,
       name,
       role,
+      codigoGestor: codigoGestor?.trim() || null,
       isActive,
     };
 
@@ -45,6 +46,7 @@ export async function PUT(
         email: true,
         name: true,
         role: true,
+        codigoGestor: true,
         isActive: true,
         updatedAt: true,
       },
