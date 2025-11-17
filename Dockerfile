@@ -68,6 +68,9 @@ RUN echo "📦 Generating Prisma client..." && \
     echo "" && \
     echo "📂 Checking index.d.ts..." && \
     grep -c "export type UserRole" node_modules/.prisma/client/index.d.ts && \
+    echo "" && \
+    echo "🧪 Testing enum import with Node.js..." && \
+    node -e "const { UserRole, StatusCuenta } = require('@prisma/client'); console.log('UserRole:', UserRole); console.log('✅ Enums import successfully!');" && \
     echo "✅ Prisma client generated successfully with enums!"
 
 # Build Next.js (with verbose error logging)
