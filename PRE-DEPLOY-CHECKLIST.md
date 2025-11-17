@@ -135,6 +135,17 @@ Error: Cannot find module '@prisma/client'
 **Solución**: Script verifica uso de `./node_modules/.bin/prisma`  
 **Verificación**: Check #3 - Path directo a Prisma CLI
 
+---
+
+### ❌ Error 7: Reinstalación de yarn en Alpine
+```
+npm error EEXIST: file already exists
+npm error File exists: /usr/local/bin/yarn
+```
+**Causa**: `RUN npm install -g yarn` en Dockerfile cuando yarn ya viene preinstalado  
+**Solución**: Script detecta y rechaza instalación redundante  
+**Verificación**: Check #3 - No reinstalar yarn en Alpine
+
 ## Integración con CI/CD
 
 Puedes agregar este script como paso de pre-deploy en tu pipeline:

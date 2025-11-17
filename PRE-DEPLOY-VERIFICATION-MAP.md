@@ -13,6 +13,7 @@ Mapa completo de verificaciones del script y errores que previene.
 | 4 | `npm dependency conflict` | Check #3: Valida yarn + --frozen-lockfile | ❌ Manual |
 | 5 | `Permission denied: ./start.sh` | Check #6: Corrige permisos | ✅ Sí |
 | 6 | `Cannot find module '@prisma/client'` | Check #3: Path directo prisma CLI | ❌ Manual |
+| 7 | `EEXIST: file already exists /usr/local/bin/yarn` | Check #3: No reinstalar yarn | ❌ Manual |
 
 ## Verificaciones Detalladas
 
@@ -95,6 +96,13 @@ grep "./node_modules/.bin/prisma generate" Dockerfile
 **Previene**:
 - ❌ Error: Cannot find module '@prisma/client'
 
+#### 3.7 No Reinstalar Yarn
+```bash
+grep "npm install -g yarn" Dockerfile
+```
+**Previene**:
+- ❌ npm error EEXIST: file already exists /usr/local/bin/yarn
+
 ---
 
 ### ✅ Check #4: Archivos Esenciales
@@ -141,6 +149,9 @@ grep "^NEXTAUTH_SECRET=" app/.env
 ### Commit Timeline
 
 ```
+d872ef2 - Fix: Eliminar instalación redundante de yarn
+        └─> Check #3.7: No reinstalar yarn
+
 c984e27 - Fix: Alpine 3.21 → 3.19
         └─> Check #3.1: Valida Alpine 3.19
 
@@ -159,13 +170,13 @@ df36a47 - Fix: yarn.lock symlink → archivo real
 
 ## Cobertura de Verificación
 
-### Auto-Fix (2/6)
+### Auto-Fix (2/7)
 ✅ Check #1: yarn.lock symlink  
 ✅ Check #6: Permisos de scripts
 
-### Manual Fix (4/6)
+### Manual Fix (5/7)
 ⚠️ Check #3.1: Alpine version (requiere editar Dockerfile)  
-⚠️ Check #3.2-3.6: Dockerfile config (requiere editar Dockerfile)  
+⚠️ Check #3.2-3.7: Dockerfile config (requiere editar Dockerfile)  
 ⚠️ Check #2: Prisma schema (requiere editar schema.prisma)  
 ⚠️ Check #4: Archivos esenciales (requiere crear archivos)
 
@@ -204,14 +215,14 @@ git push origin main
 
 ## Estadísticas
 
-- **Total de verificaciones**: 17
+- **Total de verificaciones**: 18
 - **Auto-fixes**: 2
 - **Warnings**: 4
-- **Errores críticos detectados**: 6
+- **Errores críticos detectados**: 7
 - **Build failures prevenidos**: 100% (si se siguen las recomendaciones)
 
 ---
 
 **Última actualización**: 2025-11-17  
-**Versión del script**: 2.0.0  
-**Cobertura**: 6/6 errores históricos
+**Versión del script**: 2.1.0  
+**Cobertura**: 7/7 errores históricos
