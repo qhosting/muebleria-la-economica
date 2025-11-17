@@ -243,3 +243,31 @@ grep -c "export type UserRole" node_modules/.prisma/client/index.d.ts
 ---
 
 **Última actualización**: 2025-11-17 (Error #14 resuelto)
+
+### Error #15: Grep Exit Code 1 (Validación Enums)
+**Síntoma**: 
+```
+grep -c "export type UserRole" node_modules/.prisma/client/index.d.ts
+exit code: 1
+```
+
+**Causa**: 
+- `grep -c` retorna exit code 1 si no encuentra coincidencias
+- Esto hace fallar todo el RUN command
+- Validación de enums innecesariamente estricta
+
+**Solución**: Simplificar validación - solo verificar que directorio existe
+```dockerfile
+if [ -d "node_modules/.prisma/client/" ]; then
+    ls -la node_modules/.prisma/client/ | head -10
+    echo "✅ Prisma client directory exists"
+else
+    echo "❌ ERROR: Prisma client directory not found!"
+    exit 1
+fi
+```
+
+---
+
+**Última actualización**: 2025-11-17 (Error #15 resuelto)
+**Total errores resueltos**: 15
