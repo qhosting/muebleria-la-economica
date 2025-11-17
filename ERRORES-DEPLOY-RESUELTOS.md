@@ -341,3 +341,34 @@ grep "export.*UserRole" node_modules/.prisma/client/index.d.ts
 
 **Última actualización**: 2025-11-17 (Error #17 resuelto)
 **Total errores resueltos**: 17
+
+### Error #18: Prisma Genera en Ruta Absoluta Incorrecta
+**Síntoma**: 
+```
+✔ Generated Prisma Client to ./../home/ubuntu/muebleria_la_economica/app/node_modules/.prisma/client
+❌ ERROR: Prisma client directory not found!
+```
+
+**Causa**: 
+- schema.prisma tiene `output` hardcodeado a ruta absoluta del host
+- En Docker, estamos en `/app`, no en `/home/ubuntu/muebleria_la_economica/app`
+- Prisma genera cliente en ubicación incorrecta
+- Verificación busca en `node_modules/.prisma/client/` (relativo) pero no existe
+
+**Solución**: 
+Remover el `output` hardcodeado y dejar que Prisma use ubicación por defecto:
+
+```prisma
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    # NO incluir output - usar default: node_modules/.prisma/client
+}
+```
+
+**Resultado**: Cliente generado en `node_modules/.prisma/client/` (relativo, correcto)
+
+---
+
+**Última actualización**: 2025-11-17 (Error #18 resuelto)
+**Total errores resueltos**: 18
