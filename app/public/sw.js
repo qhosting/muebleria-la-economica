@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'laeconomica-v1.3.1';
+const CACHE_NAME = 'appmuebles-v1.3.2';
 const urlsToCache = [
   '/login',
   '/dashboard',
@@ -21,11 +21,11 @@ const urlsToCache = [
 
 // Instalar Service Worker con manejo de errores mejorado
 self.addEventListener('install', (event) => {
-  console.log('[SW] Instalando Service Worker v1.3.1');
+  console.log('[SW] Instalando Service Worker v1.3.2');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[SW] Cache LaEconomica v1.3.1 abierto');
+        console.log('[SW] Cache APPMUEBLES v1.3.2 abierto');
         // Intentar agregar todas las URLs, pero continuar si alguna falla
         return Promise.allSettled(
           urlsToCache.map(url => 
@@ -46,14 +46,16 @@ self.addEventListener('install', (event) => {
 
 // Activar Service Worker y limpiar cachés antiguas
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activando Service Worker v1.3.1');
+  console.log('[SW] Activando Service Worker v1.3.2');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
           // Eliminar cachés que no sean la actual
           if (cacheName !== CACHE_NAME && 
-              (cacheName.startsWith('muebleria-cobranza-') || cacheName.startsWith('laeconomica-'))) {
+              (cacheName.startsWith('muebleria-cobranza-') || 
+               cacheName.startsWith('laeconomica-') || 
+               cacheName.startsWith('appmuebles-'))) {
             console.log('[SW] Eliminando caché antigua:', cacheName);
             return caches.delete(cacheName);
           }
@@ -219,7 +221,7 @@ self.addEventListener('push', (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification('LaEconomica', options)
+    self.registration.showNotification('APPMUEBLES', options)
   );
 });
 

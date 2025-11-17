@@ -7,7 +7,7 @@ import { Providers } from '@/components/providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'LaEconomica - Sistema de Cobranza',
+  title: 'APPMUEBLES - Sistema de Cobranza',
   description: 'Sistema integral de gestión de clientes y cobranza en campo',
   manifest: '/manifest.json',
 };
@@ -43,7 +43,7 @@ export default function RootLayout({
         {/* PWA - Mobile Web App Capable */}
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
-        <meta name="apple-mobile-web-app-title" content="LaEconomica" />
+        <meta name="apple-mobile-web-app-title" content="APPMUEBLES" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         
         {/* PWA - Theme Color */}
