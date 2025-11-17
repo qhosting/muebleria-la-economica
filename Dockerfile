@@ -16,7 +16,7 @@ COPY app/package.json app/package-lock.json ./
 # Instalar dependencias con npm (más compatible que yarn berry)
 RUN set -ex && \
     echo "📦 Installing dependencies with npm..." && \
-    npm ci 2>&1 | tee /tmp/npm-install.log && \
+    npm ci --legacy-peer-deps 2>&1 | tee /tmp/npm-install.log && \
     echo "📦 Verifying installation..." && \
     if [ ! -d "node_modules" ]; then \
         echo "❌ ERROR: node_modules not created!" && \
