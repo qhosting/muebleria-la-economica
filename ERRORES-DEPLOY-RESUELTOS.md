@@ -198,3 +198,27 @@ head -5 app/package-lock.json
 ---
 
 **Última actualización**: 2025-11-17 (Error #11 resuelto)
+
+---
+
+### Error #12: Conflicto Peer Dependencies TypeScript ESLint
+**Síntoma**: 
+```
+npm ci
+ERESOLVE could not resolve
+@typescript-eslint/eslint-plugin@7.0.0 requires @typescript-eslint/parser@^6.0.0
+Found: @typescript-eslint/parser@7.0.0
+```
+
+**Causa**: 
+- Conflicto entre versiones de @typescript-eslint/parser (7.0.0) y @typescript-eslint/eslint-plugin (7.0.0)
+- package-lock.json tiene dependencias que no se resuelven con strict mode
+
+**Solución**: Usar `--legacy-peer-deps`
+```dockerfile
+RUN npm ci --legacy-peer-deps
+```
+
+---
+
+**Última actualización**: 2025-11-17 (Error #12 resuelto)
