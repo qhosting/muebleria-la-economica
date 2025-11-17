@@ -13,7 +13,7 @@ export default function CobranzaMobilePage() {
   const router = useRouter();
   const [initialClientes, setInitialClientes] = useState<OfflineCliente[]>([]);
   const [loading, setLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false);
+  const authCheckedRef = useRef(false);
   const dataLoadedRef = useRef(false);
 
   const userRole = (session?.user as any)?.role;
@@ -22,9 +22,9 @@ export default function CobranzaMobilePage() {
   // 🚀 OPTIMIZACIÓN CRÍTICA: Un solo useEffect para autenticación sin bucles
   useEffect(() => {
     if (status === 'loading') return;
-    if (authChecked) return; // Evitar múltiples verificaciones
+    if (authCheckedRef.current) return; // Evitar múltiples verificaciones
 
-    setAuthChecked(true);
+    authCheckedRef.current = true;
 
     // Verificar autenticación sin redirect múltiple
     if (!session) {
@@ -44,7 +44,7 @@ export default function CobranzaMobilePage() {
     } else {
       setLoading(false);
     }
-  }, [status, session, userRole, userId, router, authChecked]);
+  }, [status, session, userRole, userId, router]);
 
   const loadInitialData = async () => {
     try {
@@ -72,7 +72,7 @@ export default function CobranzaMobilePage() {
   };
 
   // Estados de carga simplificados con mejores condiciones
-  if (status === 'loading' || !authChecked) {
+  if (status === 'loading' || !authCheckedRef.current) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
