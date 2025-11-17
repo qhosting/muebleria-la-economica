@@ -1,7 +1,8 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
@@ -32,46 +33,37 @@ interface DashboardClientProps {
 }
 
 export function DashboardClient({ session }: DashboardClientProps) {
+  const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasRedirected = useRef(false);
 
   const userRole = session?.user?.role;
 
-  // 🚀 OPTIMIZACIÓN CRÍTICA: Separar efectos para evitar loops
+  // 🚀 FIX: Redirección única sin loops usando useRef
   useEffect(() => {
-    // Solo cargar estadísticas si el usuario tiene permisos
+    if (!userRole || hasRedirected.current) return;
+
+    const roleRedirects: Record<string, string> = {
+      'gestor_cobranza': '/dashboard/clientes',
+      'reporte_cobranza': '/dashboard/reportes',
+      'cobrador': '/dashboard/cobranza-mobile'
+    };
+
+    const redirectPath = roleRedirects[userRole];
+    
+    if (redirectPath) {
+      hasRedirected.current = true;
+      router.replace(redirectPath);
+    }
+  }, [userRole, router]);
+
+  // 🚀 Cargar estadísticas solo para roles con permisos
+  useEffect(() => {
     if (['admin', 'gestor_cobranza', 'reporte_cobranza'].includes(userRole)) {
       fetchStats();
     } else {
-      setLoading(false); // Para cobradores, no cargar estadísticas
-    }
-  }, [userRole]);
-
-  // 🚀 OPTIMIZACIÓN: Redirección en un efecto separado sin dependencias circulares
-  useEffect(() => {
-    if (!userRole) return;
-
-    const redirectUser = () => {
-      switch (userRole) {
-        case 'gestor_cobranza':
-          window.location.href = '/dashboard/clientes';
-          break;
-        case 'reporte_cobranza':
-          window.location.href = '/dashboard/reportes';
-          break;
-        case 'cobrador':
-          window.location.href = '/dashboard/cobranza-mobile';
-          break;
-      }
-    };
-
-    if (userRole !== 'admin') {
-      // Usar requestAnimationFrame para mejor rendimiento
-      const frame = requestAnimationFrame(() => {
-        setTimeout(redirectUser, 100);
-      });
-      
-      return () => cancelAnimationFrame(frame);
+      setLoading(false);
     }
   }, [userRole]);
 
