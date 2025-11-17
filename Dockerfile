@@ -10,8 +10,8 @@ WORKDIR /app
 FROM base AS deps
 WORKDIR /app
 
-# Instalar yarn globalmente
-RUN npm install -g yarn
+# yarn ya viene preinstalado en node:18-alpine3.19
+# No es necesario instalar yarn nuevamente
 
 # Copiar archivos de dependencias
 COPY app/package.json app/yarn.lock* ./

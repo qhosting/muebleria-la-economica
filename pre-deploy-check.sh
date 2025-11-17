@@ -164,6 +164,16 @@ if [ -f "Dockerfile" ]; then
     elif grep -q "./node_modules/.bin/prisma generate" Dockerfile; then
         print_success "Dockerfile usa path directo a prisma CLI (correcto)"
     fi
+    
+    # Verificar que NO intente instalar yarn (ya viene en alpine)
+    if grep -q "npm install -g yarn" Dockerfile; then
+        print_error "Dockerfile intenta instalar yarn con npm (causará error EEXIST)"
+        print_info "  yarn ya viene preinstalado en node:18-alpine3.19"
+        print_info "  Eliminar línea: RUN npm install -g yarn"
+        ISSUES_FOUND=$((ISSUES_FOUND + 1))
+    else
+        print_success "Dockerfile no intenta reinstalar yarn (correcto)"
+    fi
 else
     print_error "Dockerfile no encontrado"
     ISSUES_FOUND=$((ISSUES_FOUND + 1))
