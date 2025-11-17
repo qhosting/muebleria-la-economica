@@ -271,3 +271,37 @@ fi
 
 **Última actualización**: 2025-11-17 (Error #15 resuelto)
 **Total errores resueltos**: 15
+
+### Error #16: package.json No Encontrado + Enums Prisma
+**Síntoma**: 
+```
+npm error path /app/package.json
+npm error errno -2
+npm error enoent Could not read package.json
+
+error TS2305: Module '"@prisma/client"' has no exported member 'UserRole'
+error TS2305: Module '"@prisma/client"' has no exported member 'StatusCuenta'
+```
+
+**Causa**: 
+- En stage builder: package.json no copiado (removido en fix #13)
+- Cliente Prisma generado en RUN anterior, pero no disponible en siguiente RUN
+- Docker RUN commands no comparten archivos generados entre layers
+- Enums de Prisma no accesibles para TypeScript
+
+**Solución**: 
+1. Copiar package.json y package-lock.json al stage builder
+2. Regenerar cliente Prisma ANTES de `npm run build`
+
+```dockerfile
+# Stage builder
+COPY app/package.json app/package-lock.json ./
+...
+RUN ./node_modules/.bin/prisma generate && \
+    npm run build
+```
+
+---
+
+**Última actualización**: 2025-11-17 (Error #16 resuelto)
+**Total errores resueltos**: 16
