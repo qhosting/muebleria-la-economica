@@ -10,8 +10,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Printer, Save, TestTube2, Loader2 } from 'lucide-react';
+import { Printer, Save, TestTube2, Loader2, Bluetooth, Radio } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 
 interface PrinterConfig {
   impresoraNombre: string;
@@ -20,12 +21,20 @@ interface PrinterConfig {
   impresoraAutoImprimir: boolean;
 }
 
+interface BluetoothPrinter {
+  id: string;
+  name: string;
+}
+
 export default function MiImpresoraPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [scanning, setScanning] = useState(false);
+  const [bluetoothAvailable, setBluetoothAvailable] = useState(false);
+  const [availablePrinters, setAvailablePrinters] = useState<BluetoothPrinter[]>([]);
   const [config, setConfig] = useState<PrinterConfig>({
     impresoraNombre: '',
     impresoraAnchoPapel: 80,
@@ -39,6 +48,11 @@ export default function MiImpresoraPage() {
     if (!session) {
       router.push('/login');
       return;
+    }
+
+    // Verificar si Bluetooth está disponible
+    if (typeof navigator !== 'undefined' && 'bluetooth' in navigator) {
+      setBluetoothAvailable(true);
     }
 
     loadConfig();
@@ -97,6 +111,51 @@ export default function MiImpresoraPage() {
     }
   };
 
+  const scanBluetoothDevices = async () => {
+    if (!bluetoothAvailable) {
+      toast.error('Bluetooth Web API no disponible en este navegador');
+      return;
+    }
+
+    setScanning(true);
+    try {
+      console.log('🔍 Iniciando escaneo de dispositivos Bluetooth...');
+      
+      // Solicitar dispositivo Bluetooth
+      const device = await (navigator as any).bluetooth.requestDevice({
+        // acceptAllDevices para mostrar todos los dispositivos
+        acceptAllDevices: true,
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Servicio común de impresoras
+      });
+
+      console.log('✅ Dispositivo seleccionado:', device);
+
+      if (device && device.name) {
+        // Actualizar configuración con el dispositivo seleccionado
+        setConfig({
+          ...config,
+          impresoraNombre: device.name
+        });
+        
+        toast.success(`Impresora "${device.name}" seleccionada correctamente`);
+      } else {
+        toast.warning('No se pudo obtener el nombre del dispositivo');
+      }
+    } catch (error: any) {
+      console.error('❌ Error al escanear Bluetooth:', error);
+      
+      if (error.name === 'NotFoundError') {
+        toast.info('No se seleccionó ningún dispositivo');
+      } else if (error.name === 'SecurityError') {
+        toast.error('Bluetooth bloqueado. Verifica los permisos del navegador.');
+      } else {
+        toast.error('Error al escanear dispositivos Bluetooth');
+      }
+    } finally {
+      setScanning(false);
+    }
+  };
+
   if (status === 'loading' || loading) {
     return (
       <DashboardLayout>
@@ -131,20 +190,71 @@ export default function MiImpresoraPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-6">
-            {/* Nombre de impresora */}
-            <div className="space-y-2">
-              <Label htmlFor="impresoraNombre">
-                Nombre de Impresora
-              </Label>
-              <Input
-                id="impresoraNombre"
-                placeholder="Ej: Impresora Bluetooth HP"
-                value={config.impresoraNombre}
-                onChange={(e) => setConfig({ ...config, impresoraNombre: e.target.value })}
-              />
+            {/* Selección de impresora Bluetooth */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="impresoraNombre">
+                  Impresora Bluetooth
+                </Label>
+                {bluetoothAvailable && (
+                  <Badge variant="outline" className="gap-1">
+                    <Radio className="h-3 w-3" />
+                    Bluetooth disponible
+                  </Badge>
+                )}
+              </div>
+              
+              <div className="flex gap-2">
+                <Input
+                  id="impresoraNombre"
+                  placeholder="Selecciona tu impresora Bluetooth"
+                  value={config.impresoraNombre}
+                  onChange={(e) => setConfig({ ...config, impresoraNombre: e.target.value })}
+                  readOnly={bluetoothAvailable}
+                  className={bluetoothAvailable ? 'cursor-not-allowed bg-muted' : ''}
+                />
+                {bluetoothAvailable && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={scanBluetoothDevices}
+                    disabled={scanning}
+                    className="shrink-0"
+                  >
+                    {scanning ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        Buscando...
+                      </>
+                    ) : (
+                      <>
+                        <Bluetooth className="h-4 w-4 mr-2" />
+                        Buscar
+                      </>
+                    )}
+                  </Button>
+                )}
+              </div>
+              
               <p className="text-sm text-muted-foreground">
-                Identificador para reconocer tu impresora
+                {bluetoothAvailable 
+                  ? 'Haz clic en "Buscar" para seleccionar tu impresora Bluetooth' 
+                  : 'Ingresa el nombre de tu impresora manualmente'}
               </p>
+
+              {!bluetoothAvailable && (
+                <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-lg p-3">
+                  <p className="text-sm text-amber-800 dark:text-amber-200">
+                    <strong>⚠️ Bluetooth Web no disponible</strong><br />
+                    Tu navegador no soporta Web Bluetooth API. Para usar esta función:
+                  </p>
+                  <ul className="text-xs text-amber-700 dark:text-amber-300 mt-2 space-y-1 ml-4">
+                    <li>• Usa Chrome, Edge o Samsung Internet</li>
+                    <li>• Habilita Bluetooth en tu dispositivo</li>
+                    <li>• Asegúrate de usar HTTPS o localhost</li>
+                  </ul>
+                </div>
+              )}
             </div>
 
             {/* Ancho de papel */}
@@ -255,13 +365,34 @@ export default function MiImpresoraPage() {
           <CardHeader>
             <CardTitle>Impresoras Compatibles</CardTitle>
           </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>• Impresoras térmicas con protocolo ESC/POS</li>
-              <li>• Modelos probados: Epson TM-T20, Star TSP143, Bixolon SRP-350</li>
-              <li>• Conexión: USB, Bluetooth, WiFi</li>
-              <li>• Ancho de papel: 58mm o 80mm</li>
-            </ul>
+          <CardContent className="space-y-4">
+            <div>
+              <h4 className="font-medium text-sm mb-2">✅ Requisitos</h4>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• Impresoras térmicas con protocolo ESC/POS</li>
+                <li>• Conexión Bluetooth habilitada en el dispositivo</li>
+                <li>• Ancho de papel: 58mm o 80mm</li>
+              </ul>
+            </div>
+
+            <div>
+              <h4 className="font-medium text-sm mb-2">📱 Modelos Probados</h4>
+              <ul className="space-y-1 text-sm text-muted-foreground">
+                <li>• Epson TM-T20, TM-T88</li>
+                <li>• Star TSP143, TSP654</li>
+                <li>• Bixolon SRP-350, SPP-R200</li>
+                <li>• Zebra ZD410, ZD620</li>
+              </ul>
+            </div>
+
+            {bluetoothAvailable && (
+              <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+                <p className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>💡 Consejo:</strong> Asegúrate de que tu impresora Bluetooth esté encendida 
+                  y en modo de emparejamiento antes de buscar dispositivos.
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
