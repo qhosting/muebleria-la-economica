@@ -4,19 +4,6 @@ import { NextResponse } from 'next/server';
 
 export default withAuth(
   function middleware(req) {
-    const token = req.nextauth.token;
-    const path = req.nextUrl.pathname;
-
-    // Si no hay token y está intentando acceder al dashboard
-    if (!token && path.startsWith('/dashboard')) {
-      return NextResponse.redirect(new URL('/login', req.url));
-    }
-
-    // Si hay token y está en login, redirigir al dashboard
-    if (token && path === '/login') {
-      return NextResponse.redirect(new URL('/dashboard', req.url));
-    }
-
     return NextResponse.next();
   },
   {
