@@ -75,7 +75,11 @@ RUN echo "📦 Generating Prisma client..." && \
     echo "🔍 Schema preview (first 30 lines):" && \
     cat prisma/schema.prisma | head -30 && \
     echo "" && \
-    echo "🔨 Running prisma generate..." && \
+    echo "🧹 Cleaning old Prisma generated client (if exists)..." && \
+    rm -rf node_modules/.prisma && \
+    echo "✅ Old generated client removed" && \
+    echo "" && \
+    echo "🔨 Running prisma generate (fresh)..." && \
     ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma && \
     echo "" && \
     echo "📂 Verifying generated client..." && \
@@ -86,6 +90,14 @@ RUN echo "📦 Generating Prisma client..." && \
         echo "❌ ERROR: Prisma client directory not found!"; \
         exit 1; \
     fi && \
+    echo "" && \
+    echo "🔍 Verifying enums in generated client..." && \
+    if [ -f "node_modules/.prisma/client/index.d.ts" ]; then \
+        echo "📄 Checking for UserRole enum..." && \
+        grep "export.*UserRole" node_modules/.prisma/client/index.d.ts | head -1 || echo "⚠️  UserRole not found"; \
+        echo "📄 Checking for StatusCuenta enum..." && \
+        grep "export.*StatusCuenta" node_modules/.prisma/client/index.d.ts | head -1 || echo "⚠️  StatusCuenta not found"; \
+    fi && \
     echo "✅ Prisma client generated successfully!"
 
 # Build Next.js (with verbose error logging)
@@ -94,9 +106,7 @@ RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && 
     echo "📍 NEXT_DIST_DIR: $NEXT_DIST_DIR" && \
     echo "📦 Verifying package.json exists..." && \
     ls -la package.json && \
-    echo "🔄 Regenerating Prisma client for build stage..." && \
-    ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma && \
-    echo "✅ Prisma client regenerated" && \
+    echo "✅ Prisma client already generated (from previous step)" && \
     npm run build 2>&1 || (echo "❌ Build failed! Checking for TypeScript errors..." && npx tsc --noEmit && exit 1) && \
     echo "✅ Build completed successfully!"
 
