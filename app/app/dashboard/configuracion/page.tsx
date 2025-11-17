@@ -134,6 +134,10 @@ export default function ConfiguracionPage() {
       console.log('Respuesta del servidor:', { status: response.status, data });
 
       if (response.ok) {
+        // Actualizar el estado local con los datos guardados
+        if (data.config) {
+          setConfig(data.config);
+        }
         setSaved(true);
         toast.success('Configuración guardada exitosamente');
         setTimeout(() => setSaved(false), 2000);

@@ -69,8 +69,10 @@ export async function GET(request: NextRequest) {
           periodicidad: cliente.periodicidad,
           diaPago: cliente.diaPago,
           diasAtraso: diasAtrasoCalculados,
-          fechaUltimoPago: ultimoPago?.fechaPago || cliente.fechaVenta,
-          cobrador: cliente.cobradorAsignado?.name,
+          ultimoPago: ultimoPago?.fechaPago?.toISOString() || null,
+          cobrador: {
+            name: cliente.cobradorAsignado?.name || 'Sin asignar',
+          },
           cobradorId: cliente.cobradorAsignado?.id,
         };
       })
@@ -78,19 +80,11 @@ export async function GET(request: NextRequest) {
       .sort((a: any, b: any) => b.diasAtraso - a.diasAtraso);
 
     // Estadísticas de morosidad
-    const stats = {
-      totalMorosos: clientesMorosos.length,
-      montoTotalMoroso: clientesMorosos.reduce((sum: any, c: any) => sum + c.saldoActual, 0),
-      promedioAtraso: clientesMorosos.length > 0 
-        ? clientesMorosos.reduce((sum: any, c: any) => sum + c.diasAtraso, 0) / clientesMorosos.length 
-        : 0,
-      rangosDiasAtraso: {
-        hasta7: clientesMorosos.filter((c: any) => c.diasAtraso <= 7).length,
-        de8a15: clientesMorosos.filter((c: any) => c.diasAtraso >= 8 && c.diasAtraso <= 15).length,
-        de16a30: clientesMorosos.filter((c: any) => c.diasAtraso >= 16 && c.diasAtraso <= 30).length,
-        mas30: clientesMorosos.filter((c: any) => c.diasAtraso > 30).length,
-      },
-    };
+    const totalMorosos = clientesMorosos.length;
+    const totalDeudaMorosa = clientesMorosos.reduce((sum: any, c: any) => sum + c.saldoActual, 0);
+    const promedioAtraso = totalMorosos > 0 
+      ? Math.round(clientesMorosos.reduce((sum: any, c: any) => sum + c.diasAtraso, 0) / totalMorosos)
+      : 0;
 
     // Morosidad por cobrador
     const morosidadPorCobrador = await prisma.user.findMany({
@@ -114,18 +108,17 @@ export async function GET(request: NextRequest) {
       const clientesMorososCobrador = clientesMorosos.filter((c: any) => c.cobradorId === cobrador.id);
       return {
         cobrador: cobrador.name,
-        totalMorosos: clientesMorososCobrador.length,
-        montoMoroso: clientesMorososCobrador.reduce((sum: any, c: any) => sum + c.saldoActual, 0),
-        promedioAtraso: clientesMorososCobrador.length > 0 
-          ? clientesMorososCobrador.reduce((sum: any, c: any) => sum + c.diasAtraso, 0) / clientesMorososCobrador.length 
-          : 0,
+        clientesMorosos: clientesMorososCobrador.length,
+        totalDeuda: clientesMorososCobrador.reduce((sum: any, c: any) => sum + c.saldoActual, 0),
       };
     });
 
     return NextResponse.json({
-      stats,
+      totalMorosos,
+      totalDeudaMorosa,
+      promedioAtraso,
       clientesMorosos,
-      reporteCobrador,
+      morosidadPorCobrador: reporteCobrador,
     });
   } catch (error) {
     console.error('Error al generar reporte de morosidad:', error);

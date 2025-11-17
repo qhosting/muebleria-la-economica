@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
       where.cobradorId = (session.user as any).id;
     }
 
-    const [pagos, total] = await Promise.all([
+    const [pagos, total, estadisticas] = await Promise.all([
       prisma.pago.findMany({
         where,
         include: {
@@ -62,7 +62,21 @@ export async function GET(request: NextRequest) {
         take: limit,
       }),
       prisma.pago.count({ where }),
+      // Calcular estadísticas
+      prisma.pago.groupBy({
+        by: ['tipoPago'],
+        where,
+        _count: { id: true },
+        _sum: { monto: true },
+      }),
     ]);
+
+    // Calcular estadísticas para el frontend
+    const totalPagos = pagos.length;
+    const montoTotal = pagos.reduce((sum: any, p: any) => sum + parseFloat(p.monto.toString()), 0);
+    const pagosRegulares = pagos.filter((p: any) => p.tipoPago === 'regular').length;
+    const pagosMoratorios = pagos.filter((p: any) => p.tipoPago === 'moratorio').length;
+    const ticketsImpresos = pagos.filter((p: any) => p.ticketImpreso).length;
 
     // Convert Decimal fields to numbers for JSON serialization
     const pagosSerializados = pagos.map((pago: any) => ({
@@ -74,6 +88,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       pagos: pagosSerializados,
+      estadisticas: {
+        totalPagos,
+        montoTotal,
+        pagosRegulares,
+        pagosMoratorios,
+        ticketsImpresos,
+      },
       pagination: {
         total,
         pages: Math.ceil(total / limit),

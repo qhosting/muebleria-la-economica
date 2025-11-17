@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Building2, LogIn, Loader2 } from 'lucide-react';
+import { Building2, LogIn, Loader2, Download } from 'lucide-react';
 import { VersionInfo } from '@/components/version-info';
 
 export function LoginForm() {
@@ -17,6 +17,8 @@ export function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [showInstallButton, setShowInstallButton] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -31,7 +33,58 @@ export function LoginForm() {
       setPassword(savedPassword);
       setRememberMe(true);
     }
+
+    // Detectar si la PWA puede instalarse
+    const handleBeforeInstallPrompt = (e: Event) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallButton(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+
+    // También mostrar el botón en Android si detectamos que es móvil
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true;
+    
+    if (isAndroid && !isStandalone) {
+      setShowInstallButton(true);
+    }
+
+    return () => {
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+    };
   }, []);
+
+  const handleInstallPWA = async () => {
+    if (deferredPrompt) {
+      // Mostrar el prompt de instalación
+      deferredPrompt.prompt();
+      
+      // Esperar a que el usuario responda
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      if (outcome === 'accepted') {
+        console.log('Usuario aceptó instalar la PWA');
+      } else {
+        console.log('Usuario rechazó instalar la PWA');
+      }
+      
+      // Limpiar el prompt
+      setDeferredPrompt(null);
+      setShowInstallButton(false);
+    } else {
+      // Para navegadores que no soportan beforeinstallprompt
+      // Mostrar instrucciones manuales
+      alert(
+        'Para instalar la aplicación:\n\n' +
+        '1. Toca el menú del navegador (⋮)\n' +
+        '2. Selecciona "Agregar a pantalla de inicio"\n' +
+        '3. Confirma la instalación'
+      );
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,6 +256,19 @@ export function LoginForm() {
                   </>
                 )}
               </Button>
+
+              {showInstallButton && (
+                <Button 
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11 mt-2"
+                  onClick={handleInstallPWA}
+                  disabled={isLoading}
+                >
+                  <Download className="mr-2 h-4 w-4" />
+                  Instalar Aplicación
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>
