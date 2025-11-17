@@ -24,6 +24,7 @@ import {
   Receipt,
   AlertTriangle,
   Upload,
+  Printer,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -60,6 +61,12 @@ const navigation = [
     name: 'Cobranza Móvil',
     href: '/dashboard/cobranza',
     icon: CreditCard,
+    roles: ['cobrador'],
+  },
+  {
+    name: 'Mi Impresora',
+    href: '/dashboard/mi-impresora',
+    icon: Printer,
     roles: ['cobrador'],
   },
   {
