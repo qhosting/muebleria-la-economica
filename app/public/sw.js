@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'laeconomica-v1.3.0';
+const CACHE_NAME = 'laeconomica-v1.3.1';
 const urlsToCache = [
   '/login',
   '/dashboard',
@@ -19,13 +19,25 @@ const urlsToCache = [
   '/favicon.ico'
 ];
 
-// Instalar Service Worker
+// Instalar Service Worker con manejo de errores mejorado
 self.addEventListener('install', (event) => {
+  console.log('[SW] Instalando Service Worker v1.3.1');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('Cache LaEconomica v1.3.0 abierto');
-        return cache.addAll(urlsToCache);
+        console.log('[SW] Cache LaEconomica v1.3.1 abierto');
+        // Intentar agregar todas las URLs, pero continuar si alguna falla
+        return Promise.allSettled(
+          urlsToCache.map(url => 
+            cache.add(url).catch(err => {
+              console.warn(`[SW] No se pudo cachear ${url}:`, err);
+              return null;
+            })
+          )
+        );
+      })
+      .catch(err => {
+        console.error('[SW] Error al abrir cache:', err);
       })
   );
   // Forzar activación inmediata
@@ -34,6 +46,7 @@ self.addEventListener('install', (event) => {
 
 // Activar Service Worker y limpiar cachés antiguas
 self.addEventListener('activate', (event) => {
+  console.log('[SW] Activando Service Worker v1.3.1');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -41,15 +54,21 @@ self.addEventListener('activate', (event) => {
           // Eliminar cachés que no sean la actual
           if (cacheName !== CACHE_NAME && 
               (cacheName.startsWith('muebleria-cobranza-') || cacheName.startsWith('laeconomica-'))) {
-            console.log('Eliminando caché antigua:', cacheName);
+            console.log('[SW] Eliminando caché antigua:', cacheName);
             return caches.delete(cacheName);
           }
         })
       );
     })
+    .then(() => {
+      console.log('[SW] Service Worker activado correctamente');
+      // Tomar control de todas las páginas inmediatamente
+      return self.clients.claim();
+    })
+    .catch(err => {
+      console.error('[SW] Error al activar Service Worker:', err);
+    })
   );
-  // Tomar control de todas las páginas inmediatamente
-  return self.clients.claim();
 });
 
 // Buscar en cache con estrategia Network First para páginas dinámicas
@@ -67,45 +86,59 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Para páginas de dashboard, usar estrategia Network First
+  // Ignorar requests de API y WebSocket
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/_next/webpack-hmr')) {
+    return;
+  }
+
+  // Para páginas de dashboard, usar estrategia Network First con timeout
   if (url.pathname.startsWith('/dashboard') || url.pathname === '/login') {
     event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          // Si la respuesta es exitosa, guardar en cache y devolver
-          if (response && response.status === 200 && response.type === 'basic') {
-            const responseToCache = response.clone();
-            caches.open(CACHE_NAME)
-              .then((cache) => {
-                cache.put(event.request, responseToCache);
-              });
-          }
-          return response;
-        })
-        .catch(() => {
-          // Si la red falla, intentar desde cache
-          return caches.match(event.request)
-            .then((cachedResponse) => {
-              if (cachedResponse) {
-                return cachedResponse;
-              }
-              
-              // Si no hay cache y es una página de navegación, devolver el dashboard principal
-              if (url.pathname.startsWith('/dashboard') && url.pathname !== '/dashboard') {
-                return caches.match('/dashboard');
-              }
-              
-              // Para login, intentar desde cache
-              if (url.pathname === '/login') {
-                return caches.match('/login');
-              }
-              
-              return new Response('Página no disponible offline', { 
-                status: 503, 
-                statusText: 'Service Unavailable' 
-              });
+      // Intentar fetch con timeout
+      Promise.race([
+        fetch(event.request),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('timeout')), 5000)
+        )
+      ])
+      .then((response) => {
+        // Si la respuesta es exitosa, guardar en cache y devolver
+        if (response && response.status === 200 && response.type === 'basic') {
+          const responseToCache = response.clone();
+          caches.open(CACHE_NAME)
+            .then((cache) => {
+              cache.put(event.request, responseToCache);
+            })
+            .catch(err => console.warn('[SW] Error al guardar en cache:', err));
+        }
+        return response;
+      })
+      .catch((err) => {
+        console.log('[SW] Red no disponible, usando cache para:', url.pathname);
+        // Si la red falla, intentar desde cache
+        return caches.match(event.request)
+          .then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            
+            // Si no hay cache y es una página de navegación, devolver el dashboard principal
+            if (url.pathname.startsWith('/dashboard') && url.pathname !== '/dashboard') {
+              return caches.match('/dashboard');
+            }
+            
+            // Para login, intentar desde cache
+            if (url.pathname === '/login') {
+              return caches.match('/login');
+            }
+            
+            return new Response('Página no disponible offline', { 
+              status: 503, 
+              statusText: 'Service Unavailable',
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' }
             });
-        })
+          });
+      })
     );
     return;
   }
@@ -118,8 +151,8 @@ self.addEventListener('fetch', (event) => {
           return response;
         }
         
-        return fetch(event.request).then(
-          (response) => {
+        return fetch(event.request)
+          .then((response) => {
             if (!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
@@ -128,11 +161,18 @@ self.addEventListener('fetch', (event) => {
             caches.open(CACHE_NAME)
               .then((cache) => {
                 cache.put(event.request, responseToCache);
-              });
+              })
+              .catch(err => console.warn('[SW] Error al guardar recurso en cache:', err));
 
             return response;
-          }
-        );
+          })
+          .catch(err => {
+            console.warn('[SW] Error al cargar recurso:', url.pathname, err);
+            return new Response('Recurso no disponible', { 
+              status: 404,
+              headers: { 'Content-Type': 'text/plain; charset=utf-8' }
+            });
+          });
       })
   );
 });
