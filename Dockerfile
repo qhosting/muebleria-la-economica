@@ -41,7 +41,8 @@ ARG NEXTAUTH_SECRET
 # Copy node_modules from deps
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy app source (package.json already copied in deps stage)
+# Copy app source - package.json needed for npm run build
+COPY app/package.json app/package-lock.json ./
 COPY app/next.config.js ./
 COPY app/next-env.d.ts* ./
 COPY app/tsconfig.json ./
@@ -91,6 +92,11 @@ RUN echo "📦 Generating Prisma client..." && \
 RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
     echo "📍 PWD: $(pwd)" && \
     echo "📍 NEXT_DIST_DIR: $NEXT_DIST_DIR" && \
+    echo "📦 Verifying package.json exists..." && \
+    ls -la package.json && \
+    echo "🔄 Regenerating Prisma client for build stage..." && \
+    ./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma && \
+    echo "✅ Prisma client regenerated" && \
     npm run build 2>&1 || (echo "❌ Build failed! Checking for TypeScript errors..." && npx tsc --noEmit && exit 1) && \
     echo "✅ Build completed successfully!"
 
