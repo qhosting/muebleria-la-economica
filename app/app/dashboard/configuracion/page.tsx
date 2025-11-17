@@ -19,7 +19,9 @@ import {
   Printer, 
   Database,
   Save,
-  RotateCcw
+  RotateCcw,
+  Trash2,
+  AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -169,6 +171,47 @@ export default function ConfiguracionPage() {
       }
     } catch (error) {
       toast.error('Error al probar la impresora');
+    }
+  };
+
+  const handleResetDatabase = async () => {
+    const confirmed = confirm(
+      '⚠️ ADVERTENCIA: Esta acción eliminará TODOS los clientes, pagos y rutas.\n\n' +
+      'Se mantendrán:\n' +
+      '- Usuarios por defecto\n' +
+      '- Plantilla de ticket estándar\n' +
+      '- Configuración del sistema\n\n' +
+      '¿Está seguro de continuar?'
+    );
+
+    if (!confirmed) return;
+
+    const doubleConfirm = confirm(
+      '¿REALMENTE desea resetear la base de datos?\n\n' +
+      'Esta acción NO se puede deshacer.'
+    );
+
+    if (!doubleConfirm) return;
+
+    setLoading(true);
+    try {
+      const response = await fetch('/api/reset-database', {
+        method: 'POST',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success('Base de datos reseteada exitosamente');
+        console.log('Registros eliminados:', data.stats);
+      } else {
+        throw new Error(data.error || 'Error al resetear');
+      }
+    } catch (error: any) {
+      console.error('Error al resetear BD:', error);
+      toast.error(error.message || 'Error al resetear la base de datos');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -481,6 +524,44 @@ export default function ConfiguracionPage() {
                   })}
                 />
               </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Zona de Peligro */}
+        <Card className="border-red-200 bg-red-50/50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-700">
+              <AlertTriangle className="h-5 w-5" />
+              Zona de Peligro
+            </CardTitle>
+            <CardDescription className="text-red-600">
+              Acciones irreversibles que afectan la base de datos
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-start justify-between p-4 bg-white rounded-lg border border-red-200">
+              <div className="flex-1">
+                <h4 className="font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                  <Database className="h-4 w-4" />
+                  Resetear Base de Datos
+                </h4>
+                <p className="text-sm text-gray-600 mb-2">
+                  Elimina todos los clientes, pagos, rutas y motararios.
+                </p>
+                <p className="text-xs text-gray-500">
+                  Se mantienen: usuarios por defecto, plantilla de ticket y configuración del sistema.
+                </p>
+              </div>
+              <Button 
+                variant="destructive" 
+                onClick={handleResetDatabase}
+                disabled={loading}
+                className="ml-4"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Resetear BD
+              </Button>
             </div>
           </CardContent>
         </Card>
