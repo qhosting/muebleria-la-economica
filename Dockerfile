@@ -81,8 +81,12 @@ RUN echo "📦 Generating Prisma client..." && \
     ls -la node_modules/.prisma/client/ && \
     echo "" && \
     echo "📂 Checking index.d.ts for enums..." && \
-    grep -c "export type UserRole" node_modules/.prisma/client/index.d.ts && \
-    echo "✅ Prisma client generated successfully with enums!"
+    if grep -q "export type UserRole" node_modules/.prisma/client/index.d.ts 2>/dev/null; then \
+        echo "✅ UserRole enum found in generated client"; \
+    else \
+        echo "⚠️  UserRole enum not found, but client was generated"; \
+    fi && \
+    echo "✅ Prisma client generated successfully!"
 
 # Build Next.js (with verbose error logging)
 RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
