@@ -305,3 +305,39 @@ RUN ./node_modules/.bin/prisma generate && \
 
 **Última actualización**: 2025-11-17 (Error #16 resuelto)
 **Total errores resueltos**: 16
+
+### Error #17: Enums Prisma Persistentemente No Exportados
+**Síntoma**: 
+```
+error TS2305: Module '"@prisma/client"' has no exported member 'UserRole'
+error TS2305: Module '"@prisma/client"' has no exported member 'StatusCuenta'
+(Persiste después del fix #16)
+```
+
+**Causa**: 
+- npm ci ejecuta postinstall de Prisma automáticamente
+- Prisma genera cliente ANTES de copiar schema.prisma al stage builder
+- Cliente generado sin schema = sin enums
+- Regeneración posterior no refresca correctamente por cache/conflicto
+
+**Solución**: 
+1. Limpiar cliente generado viejo (node_modules/.prisma)
+2. NO tocar runtime (@prisma/client instalado por npm)
+3. Generar cliente limpio con schema correcto
+4. Verificar enums en index.d.ts
+
+```dockerfile
+# Limpiar solo el cliente generado
+rm -rf node_modules/.prisma
+
+# Generar limpio con schema completo
+./node_modules/.bin/prisma generate --schema=./prisma/schema.prisma
+
+# Verificar enums existen
+grep "export.*UserRole" node_modules/.prisma/client/index.d.ts
+```
+
+---
+
+**Última actualización**: 2025-11-17 (Error #17 resuelto)
+**Total errores resueltos**: 17
