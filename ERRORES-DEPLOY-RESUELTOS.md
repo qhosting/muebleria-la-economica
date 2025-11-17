@@ -159,3 +159,42 @@ Si alguna verificación falla, el push se bloquea y muestra el problema.
 ---
 
 **Última actualización**: 2025-11-17 (Error #8 resuelto)
+
+---
+
+### Error #11: Incompatibilidad Yarn Berry vs Yarn Classic
+**Síntoma**: 
+```
+yarn install --frozen-lockfile
+error Your lockfile needs to be updated
+⚠️ @prisma not found in node_modules
+ERROR: "/app/node_modules": not found
+```
+
+**Causa**: 
+- yarn.lock generado con Yarn 4 (Berry) - `__metadata: version: 8`
+- node:18-alpine tiene Yarn 1.x (Classic) preinstalado
+- Yarn 1 no puede leer el formato de lockfile de Yarn 4
+
+**Solución**: Cambiar a npm que es más compatible
+```dockerfile
+# Antes (fallaba):
+COPY app/yarn.lock ./
+RUN yarn install --frozen-lockfile
+
+# Después (funciona):
+COPY app/package-lock.json ./
+RUN npm ci
+```
+
+**Verificación**:
+```bash
+head -5 app/package-lock.json
+# {
+#   "name": "app",
+#   "lockfileVersion": 3,  ✓
+```
+
+---
+
+**Última actualización**: 2025-11-17 (Error #11 resuelto)
