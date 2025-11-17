@@ -43,12 +43,14 @@ export function LoginForm() {
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // También mostrar el botón en Android si detectamos que es móvil
+    // Detectar si es Android y no está instalada la PWA
     const isAndroid = /Android/i.test(navigator.userAgent);
+    const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
                          (window.navigator as any).standalone === true;
     
-    if (isAndroid && !isStandalone) {
+    // Mostrar el botón siempre en dispositivos móviles que no tengan la PWA instalada
+    if ((isAndroid || isMobile) && !isStandalone) {
       setShowInstallButton(true);
     }
 
@@ -256,22 +258,22 @@ export function LoginForm() {
                   </>
                 )}
               </Button>
-
-              {showInstallButton && (
-                <Button 
-                  type="button"
-                  variant="outline"
-                  className="w-full h-11 mt-2"
-                  onClick={handleInstallPWA}
-                  disabled={isLoading}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  Instalar Aplicación
-                </Button>
-              )}
             </form>
           </CardContent>
         </Card>
+
+        {showInstallButton && (
+          <Button 
+            type="button"
+            variant="default"
+            className="w-full h-11 mt-4 bg-green-600 hover:bg-green-700 text-white shadow-lg"
+            onClick={handleInstallPWA}
+            disabled={isLoading}
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Instalar Aplicación
+          </Button>
+        )}
 
         <div className="text-center mt-6 space-y-2">
           <div className="text-blue-200 text-sm">
