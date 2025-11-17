@@ -41,8 +41,7 @@ ARG NEXTAUTH_SECRET
 # Copy node_modules from deps
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy app source
-COPY app/package*.json ./
+# Copy app source (package.json already copied in deps stage)
 COPY app/next.config.js ./
 COPY app/next-env.d.ts* ./
 COPY app/tsconfig.json ./
