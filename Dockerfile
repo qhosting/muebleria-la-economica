@@ -1,8 +1,8 @@
 # Multi-stage build para optimizar el tamaño de la imagen
-FROM node:18-alpine AS base
+FROM node:18-alpine3.19 AS base
 
 # Instalar dependencias necesarias para Prisma y Alpine
-RUN apk add --no-cache libc6-compat openssl bash
+RUN apk update && apk add --no-cache libc6-compat openssl bash
 
 WORKDIR /app
 
