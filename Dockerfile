@@ -10,21 +10,17 @@ WORKDIR /app
 FROM base AS deps
 WORKDIR /app
 
-# yarn ya viene preinstalado en node:18-alpine3.19
-# No es necesario instalar yarn nuevamente
-
 # Copiar archivos de dependencias
-COPY app/package.json app/yarn.lock ./
-COPY app/.yarnrc.yml ./
+COPY app/package.json app/package-lock.json ./
 
-# Instalar dependencias con yarn
+# Instalar dependencias con npm (más compatible que yarn berry)
 RUN set -ex && \
-    echo "📦 Installing dependencies..." && \
-    yarn install --frozen-lockfile 2>&1 | tee /tmp/yarn-install.log && \
+    echo "📦 Installing dependencies with npm..." && \
+    npm ci 2>&1 | tee /tmp/npm-install.log && \
     echo "📦 Verifying installation..." && \
     if [ ! -d "node_modules" ]; then \
         echo "❌ ERROR: node_modules not created!" && \
-        cat /tmp/yarn-install.log && \
+        cat /tmp/npm-install.log && \
         exit 1; \
     fi && \
     if [ ! -d "node_modules/@prisma" ]; then \
@@ -96,7 +92,7 @@ RUN echo "📦 Generating Prisma client..." && \
 RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
     echo "📍 PWD: $(pwd)" && \
     echo "📍 NEXT_DIST_DIR: $NEXT_DIST_DIR" && \
-    yarn build 2>&1 || (echo "❌ Build failed! Checking for TypeScript errors..." && yarn tsc --noEmit && exit 1) && \
+    npm run build 2>&1 || (echo "❌ Build failed! Checking for TypeScript errors..." && npx tsc --noEmit && exit 1) && \
     echo "✅ Build completed successfully!"
 
 # Verify build output
