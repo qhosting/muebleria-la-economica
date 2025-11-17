@@ -18,9 +18,20 @@ COPY app/package.json app/yarn.lock ./
 COPY app/.yarnrc.yml ./
 
 # Instalar dependencias con yarn
-RUN yarn install --frozen-lockfile && \
-    echo "📦 Dependencies installed with yarn" && \
-    ls -la node_modules/@prisma/ 2>/dev/null || echo "⚠️ @prisma not found in node_modules"
+RUN set -ex && \
+    echo "📦 Installing dependencies..." && \
+    yarn install --frozen-lockfile 2>&1 | tee /tmp/yarn-install.log && \
+    echo "📦 Verifying installation..." && \
+    if [ ! -d "node_modules" ]; then \
+        echo "❌ ERROR: node_modules not created!" && \
+        cat /tmp/yarn-install.log && \
+        exit 1; \
+    fi && \
+    if [ ! -d "node_modules/@prisma" ]; then \
+        echo "⚠️ WARNING: @prisma not found in node_modules" && \
+        ls -la node_modules/ | head -20; \
+    fi && \
+    echo "✅ Dependencies installed successfully"
 
 # Rebuild the source code only when needed
 FROM base AS builder
