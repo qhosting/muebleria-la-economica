@@ -220,7 +220,7 @@ export default function PlantillasPage() {
       '{{saldo_anterior}}': '$2,500.00',
       '{{saldo_nuevo}}': '$2,000.00',
       '{{cobrador}}': 'María González',
-      '{{empresa_nombre}}': 'APPMUEBLES',
+      '{{empresa_nombre}}': 'VertexERP Muebles',
       '{{empresa_telefono}}': '555-1234',
       '{{empresa_direccion}}': 'Av. Principal 123, Col. Centro',
     };
