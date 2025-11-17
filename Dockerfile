@@ -9,9 +9,16 @@ WORKDIR /app
 # Instalar dependencias
 FROM base AS deps
 WORKDIR /app
-COPY app/package*.json ./
-RUN npm ci --legacy-peer-deps --no-audit --no-fund && \
-    echo "📦 Dependencies installed" && \
+
+# Instalar yarn globalmente
+RUN npm install -g yarn
+
+# Copiar archivos de dependencias
+COPY app/package.json app/yarn.lock* ./
+
+# Instalar dependencias con yarn
+RUN yarn install --frozen-lockfile && \
+    echo "📦 Dependencies installed with yarn" && \
     ls -la node_modules/@prisma/ 2>/dev/null || echo "⚠️ @prisma not found in node_modules"
 
 # Rebuild the source code only when needed
@@ -77,7 +84,7 @@ RUN echo "📦 Generating Prisma client..." && \
 RUN echo "🔨 Building Next.js application (NORMAL mode, no standalone)..." && \
     echo "📍 PWD: $(pwd)" && \
     echo "📍 NEXT_DIST_DIR: $NEXT_DIST_DIR" && \
-    npm run build 2>&1 || (echo "❌ Build failed! Checking for TypeScript errors..." && npx tsc --noEmit && exit 1) && \
+    yarn build 2>&1 || (echo "❌ Build failed! Checking for TypeScript errors..." && yarn tsc --noEmit && exit 1) && \
     echo "✅ Build completed successfully!"
 
 # Verify build output
