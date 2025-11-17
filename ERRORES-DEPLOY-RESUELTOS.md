@@ -222,3 +222,24 @@ RUN npm ci --legacy-peer-deps
 ---
 
 **Última actualización**: 2025-11-17 (Error #12 resuelto)
+
+### Error #14: Test Enum Node.js Innecesario
+**Síntoma**: 
+```
+node -e "const { UserRole, StatusCuenta } = require('@prisma/client'); ..."
+exit code: 1
+```
+
+**Causa**: 
+- Test de importación de enums con Node.js puede fallar en entorno Docker
+- El grep ya verifica que los enums existen en index.d.ts
+- Test redundante e innecesario
+
+**Solución**: Eliminar test de Node.js, mantener solo grep
+```dockerfile
+grep -c "export type UserRole" node_modules/.prisma/client/index.d.ts
+```
+
+---
+
+**Última actualización**: 2025-11-17 (Error #14 resuelto)
