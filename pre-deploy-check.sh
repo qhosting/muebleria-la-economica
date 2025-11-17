@@ -109,10 +109,32 @@ print_info "3. Verificando Dockerfile..."
 cd /home/ubuntu/muebleria_la_economica
 
 if [ -f "Dockerfile" ]; then
+    # Verificar versión de Alpine (debe ser 3.19, no 3.21)
+    if grep -q "alpine3.19" Dockerfile; then
+        print_success "Dockerfile usa Alpine 3.19 (correcto)"
+    elif grep -q "alpine3.21" Dockerfile; then
+        print_error "Dockerfile usa Alpine 3.21 (causará errores de repos)"
+        print_info "  Cambiar a: FROM node:18-alpine3.19"
+        ISSUES_FOUND=$((ISSUES_FOUND + 1))
+    else
+        ALPINE_VERSION=$(grep -o "alpine[0-9.]*" Dockerfile | head -1)
+        if [ -n "$ALPINE_VERSION" ]; then
+            print_warning "Dockerfile usa $ALPINE_VERSION (verificar compatibilidad)"
+        fi
+    fi
+    
     # Verificar que use yarn si existe yarn.lock
     if [ -f "app/yarn.lock" ]; then
         if grep -q "yarn install" Dockerfile; then
             print_success "Dockerfile usa yarn (correcto para yarn.lock)"
+            
+            # Verificar --frozen-lockfile
+            if grep -q "yarn install --frozen-lockfile" Dockerfile; then
+                print_success "Dockerfile usa --frozen-lockfile (correcto)"
+            else
+                print_warning "Dockerfile no usa --frozen-lockfile"
+                print_info "  Considera agregar: yarn install --frozen-lockfile"
+            fi
         else
             print_warning "Dockerfile no usa yarn, pero yarn.lock existe"
             print_info "  Considera actualizar Dockerfile para usar yarn"
@@ -122,9 +144,25 @@ if [ -f "Dockerfile" ]; then
     # Verificar que tenga prisma generate
     if grep -q "prisma generate" Dockerfile; then
         print_success "Dockerfile genera Prisma client"
+        
+        # Verificar validación de enums (test con node -e)
+        if grep -q "node -e.*UserRole.*require" Dockerfile; then
+            print_success "Dockerfile valida enums de Prisma"
+        else
+            print_warning "Dockerfile no valida enums después de generar"
+            print_info "  Recomendado: Agregar test con node -e para validar enums"
+        fi
     else
         print_warning "Dockerfile no ejecuta 'prisma generate'"
         ISSUES_FOUND=$((ISSUES_FOUND + 1))
+    fi
+    
+    # Verificar que use ./node_modules/.bin/prisma en lugar de npx
+    if grep -q "npx prisma generate" Dockerfile; then
+        print_warning "Dockerfile usa 'npx prisma' (puede causar problemas)"
+        print_info "  Recomendado: ./node_modules/.bin/prisma generate"
+    elif grep -q "./node_modules/.bin/prisma generate" Dockerfile; then
+        print_success "Dockerfile usa path directo a prisma CLI (correcto)"
     fi
 else
     print_error "Dockerfile no encontrado"

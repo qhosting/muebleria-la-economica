@@ -26,9 +26,11 @@ bash pre-deploy-check.sh
   - MotivoMotarario
 
 ### 3. ✓ Dockerfile
-- Verifica que use `yarn` (si existe yarn.lock)
-- Confirma que ejecute `prisma generate`
-- Valida estructura correcta
+- **Alpine 3.19**: Verifica versión correcta (no 3.21 que causa errores)
+- **yarn + frozen-lockfile**: Confirma uso de `yarn install --frozen-lockfile`
+- **Prisma Generate**: Valida que ejecute `prisma generate`
+- **Validación de Enums**: Verifica test con `node -e` para UserRole
+- **Path Directo**: Confirma uso de `./node_modules/.bin/prisma` (no npx)
 
 ### 4. ✓ Archivos Esenciales
 - `app/package.json`
@@ -70,23 +72,68 @@ git push origin main
 
 ## Problemas Comunes que Resuelve
 
-### ❌ yarn.lock symlink roto
+### ❌ Error 1: yarn.lock symlink roto
 ```
-ERROR: "/app/yarn.lock": not found
+ERROR: failed to calculate checksum: "/app/yarn.lock": not found
 ```
-**Solución**: Script detecta y convierte a archivo real
+**Causa**: yarn.lock era un symlink a `/opt/hostedapp/node/root/app/yarn.lock`  
+**Solución**: Script detecta y convierte automáticamente a archivo real  
+**Verificación**: Check #1 - Convierte symlink → archivo real (448KB)
 
-### ❌ Prisma Client sin generar
-```
-Module '"@prisma/client"' has no exported member 'UserRole'
-```
-**Solución**: Verifica que Dockerfile ejecute `prisma generate`
+---
 
-### ❌ Scripts sin permisos
+### ❌ Error 2: Alpine Linux 3.21 Repository Error
+```
+ERROR: unable to select packages:
+  openssl-dev (no such package)
+```
+**Causa**: Alpine 3.21 tiene problemas con repositorios  
+**Solución**: Script verifica que Dockerfile use Alpine 3.19  
+**Verificación**: Check #3 - Valida `FROM node:18-alpine3.19`
+
+---
+
+### ❌ Error 3: Prisma Client - Enums no exportados
+```
+error TS2305: Module '"@prisma/client"' has no exported member 'UserRole'
+error TS2305: Module '"@prisma/client"' has no exported member 'StatusCuenta'
+```
+**Causa**: Prisma Client no se generó correctamente o enums no disponibles  
+**Solución**: Script verifica:
+- Prisma schema tiene los 5 enums requeridos (Check #2)
+- Dockerfile ejecuta `prisma generate` (Check #3)
+- Dockerfile valida enums con `node -e` test (Check #3)  
+**Verificación**: Check #2 y #3 - Schema + Generación + Validación
+
+---
+
+### ❌ Error 4: npm vs yarn inconsistencia
+```
+npm ERR! Fix the upstream dependency conflict, or retry with --legacy-peer-deps
+```
+**Causa**: Proyecto usa yarn.lock pero Dockerfile usaba npm  
+**Solución**: Script verifica que Dockerfile use yarn + --frozen-lockfile  
+**Verificación**: Check #3 - Valida `yarn install --frozen-lockfile`
+
+---
+
+### ❌ Error 5: Scripts sin permisos
 ```
 /bin/sh: ./start.sh: Permission denied
 ```
-**Solución**: Script corrige permisos automáticamente
+**Causa**: Scripts no tienen permisos de ejecución  
+**Solución**: Script corrige permisos automáticamente  
+**Verificación**: Check #6 - Ejecuta `chmod +x` automáticamente
+
+---
+
+### ❌ Error 6: npx prisma genera problemas
+```
+Error: Cannot find module '@prisma/client'
+```
+**Causa**: `npx prisma` puede no encontrar el CLI correcto  
+**Solución**: Script verifica uso de `./node_modules/.bin/prisma`  
+**Verificación**: Check #3 - Path directo a Prisma CLI
 
 ## Integración con CI/CD
 
@@ -111,8 +158,12 @@ Puedes agregar este script como paso de pre-deploy en tu pipeline:
 ✓ Prisma schema válido (5/5 enums encontrados)
 
 ℹ 3. Verificando Dockerfile...
+✓ Dockerfile usa Alpine 3.19 (correcto)
 ✓ Dockerfile usa yarn (correcto para yarn.lock)
+✓ Dockerfile usa --frozen-lockfile (correcto)
 ✓ Dockerfile genera Prisma client
+✓ Dockerfile valida enums de Prisma
+✓ Dockerfile usa path directo a prisma CLI (correcto)
 
 ℹ 4. Verificando archivos esenciales...
 ✓   app/package.json ✓
@@ -127,9 +178,18 @@ Puedes agregar este script como paso de pre-deploy en tu pipeline:
 
 ℹ 6. Verificando permisos de scripts...
 ✓   start.sh tiene permisos de ejecución
+✓   seed-admin.sh tiene permisos de ejecución
+✓   backup-manual.sh tiene permisos de ejecución
+✓   restore-backup.sh tiene permisos de ejecución
 
 ==========================================
 ✓ 🎉 ¡TODO LISTO PARA DEPLOY!
+
+ℹ Próximos pasos:
+  1. git add -A
+  2. git commit -m 'Pre-deploy check: Todo OK'
+  3. git push origin main
+  4. Deploy en Coolify
 ```
 
 ## Notas
