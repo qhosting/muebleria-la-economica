@@ -2,7 +2,23 @@
 
 **Fecha:** 2026-02-07  
 **Versión PWA Actual:** v1.4.0  
-**Objetivo:** Crear una aplicación nativa Android que soporte dispositivos que no pueden instalar la PWA
+# 📱 Plan de Implementación: App Nativa Android (VertexERP)
+
+> **⚠️ ACTUALIZACIÓN IMPORTANTE (2026-02-07):**
+> Se ha decidido enfocar el desarrollo de la app nativa **exclusivamente para el perfil de Cobrador en Campo**.
+> Para detalles técnicos específicos, scripts de instalación y guía de uso, consultar:
+> - **Plan Técnico:** [PLAN-APP-COBRADOR-ANDROID.md](./PLAN-APP-COBRADOR-ANDROID.md)
+> - **Guía Rápida:** [GUIA-APP-COBRADOR.md](./GUIA-APP-COBRADOR.md)
+
+---
+
+## 🎯 Objetivo General
+Crear una aplicación nativa Android robusta para superar las limitaciones de compatibilidad de la PWA actual en dispositivos antiguos (Android 5.0 - 7.0), enfocada principalmente en la **operatividad de los cobradores en ruta**.
+
+## 📱 Alcance del Proyecto (Actualizado)
+El proyecto se dividirá en dos plataformas claramente diferenciadas:
+1.  **Web Admin (Actual):** Gestión completa, administración, reportes (Para Administradores y Gestores).
+2.  **App Nativa (Nueva):** Funcionalidades exclusivas de cobranza, offline y hardware (Para Cobradores).
 
 ---
 
@@ -23,25 +39,24 @@ Aunque VertexERP Muebles funciona como PWA en la mayoría de dispositivos Androi
 
 ## 🔧 Opciones de Implementación
 
-### Opción 1: **Capacitor** (⭐ RECOMENDADA)
+### 1. **Estrategia Recomendada: Capacitor (Seleccionada)**
 
-**Descripción:** Framework de Ionic que convierte aplicaciones web en nativas usando WebView nativo de Android.
+Esta es la opción más viable y rápida, ya que **reutiliza el 100% de la lógica de negocio y UI** de Next.js, añadiendo una capa nativa transparente.
 
-#### Ventajas
-- ✅ Integración perfecta con Next.js/React
-- ✅ Plugins nativos para Bluetooth, GPS, cámara, etc.
-- ✅ Mantiene el 100% del código web existente
-- ✅ Actualizaciones OTA (Over-The-Air) sin pasar por Play Store
-- ✅ Comunidad activa y bien documentado
-- ✅ Soporte para Android e iOS (futuro)
+**Ventajas clave:**
+*   ✅ **Mantenimiento Único:** Un solo repositorio para Web y Android.
+*   ✅ **Acceso Nativo:** Bluetooth LE, GPS, Storage Nativo ya integrados.
+*   ✅ **Compatibilidad Windows:** Configuración con `cross-env` para desarrollo multiplataforma.
+*   ✅ **Despliegue Rápido:** Build automatizado (`npm run cobrador:sync`).
 
-#### Desventajas
-- ⚠️ Tamaño de APK mayor (~15-30 MB)
-- ⚠️ Requiere configuración inicial
+### 2. **Configuración Técnica Implementada**
 
-#### Tiempo de Implementación
-- **Configuración inicial:** 1-2 días
-- **Integración de plugins:** 2-3 días
+Se ha configurado el proyecto para **exportación estática** selectiva:
+- Cuando `BUILD_TARGET=capacitor`, Next.js genera HTML/CSS/JS estático en `out/`.
+- Capacitor toma este directorio y lo empaqueta en una App Android.
+- Se usan **plugins comunitarios** (`@capacitor-community/bluetooth-le`) para hardware específico.
+
+> **Nota Técnica:** Se solucionaron conflictos de tipos en `lib/bluetooth-printer.ts` renombrando las interfaces Web Bluetooth para evitar colisiones con los tipos globales de Capacitor.s:** 2-3 días
 - **Testing y ajustes:** 2-3 días
 - **Total:** ~1 semana
 
