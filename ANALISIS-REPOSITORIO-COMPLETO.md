@@ -75,6 +75,7 @@ La fusión agregó **2 commits** con los siguientes archivos:
 - **Framework:** Capacitor 7
 - **Plataforma:** Android 5.0+ (API 21+)
 - **Plugins:** Bluetooth LE, Geolocation, Storage Nativo, Network Status
+- **Compatibilidad:** Validada para Windows (cross-env) y Linux / Mac
 
 #### DevOps & Deployment
 - **Containerización:** Docker + Docker Compose

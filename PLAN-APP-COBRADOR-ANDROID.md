@@ -122,19 +122,25 @@ VertexERP Cobrador/
 
 Los archivos de configuración ya han sido creados (`capacitor.config.ts`, `next.config.js`, etc.). Solo falta instalar las librerías:
 
+> **Nota:** Usar `--legacy-peer-deps` para evitar conflictos de dependencias.
+
 ```bash
 cd app
 
-# 1. Instalar núcleo de Capacitor
-npm install @capacitor/core @capacitor/cli @capacitor/android
+# 1. Instalar utilidad cross-env (necesario para Windows)
+npm install cross-env --save-dev --legacy-peer-deps
 
-# 2. Instalar plugins nativos ya configurados
-npm install @capacitor-community/bluetooth-le @capacitor/geolocation @capacitor/preferences @capacitor/network @capacitor/app @capacitor/status-bar @capacitor/splash-screen
+# 2. Instalar núcleo de Capacitor
+npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
 
-# 3. Inicializar plataforma Android
+# 3. Instalar plugins nativos ya configurados
+npm install @capacitor-community/bluetooth-le @capacitor/geolocation @capacitor/preferences @capacitor/network @capacitor/app @capacitor/status-bar @capacitor/splash-screen --legacy-peer-deps
+
+# 4. Inicializar plataforma Android
+// Si falla este paso, verifica que tengas Java instalado y la variable ANDROID_HOME
 npx cap add android
 
-# 4. Sincronizar proyecto
+# 5. Sincronizar proyecto
 npm run cobrador:sync
 ```
 

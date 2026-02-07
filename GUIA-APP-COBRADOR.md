@@ -11,12 +11,17 @@ La infraestructura ya está implementada en el repositorio. Sigue estos pasos pa
 
 ### 1. Instalación de Dependencias
 
+> **⚠️ Nota para usuarios de Windows:** Si encuentras errores de dependencias (ERESOLVE), agrega `--legacy-peer-deps` al final de los comandos de instalación.
+
 ```bash
 cd app
 
+# Instalar utilidad para variables de entorno (Windows)
+npm install cross-env --save-dev --legacy-peer-deps
+
 # Instalar núcleo y plugins de Capacitor
-npm install @capacitor/core @capacitor/cli @capacitor/android
-npm install @capacitor-community/bluetooth-le @capacitor/geolocation @capacitor/preferences @capacitor/network @capacitor/app @capacitor/status-bar @capacitor/splash-screen
+npm install @capacitor/core @capacitor/cli @capacitor/android --legacy-peer-deps
+npm install @capacitor-community/bluetooth-le @capacitor/geolocation @capacitor/preferences @capacitor/network @capacitor/app @capacitor/status-bar @capacitor/splash-screen --legacy-peer-deps
 
 # Inicializar plataforma Android
 npx cap add android
