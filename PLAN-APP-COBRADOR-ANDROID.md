@@ -118,49 +118,40 @@ VertexERP Cobrador/
 
 ## 🚀 Plan de Implementación Simplificado
 
-### Fase 1: Setup Inicial (1 día)
+### Fase 1: Instalación de Dependencias (Pendiente)
+
+Los archivos de configuración ya han sido creados (`capacitor.config.ts`, `next.config.js`, etc.). Solo falta instalar las librerías:
 
 ```bash
-# 1. Instalar Capacitor
 cd app
-npm install @capacitor/core @capacitor/cli
 
-# 2. Inicializar con configuración específica
-npx cap init "VertexERP Cobrador" "com.vertexerp.cobrador" --web-dir=out
+# 1. Instalar núcleo de Capacitor
+npm install @capacitor/core @capacitor/cli @capacitor/android
 
-# 3. Agregar plataforma Android
-npm install @capacitor/android
+# 2. Instalar plugins nativos ya configurados
+npm install @capacitor-community/bluetooth-le @capacitor/geolocation @capacitor/preferences @capacitor/network @capacitor/app @capacitor/status-bar @capacitor/splash-screen
+
+# 3. Inicializar plataforma Android
 npx cap add android
+
+# 4. Sincronizar proyecto
+npm run cobrador:sync
 ```
 
-### Fase 2: Plugins Esenciales (1 día)
+### Fase 2: Archivos Implementados (✅ COMPLETADO)
 
-Solo los plugins necesarios para cobranza:
+Se han creado los siguientes módulos nativos en el repositorio:
 
-```bash
-# Bluetooth para impresoras
-npm install @capacitor-community/bluetooth-le
+- ✅ **Configuración:** `capacitor.config.ts` (ID: `com.vertexerp.cobrador`)
+- ✅ **Build:** `next.config.js` (Soporte static export)
+- ✅ **Scripts:** `package.json` (Comandos `npm run cobrador:*`)
+- ✅ **Plataforma:** `hooks/usePlatform.ts` (Detector de entorno)
+- ✅ **Impresión:** `lib/native/printer.ts` (Bluetooth wrapper)
+- ✅ **GPS:** `lib/native/location.ts` (Geolocalización wrapper)
+- ✅ **Storage:** `lib/native/storage.ts` (Persistencia nativa)
+- ✅ **Red:** `lib/native/network.ts` (Monitor de conexión)
 
-# Geolocalización
-npm install @capacitor/geolocation
-
-# Almacenamiento local
-npm install @capacitor/preferences
-
-# Network status
-npm install @capacitor/network
-
-# App lifecycle
-npm install @capacitor/app
-
-# Status bar
-npm install @capacitor/status-bar
-
-# Splash screen
-npm install @capacitor/splash-screen
-```
-
-### Fase 3: Crear Vista Específica para Cobrador (2-3 días)
+### Fase 3: Crear Vista Específica para Cobrador (En Progreso)
 
 #### 3.1 Crear Ruta Dedicada
 

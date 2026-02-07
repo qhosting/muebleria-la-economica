@@ -71,6 +71,11 @@ La fusión agregó **2 commits** con los siguientes archivos:
 - **Service Workers:** Next.js PWA capabilities
 - **Sincronización:** Custom offline-first sync logic
 
+#### App Nativa Android (Nueva)
+- **Framework:** Capacitor 7
+- **Plataforma:** Android 5.0+ (API 21+)
+- **Plugins:** Bluetooth LE, Geolocation, Storage Nativo, Network Status
+
 #### DevOps & Deployment
 - **Containerización:** Docker + Docker Compose
 - **Plataformas:** Coolify, Easypanel
@@ -85,12 +90,15 @@ muebleria-la-economica/
 ├── app/                          # Aplicación Next.js principal
 │   ├── app/                      # App Router (53 archivos)
 │   ├── components/               # Componentes React (67 archivos)
-│   ├── hooks/                    # Custom React Hooks (5 archivos)
-│   ├── lib/                      # Utilidades y helpers (10 archivos)
+│   ├── hooks/                    # Custom React Hooks (6 archivos)
+│   │   └── usePlatform.ts        # Detector de App Nativa
+│   ├── lib/                      # Utilidades y helpers (11 archivos)
+│   │   └── native/               # Módulos para App Android (Printer, GPS...)
 │   ├── prisma/                   # Schema y migraciones
 │   │   └── schema.prisma         # 220 líneas, 6 modelos principales
 │   ├── scripts/                  # Scripts de seed y utilidades (16 archivos)
 │   └── public/                   # Assets estáticos
+│       └── manifest-cobrador.json # Manifest para app cobrador
 │
 ├── .coolify/                     # Configuración Coolify
 ├── Dockerfile                    # Imagen Docker optimizada
