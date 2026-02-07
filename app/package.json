@@ -5,7 +5,14 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "build:cobrador": "BUILD_TARGET=capacitor NEXT_PUBLIC_APP_MODE=cobrador next build",
+    "cobrador:sync": "npm run build:cobrador && npx cap sync",
+    "cobrador:open": "npx cap open android",
+    "cobrador:run": "npx cap run android",
+    "cobrador:dev": "npm run build:cobrador && npx cap sync && npx cap open android",
+    "cobrador:build:apk": "cd android && ./gradlew assembleRelease",
+    "cobrador:build:aab": "cd android && ./gradlew bundleRelease"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"
