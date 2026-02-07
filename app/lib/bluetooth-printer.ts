@@ -7,59 +7,60 @@ declare global {
   interface Navigator {
     bluetooth: Bluetooth;
   }
-  
+
   interface Bluetooth {
-    requestDevice(options: RequestDeviceOptions): Promise<BluetoothDevice>;
+    requestDevice(options: WebBluetoothRequestDeviceOptions): Promise<WebBluetoothDevice>;
   }
 
-  interface RequestDeviceOptions {
-    filters?: BluetoothLEScanFilter[];
-    optionalServices?: BluetoothServiceUUID[];
+  interface WebBluetoothRequestDeviceOptions {
+    filters?: WebBluetoothLEScanFilter[];
+    optionalServices?: WebBluetoothServiceUUID[];
+    acceptAllDevices?: boolean;
   }
 
-  interface BluetoothLEScanFilter {
-    services?: BluetoothServiceUUID[];
+  interface WebBluetoothLEScanFilter {
+    services?: WebBluetoothServiceUUID[];
     name?: string;
     namePrefix?: string;
   }
 
-  interface BluetoothDevice {
+  interface WebBluetoothDevice {
     id: string;
     name?: string;
-    gatt?: BluetoothRemoteGATTServer;
+    gatt?: WebBluetoothRemoteGATTServer;
     addEventListener(type: 'gattserverdisconnected', listener: () => void): void;
   }
 
-  interface BluetoothRemoteGATTServer {
-    device: BluetoothDevice;
+  interface WebBluetoothRemoteGATTServer {
+    device: WebBluetoothDevice;
     connected: boolean;
-    connect(): Promise<BluetoothRemoteGATTServer>;
+    connect(): Promise<WebBluetoothRemoteGATTServer>;
     disconnect(): void;
-    getPrimaryService(service: BluetoothServiceUUID): Promise<BluetoothRemoteGATTService>;
+    getPrimaryService(service: WebBluetoothServiceUUID): Promise<WebBluetoothRemoteGATTService>;
   }
 
-  interface BluetoothRemoteGATTService {
-    device: BluetoothDevice;
+  interface WebBluetoothRemoteGATTService {
+    device: WebBluetoothDevice;
     isPrimary: boolean;
     uuid: string;
-    getCharacteristic(characteristic: BluetoothServiceUUID): Promise<BluetoothRemoteGATTCharacteristic>;
+    getCharacteristic(characteristic: WebBluetoothServiceUUID): Promise<WebBluetoothRemoteGATTCharacteristic>;
   }
 
-  interface BluetoothRemoteGATTCharacteristic {
-    service: BluetoothRemoteGATTService;
+  interface WebBluetoothRemoteGATTCharacteristic {
+    service: WebBluetoothRemoteGATTService;
     uuid: string;
     value?: DataView;
     writeValue(value: BufferSource): Promise<void>;
   }
 
-  type BluetoothServiceUUID = string;
+  type WebBluetoothServiceUUID = string;
 }
 
 export interface PrinterConnection {
-  device: BluetoothDevice | null;
-  server: BluetoothRemoteGATTServer | null;
-  service: BluetoothRemoteGATTService | null;
-  characteristic: BluetoothRemoteGATTCharacteristic | null;
+  device: WebBluetoothDevice | null;
+  server: WebBluetoothRemoteGATTServer | null;
+  service: WebBluetoothRemoteGATTService | null;
+  characteristic: WebBluetoothRemoteGATTCharacteristic | null;
   isConnected: boolean;
 }
 
@@ -104,12 +105,12 @@ class BluetoothPrinterService {
 
   private readonly SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
   private readonly CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
-  
+
   // 🔧 Storage keys para persistencia
   private readonly STORAGE_KEY_CONNECTED = 'bluetooth_printer_connected';
   private readonly STORAGE_KEY_DEVICE_NAME = 'bluetooth_printer_device_name';
   private readonly STORAGE_KEY_DEVICE_ID = 'bluetooth_printer_device_id';
-  
+
   // 🆕 Variable para reconexión automática
   private lastConnectedDeviceId: string | null = null;
 
@@ -119,7 +120,7 @@ class BluetoothPrinterService {
   private readonly CR = '\x0d';
   private readonly FF = '\x0c';
   private readonly GS = '\x1d';
-  
+
   // Comandos de formato
   private readonly COMMANDS = {
     INIT: this.ESC + '@',
@@ -141,7 +142,7 @@ class BluetoothPrinterService {
   // 🔧 Guardar estado de conexión en localStorage
   private saveConnectionState(connected: boolean, deviceName?: string, deviceId?: string): void {
     if (typeof window === 'undefined') return;
-    
+
     try {
       localStorage.setItem(this.STORAGE_KEY_CONNECTED, connected.toString());
       if (connected && deviceName) {
@@ -151,7 +152,7 @@ class BluetoothPrinterService {
         localStorage.setItem(this.STORAGE_KEY_DEVICE_ID, deviceId);
         this.lastConnectedDeviceId = deviceId;
       }
-      
+
       if (!connected) {
         // No borrar el nombre del dispositivo, solo marcarlo como desconectado
         // Así el usuario sabe qué impresora reconectar
@@ -167,16 +168,16 @@ class BluetoothPrinterService {
     if (typeof window === 'undefined') {
       return { wasConnected: false, deviceName: null, deviceId: null };
     }
-    
+
     try {
       const wasConnected = localStorage.getItem(this.STORAGE_KEY_CONNECTED) === 'true';
       const deviceName = localStorage.getItem(this.STORAGE_KEY_DEVICE_NAME);
       const deviceId = localStorage.getItem(this.STORAGE_KEY_DEVICE_ID);
-      
+
       if (deviceId) {
         this.lastConnectedDeviceId = deviceId;
       }
-      
+
       return { wasConnected, deviceName, deviceId };
     } catch (error) {
       console.error('Error cargando estado de conexión:', error);
@@ -189,7 +190,7 @@ class BluetoothPrinterService {
     if (!this.connection.device || !this.connection.server) {
       return false;
     }
-    
+
     // Verificar si el servidor GATT está realmente conectado
     return this.connection.server.connected === true;
   }
@@ -220,16 +221,16 @@ class BluetoothPrinterService {
       if (!this.connection.device.gatt) {
         throw new Error('GATT no disponible en el dispositivo');
       }
-      
+
       this.connection.server = await this.connection.device.gatt.connect();
-      
+
       if (!this.connection.server) {
         throw new Error('No se pudo conectar al servidor GATT');
       }
 
       // Obtener el servicio
       this.connection.service = await this.connection.server.getPrimaryService(this.SERVICE_UUID);
-      
+
       // Obtener la característica
       this.connection.characteristic = await this.connection.service.getCharacteristic(this.CHARACTERISTIC_UUID);
 
@@ -237,7 +238,7 @@ class BluetoothPrinterService {
 
       // 🔧 MEJORADO: Guardar estado con ID y nombre del dispositivo
       this.saveConnectionState(true, this.connection.device.name, this.connection.device.id);
-      
+
       // Listener para desconexión
       this.connection.device.addEventListener('gattserverdisconnected', () => {
         console.log('⚠️ Impresora desconectada (evento GATT)');
@@ -261,13 +262,13 @@ class BluetoothPrinterService {
       // Si ya hay un dispositivo conectado, solo reconectar GATT
       if (this.connection.device && !this.connection.isConnected) {
         console.log('🔄 Intentando reconectar a:', this.connection.device.name);
-        
+
         if (!this.connection.device.gatt) {
           throw new Error('GATT no disponible en el dispositivo');
         }
-        
+
         this.connection.server = await this.connection.device.gatt.connect();
-        
+
         if (!this.connection.server) {
           throw new Error('No se pudo conectar al servidor GATT');
         }
@@ -277,14 +278,14 @@ class BluetoothPrinterService {
         this.connection.isConnected = true;
 
         this.saveConnectionState(true, this.connection.device.name, this.connection.device.id);
-        
+
         console.log('✅ Impresora reconectada:', this.connection.device.name);
         return true;
       }
-      
+
       // Si no hay dispositivo guardado, hacer conexión normal
       return await this.connectToPrinter();
-      
+
     } catch (error) {
       console.error('❌ Error reconectando a impresora:', error);
       this.connection.isConnected = false;
@@ -308,17 +309,17 @@ class BluetoothPrinterService {
     if (!this.connection.isConnected) {
       return false;
     }
-    
+
     // Verificar el estado real del servidor GATT
     const realStatus = this.checkRealConnectionStatus();
-    
+
     // Si hay discrepancia, actualizar el estado
     if (realStatus !== this.connection.isConnected) {
       console.log('⚠️ Estado de conexión actualizado:', realStatus);
       this.connection.isConnected = realStatus;
       this.saveConnectionState(realStatus, realStatus ? this.connection.device?.name : undefined);
     }
-    
+
     return this.connection.isConnected;
   }
 
@@ -347,7 +348,7 @@ class BluetoothPrinterService {
 
     const encoder = new TextEncoder();
     const uint8Array = encoder.encode(data);
-    
+
     // Dividir en chunks para evitar problemas con MTU
     const chunkSize = 20;
     for (let i = 0; i < uint8Array.length; i += chunkSize) {
@@ -420,7 +421,7 @@ class BluetoothPrinterService {
       ticket += this.COMMANDS.BOLD_ON;
       ticket += ticketData.empresa.nombre.toUpperCase() + this.LF;
       ticket += this.COMMANDS.BOLD_OFF;
-      
+
       if (ticketData.empresa.direccion) {
         ticket += ticketData.empresa.direccion + this.LF;
       }
@@ -451,11 +452,11 @@ class BluetoothPrinterService {
       ticket += 'CLIENTE:' + this.LF;
       ticket += this.COMMANDS.BOLD_OFF;
       ticket += ticketData.cliente.nombreCompleto + this.LF;
-      
+
       if (ticketData.cliente.telefono) {
         ticket += 'Tel: ' + ticketData.cliente.telefono + this.LF;
       }
-      
+
       ticket += 'Dir: ' + ticketData.cliente.direccion + this.LF;
       ticket += 'Dia Pago: ' + this.getDayName(ticketData.cliente.diaPago) + this.LF;
 
@@ -466,11 +467,11 @@ class BluetoothPrinterService {
       ticket += this.COMMANDS.BOLD_ON;
       ticket += 'DETALLE DEL PAGO:' + this.LF;
       ticket += this.COMMANDS.BOLD_OFF;
-      
+
       ticket += 'Fecha: ' + this.formatDate(ticketData.pago.fechaPago) + this.LF;
       ticket += 'Tipo: ' + ticketData.pago.tipoPago.toUpperCase() + this.LF;
       ticket += 'Metodo: ' + ticketData.pago.metodoPago.toUpperCase() + this.LF;
-      
+
       if (ticketData.pago.concepto) {
         ticket += 'Concepto: ' + ticketData.pago.concepto + this.LF;
       }
@@ -482,7 +483,7 @@ class BluetoothPrinterService {
       ticket += this.COMMANDS.BOLD_ON;
       ticket += 'IMPORTES:' + this.LF;
       ticket += this.COMMANDS.BOLD_OFF;
-      
+
       ticket += 'Saldo Anterior:' + this.rightAlignText(this.formatCurrency(ticketData.saldos.anterior)) + this.LF;
       ticket += 'Pago Recibido:' + this.rightAlignText(this.formatCurrency(ticketData.pago.monto)) + this.LF;
       ticket += this.createDivider() + this.LF;
@@ -537,7 +538,7 @@ class BluetoothPrinterService {
 
     try {
       let ticket = '';
-      
+
       ticket += this.COMMANDS.INIT;
       ticket += this.COMMANDS.CENTER;
       ticket += this.COMMANDS.BOLD_ON;
