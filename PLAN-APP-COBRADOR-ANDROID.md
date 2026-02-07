@@ -572,35 +572,38 @@ Email: soporte@vertexerp.com
 ## ✅ Checklist de Implementación Específica
 
 ### Preparación
-- [ ] Decidir si será solo para cobradores
+- [x] Decidir si será solo para cobradores
 - [ ] Diseñar icono específico para cobrador (verde)
 - [ ] Preparar dispositivos Android para testing
 
-### Desarrollo
-- [ ] Instalar Capacitor con ID `com.vertexerp.cobrador`
-- [ ] Configurar plugins esenciales (Bluetooth, GPS, Storage)
-- [ ] Crear ruta `/cobrador-app`
+### Configuración e Infraestructura (✅ 100% Completado)
+- [x] Instalar Capacitor con ID `com.vertexerp.cobrador`
+- [x] Configurar plugins esenciales (Bluetooth, GPS, Storage, Network)
+- [x] Implementar detección de plataforma (`userPlatform.ts`)
+- [x] Configurar scripts de build compatibles con Windows (`cross-env`)
+- [x] Solucionar conflictos de tipos TypeScript (WebBluetooth)
+- [x] Validar primer build Android exitoso
+
+### Desarrollo UI/UX (En Progreso)
+- [ ] Crear ruta `/cobrador-app` (Punto de entrada nativo)
 - [ ] Adaptar `/dashboard/cobranza-mobile` para app nativa
-- [ ] Implementar detección de plataforma
-- [ ] Optimizar UI para móvil
+- [ ] Implementar navegación optimizada para móvil
+- [ ] Integrar lógica offline con IndexedDB/Dexie
+- [ ] Conectar impresión Bluetooth con datos reales
 
 ### Testing
-- [ ] Probar en Android 5.0
-- [ ] Probar en Android 8.0
-- [ ] Probar en Android 13.0
-- [ ] Probar impresión Bluetooth
-- [ ] Probar modo offline completo
-- [ ] Probar sincronización
-- [ ] Probar geolocalización
+- [ ] Probar en Android 5.0 (Emulador/Dispositivo)
+- [ ] Probar en Android 13.0+
+- [ ] Probar impresión Bluetooth física
+- [ ] Probar flujo offline/online (Sincronización)
+- [ ] Validar geolocalización en segundo plano
 
 ### Publicación
-- [ ] Generar iconos específicos (192x192, 512x512)
-- [ ] Crear screenshots de la app
-- [ ] Escribir descripción para Play Store
-- [ ] Generar AAB firmado
-- [ ] Subir a Play Console
-- [ ] Configurar ficha de la app
-- [ ] Enviar a revisión
+- [ ] Generar activos gráficos (Iconos, Splash)
+- [ ] Configurar firma de aplicación (Keystore)
+- [ ] Generar AAB (Android App Bundle) para producción
+- [ ] Configurar ficha en Google Play Console
+- [ ] Subir versión de prueba interna
 
 ---
 
