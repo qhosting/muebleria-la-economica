@@ -6,13 +6,15 @@ Este documento detalla las características planificadas, mejoras técnicas y nu
 
 ### 🔴 Prioridad Alta (Q1 2026)
 
-#### 1. Aplicación Nativa Android 📱
-- **Compatibilidad Universal:** Crear app nativa con Capacitor para dispositivos Android que no soportan PWA (Android 5.0+).
-- **Distribución Play Store:** Publicar en Google Play Store para mayor alcance y credibilidad.
-- **Plugins Nativos:** Integración nativa de Bluetooth para impresoras, GPS, cámara y notificaciones push.
-- **Mejor Rendimiento:** Experiencia optimizada en dispositivos de gama baja.
-- **Documentación:** Plan completo disponible en `PLAN-APP-NATIVA-ANDROID.md` y `GUIA-RAPIDA-APP-ANDROID.md`.
-- **Tiempo estimado:** 1-2 semanas de implementación.
+#### 1. Aplicación Nativa Android 📱 (Solo Cobradores)
+- **Alcance:** App exclusiva para cobradores en campo (no incluye módulos administrativos).
+- **Compatibilidad Universal:** Funciona en Android 5.0+ (vs PWA que requiere Android 8.0+).
+- **Distribución Play Store:** Mayor alcance y credibilidad con app oficial.
+- **Plugins Nativos:** Bluetooth para impresoras térmicas, GPS para navegación, almacenamiento offline.
+- **Funcionalidades:** Lista de clientes, registro de pagos, motararios, caja diaria, impresión de tickets.
+- **Mejor Rendimiento:** App ligera (~25 MB) optimizada para dispositivos de gama baja.
+- **Documentación:** Plan completo en `PLAN-APP-COBRADOR-ANDROID.md` y script `setup-capacitor-cobrador.sh`.
+- **Tiempo estimado:** 7-10 días de implementación.
 
 #### 2. Optimización Inteligente de Rutas
 - **Visualización en Mapa:** Integración con servicios de mapas (Google Maps / Mapbox) para ver la ubicación de los clientes de una ruta.
