@@ -2,7 +2,7 @@
 // Componente principal de cobranza móvil con funcionalidad offline
 'use client';
 
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, Fragment } from 'react';
 import { useSession } from 'next-auth/react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Button } from '@/components/ui/button';
@@ -11,8 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Search, 
+import {
+  Search,
   Filter,
   Users,
   TrendingUp,
@@ -41,9 +41,10 @@ import { PWAInstallButton } from '@/components/pwa/pwa-install-button';
 
 interface CobranzaMobileProps {
   initialClientes?: OfflineCliente[];
+  disableLayout?: boolean;
 }
 
-export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileProps) {
+export default function CobranzaMobile({ initialClientes = [], disableLayout = false }: CobranzaMobileProps) {
   const { data: session } = useSession();
   const [searchTerm, setSearchTerm] = useState('');
   // Filtro por defecto: día actual de la semana
@@ -98,29 +99,29 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
   // 🚀 OPTIMIZACIÓN CRÍTICA: Cargar clientes con useCallback para evitar re-creaciones
   const loadClientesOffline = useCallback(async () => {
     if (!userId) return;
-    
+
     try {
       const clientes = await db.clientes
         .where('cobradorAsignadoId')
         .equals(userId)
         .and(cliente => cliente.statusCuenta === 'activo')
         .toArray();
-      
+
       // Solo actualizar si hay cambios para evitar re-renders innecesarios
       setClientesOffline(prevClientes => {
         // Comparación simple por longitud y algunos IDs
         if (prevClientes.length !== clientes.length) {
           return clientes;
         }
-        
+
         // Verificar algunos IDs para detectar cambios
         const prevIds = prevClientes.slice(0, 5).map(c => c.id).sort();
         const newIds = clientes.slice(0, 5).map(c => c.id).sort();
-        
+
         if (JSON.stringify(prevIds) !== JSON.stringify(newIds)) {
           return clientes;
         }
-        
+
         // Si no hay cambios significativos, mantener el estado anterior
         return prevClientes;
       });
@@ -138,7 +139,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     }
 
     let mounted = true; // Flag para evitar actualizaciones si el componente se desmonta
-    
+
     const initializeData = async () => {
       if (!mounted) return;
       setLoading(true);
@@ -159,7 +160,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
               .where('cobradorAsignadoId')
               .equals(userId)
               .count();
-            
+
             // Solo insertar si no hay clientes existentes
             if (existingClientes === 0) {
               await db.transaction('rw', db.clientes, async () => {
@@ -171,7 +172,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
                   });
                 }
               });
-              
+
               // Recargar después de insertar solo si el componente sigue montado
               if (mounted) {
                 await loadClientesOffline();
@@ -203,9 +204,9 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
   useEffect(() => {
     if (!userId || userRole !== 'cobrador' || initialClientes.length === 0) return;
     if (loading) return; // No procesar si aún está cargando
-    
+
     let mounted = true;
-    
+
     const processInitialClientes = async () => {
       try {
         // Solo procesar si hay clientes y no se han guardado antes
@@ -213,7 +214,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
           .where('cobradorAsignadoId')
           .equals(userId)
           .count();
-        
+
         if (existingCount === 0 && mounted) {
           await db.transaction('rw', db.clientes, async () => {
             for (const cliente of initialClientes) {
@@ -224,7 +225,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
               });
             }
           });
-          
+
           if (mounted) {
             await loadClientesOffline();
           }
@@ -247,23 +248,23 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
 
     // Filtrado optimizado con búsqueda en minúsculas pre-calculada
     const searchLower = searchTerm.toLowerCase();
-    
+
     return clientesOffline
       .filter(cliente => {
         // 🚀 Short-circuit evaluation para mejor rendimiento
         if (selectedDia !== 'all' && cliente.diaPago !== selectedDia) return false;
-        
+
         if (searchLower && !cliente.nombreCompleto.toLowerCase().includes(searchLower) &&
-            !cliente.telefono?.toLowerCase().includes(searchLower) &&
-            !cliente.direccion.toLowerCase().includes(searchLower)) {
+          !cliente.telefono?.toLowerCase().includes(searchLower) &&
+          !cliente.direccion.toLowerCase().includes(searchLower)) {
           return false;
         }
-        
+
         return true;
       })
       .sort((a, b) => {
         let comparison = 0;
-        
+
         switch (sortBy) {
           case 'nombre':
             comparison = a.nombreCompleto.localeCompare(b.nombreCompleto);
@@ -275,7 +276,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
             comparison = parseInt(a.diaPago) - parseInt(b.diaPago);
             break;
         }
-        
+
         return sortOrder === 'asc' ? comparison : -comparison;
       });
   }, [clientesOffline, searchTerm, selectedDia, sortBy, sortOrder]);
@@ -285,7 +286,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     const totalSaldoPendiente = filteredClientes.reduce((sum, c) => sum + c.saldoPendiente, 0);
     const clientesConDeuda = filteredClientes.filter(c => c.saldoPendiente > 0).length;
     const clientesAlDia = filteredClientes.filter(c => c.saldoPendiente <= 0).length;
-    
+
     return { totalSaldoPendiente, clientesConDeuda, clientesAlDia };
   }, [filteredClientes]);
 
@@ -305,7 +306,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     try {
       // Recargar clientes después de un pago exitoso
       await loadClientesOffline();
-      
+
       // Recargar estadísticas básicas
       if (userId) {
         const stats = await getSyncStats(userId);
@@ -321,6 +322,16 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
   };
 
   if (userRole !== 'cobrador') {
+    if (disableLayout) {
+      return (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">
+            Esta sección es solo para cobradores
+          </p>
+        </div>
+      );
+    }
+
     return (
       <DashboardLayout>
         <div className="text-center py-8">
@@ -332,9 +343,11 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
     );
   }
 
+  const LayoutWrapper = disableLayout ? Fragment : DashboardLayout;
+
   return (
-    <DashboardLayout>
-      <div className="max-w-md mx-auto space-y-4 pb-20">
+    <LayoutWrapper>
+      <div className={disableLayout ? "" : "max-w-md mx-auto space-y-4 pb-20"}>
         {/* Header con estado de conexión */}
         <div className="flex items-center justify-between">
           <div>
@@ -343,7 +356,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
               {filteredClientes.length} clientes
             </p>
           </div>
-          
+
           <div className="flex items-center gap-2">
             <Badge variant={isOnline ? 'default' : 'secondary'}>
               {isOnline ? (
@@ -371,14 +384,14 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
               <div className="text-xs text-muted-foreground">Al día</div>
             </CardContent>
           </Card>
-          
+
           <Card className="text-center">
             <CardContent className="p-3">
               <div className="text-lg font-semibold text-red-600">{clientStats.clientesConDeuda}</div>
               <div className="text-xs text-muted-foreground">Con deuda</div>
             </CardContent>
           </Card>
-          
+
           <Card className="text-center">
             <CardContent className="p-3">
               <div className="text-sm font-semibold">{formatCurrency(clientStats.totalSaldoPendiente)}</div>
@@ -450,7 +463,7 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
           <div className="text-center py-8">
             <Database className="w-12 h-12 mx-auto mb-2 text-muted-foreground" />
             <p className="text-muted-foreground">
-              {searchTerm || selectedDia !== 'all' 
+              {searchTerm || selectedDia !== 'all'
                 ? 'No se encontraron clientes con los filtros aplicados'
                 : 'No hay clientes asignados'
               }
@@ -496,6 +509,6 @@ export default function CobranzaMobile({ initialClientes = [] }: CobranzaMobileP
           <FooterVersion />
         </div>
       </div>
-    </DashboardLayout>
+    </LayoutWrapper>
   );
 }
