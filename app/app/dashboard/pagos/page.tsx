@@ -9,10 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { 
-  Receipt, 
-  Search, 
-  Filter, 
+import {
+  Receipt,
+  Search,
+  Filter,
   Download,
   Calendar,
   User,
@@ -52,12 +52,17 @@ interface EstadisticasPagos {
 export default function PagosPage() {
   const { data: session } = useSession();
   const [pagos, setPagos] = useState<Pago[]>([]);
+  const [cobradores, setCobradores] = useState<{ id: string; name: string }[]>([]);
   const [estadisticas, setEstadisticas] = useState<EstadisticasPagos | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedTipo, setSelectedTipo] = useState('all');
   const [selectedCobrador, setSelectedCobrador] = useState('all');
   const [selectedFecha, setSelectedFecha] = useState('');
+
+  useEffect(() => {
+    fetchCobradores();
+  }, []);
 
   useEffect(() => {
     fetchPagos();
@@ -67,9 +72,12 @@ export default function PagosPage() {
     try {
       setLoading(true);
       const params = new URLSearchParams();
-      if (selectedTipo !== 'all') params.set('tipo', selectedTipo);
-      if (selectedCobrador !== 'all') params.set('cobrador', selectedCobrador);
-      if (selectedFecha) params.set('fecha', selectedFecha);
+      if (selectedTipo !== 'all') params.set('tipoPago', selectedTipo);
+      if (selectedCobrador !== 'all') params.set('cobradorId', selectedCobrador);
+      if (selectedFecha) {
+        params.set('fechaDesde', selectedFecha);
+        params.set('fechaHasta', selectedFecha);
+      }
 
       const response = await fetch(`/api/pagos?${params.toString()}`);
       const data = await response.json();
@@ -80,6 +88,21 @@ export default function PagosPage() {
       toast.error('Error al cargar pagos');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCobradores = async () => {
+    try {
+      const response = await fetch('/api/users');
+      if (response.ok) {
+        const users = await response.json();
+        const filteredCobradores = users
+          .filter((u: any) => u.role === 'cobrador' && u.isActive)
+          .map((u: any) => ({ id: u.id, name: u.name }));
+        setCobradores(filteredCobradores);
+      }
+    } catch (error) {
+      console.error('Error al obtener cobradores:', error);
     }
   };
 
@@ -221,7 +244,11 @@ export default function PagosPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todos los cobradores</SelectItem>
-                  {/* Aquí se cargarían dinámicamente los cobradores */}
+                  {cobradores.map((cobrador) => (
+                    <SelectItem key={cobrador.id} value={cobrador.id}>
+                      {cobrador.name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Input
@@ -287,10 +314,10 @@ export default function PagosPage() {
                           <span className="text-sm text-gray-900">{pago.concepto}</span>
                         </td>
                         <td className="p-3">
-                          <Badge 
+                          <Badge
                             className={
-                              pago.tipoPago === 'regular' 
-                                ? 'bg-green-100 text-green-800' 
+                              pago.tipoPago === 'regular'
+                                ? 'bg-green-100 text-green-800'
                                 : 'bg-red-100 text-red-800'
                             }
                           >
