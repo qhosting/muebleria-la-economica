@@ -19,4 +19,8 @@ npx prisma generate
 echo "✅ Configuración completada, iniciando aplicación..."
 
 # Start the application
-exec "$@"
+if [ -z "$*" ]; then
+  exec npm start
+else
+  exec "$@"
+fi
