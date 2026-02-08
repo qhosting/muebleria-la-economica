@@ -8,7 +8,7 @@
     "display": "standalone",
     "orientation": "portrait-primary",
     "scope": "/",
-    "start_url": "/dashboard/cobranza-mobile?source=native",
+    "start_url": "/cobrador-app?source=native",
     "icons": [
         {
             "src": "/icon-192x192.png",
@@ -30,7 +30,7 @@
     "shortcuts": [
         {
             "name": "Mis Clientes",
-            "url": "/dashboard/cobranza-mobile?source=shortcut",
+            "url": "/cobrador-app?source=shortcut",
             "icons": [
                 {
                     "src": "/icon-192x192.png",

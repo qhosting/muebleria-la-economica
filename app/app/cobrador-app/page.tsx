@@ -23,7 +23,7 @@ export default function CobradorAppPage() {
         }
 
         if (status === 'authenticated') {
-            const userRole = session?.user?.role;
+            const userRole = (session?.user as any)?.role;
 
             // Verificación de seguridad: Solo cobradores
             if (userRole !== 'cobrador' && userRole !== 'admin') { // Permitimos admin para debug

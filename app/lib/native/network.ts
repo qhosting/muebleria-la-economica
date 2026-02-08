@@ -28,7 +28,7 @@ export function escucharCambiosRed(callback: (status: NetworkStatusResult) => vo
     const isNative = Capacitor.isNativePlatform();
 
     if (isNative) {
-        const listener = Network.addListener('networkStatusChange', (status) => {
+        const handlePromise = Network.addListener('networkStatusChange', (status: any) => {
             callback({
                 connected: status.connected,
                 connectionType: status.connectionType
@@ -37,7 +37,7 @@ export function escucharCambiosRed(callback: (status: NetworkStatusResult) => vo
 
         // Retornamos función para limpiar el listener
         return () => {
-            listener.remove();
+            handlePromise.then((h: any) => h.remove());
         };
     } else {
         // Eventos Web 'online' y 'offline'

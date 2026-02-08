@@ -3,6 +3,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
@@ -32,7 +33,9 @@ interface DashboardClientProps {
   session: any;
 }
 
-export function DashboardClient({ session }: DashboardClientProps) {
+export function DashboardClient({ session: initialSession }: DashboardClientProps) {
+  const { data: clientSession } = useSession();
+  const session = initialSession || clientSession;
   const router = useRouter();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -47,11 +50,11 @@ export function DashboardClient({ session }: DashboardClientProps) {
     const roleRedirects: Record<string, string> = {
       'gestor_cobranza': '/dashboard/clientes',
       'reporte_cobranza': '/dashboard/reportes',
-      'cobrador': '/dashboard/cobranza-mobile'
+      'cobrador': '/cobrador-app'
     };
 
     const redirectPath = roleRedirects[userRole];
-    
+
     if (redirectPath) {
       hasRedirected.current = true;
       router.replace(redirectPath);
@@ -150,11 +153,11 @@ export function DashboardClient({ session }: DashboardClientProps) {
           <div className="flex items-center space-x-2 mt-4 sm:mt-0">
             <Badge variant="outline" className="flex items-center space-x-1">
               <Calendar className="h-3 w-3" />
-              <span>{new Date().toLocaleDateString('es-MX', { 
-                weekday: 'long', 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
+              <span>{new Date().toLocaleDateString('es-MX', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
               })}</span>
             </Badge>
           </div>
@@ -187,7 +190,7 @@ export function DashboardClient({ session }: DashboardClientProps) {
               icon={Users}
               color="purple"
             />
-            
+
             <StatCard
               title="Cobranza Hoy"
               value={formatCurrency(stats.cobranzaHoy)}
@@ -195,7 +198,7 @@ export function DashboardClient({ session }: DashboardClientProps) {
               icon={DollarSign}
               color="green"
             />
-            
+
             <StatCard
               title="Cobranza del Mes"
               value={formatCurrency(stats.cobranzaMes)}
@@ -203,7 +206,7 @@ export function DashboardClient({ session }: DashboardClientProps) {
               icon={TrendingUp}
               color="blue"
             />
-            
+
             <StatCard
               title="Clientes Morosos"
               value={stats.clientesMorosos}
@@ -211,7 +214,7 @@ export function DashboardClient({ session }: DashboardClientProps) {
               icon={AlertTriangle}
               color="red"
             />
-            
+
             <StatCard
               title="Saldos Totales"
               value={formatCurrency(stats.saldosTotales)}

@@ -569,41 +569,46 @@ Email: soporte@vertexerp.com
 
 ---
 
-## ✅ Checklist de Implementación Específica
+## ✅ Checklist de Implementación
 
 ### Preparación
-- [x] Decidir si será solo para cobradores
-- [ ] Diseñar icono específico para cobrador (verde)
-- [ ] Preparar dispositivos Android para testing
+- [ ] Instalar Android Studio (Manual por el usuario)
+- [ ] Instalar JDK 11+ (Manual por el usuario)
+- [ ] Configurar variables de entorno (ANDROID_HOME, JAVA_HOME)
+- [ ] Crear cuenta de Google Play Developer ($25 USD)
 
-### Configuración e Infraestructura (✅ 100% Completado)
-- [x] Instalar Capacitor con ID `com.vertexerp.cobrador`
-- [x] Configurar plugins esenciales (Bluetooth, GPS, Storage, Network)
-- [x] Implementar detección de plataforma (`userPlatform.ts`)
-- [x] Configurar scripts de build compatibles con Windows (`cross-env`)
-- [x] Solucionar conflictos de tipos TypeScript (WebBluetooth)
-- [x] Validar primer build Android exitoso
+### Fase 1: Setup (✅ 90%)
+- [x] Instalar Capacitor y dependencias
+- [x] Agregar plataforma Android (`/android`)
+- [x] Configurar build estático en Next.js (`output: 'export'`)
+- [ ] Hacer primer build y sincronización exitosa (En proceso ⏳)
 
-### Desarrollo UI/UX (En Progreso)
-- [ ] Crear ruta `/cobrador-app` (Punto de entrada nativo)
-- [ ] Adaptar `/dashboard/cobranza-mobile` para app nativa
-- [ ] Implementar navegación optimizada para móvil
-- [ ] Integrar lógica offline con IndexedDB/Dexie
-- [ ] Conectar impresión Bluetooth con datos reales
+### Fase 2: Plugins (✅ 100%)
+- [x] Instalar plugin Bluetooth (@capacitor-community/bluetooth-le)
+- [x] Instalar plugin Geolocalización (@capacitor/geolocation)
+- [x] Instalar plugin Cámara (@capacitor/camera)
+- [x] Instalar plugin Notificaciones (@capacitor/push-notifications)
+- [x] Instalar plugin Almacenamiento (@capacitor/preferences + IndexedDB)
 
-### Testing
-- [ ] Probar en Android 5.0 (Emulador/Dispositivo)
-- [ ] Probar en Android 13.0+
+### Fase 3: Código (✅ 80%)
+- [x] Crear hook `usePlatform` para detección nativa
+- [x] Adaptar impresión Bluetooth (Refactorización a `WebBluetooth`)
+- [x] Crear Launchpad `/cobrador-app` y Layout nativo
+- [x] Adaptar rutas móviles `/mobile/*`
+- [x] Adaptar almacenamiento local y sincronización offline (Dexie)
+- [ ] Adaptar geolocalización nativa (Mapear API browser a plugin)
+
+### Fase 4: Testing
+- [ ] Probar en emulador Android
+- [ ] Probar en dispositivo real (Android 5.0 - Android 14)
 - [ ] Probar impresión Bluetooth física
 - [ ] Probar flujo offline/online (Sincronización)
-- [ ] Validar geolocalización en segundo plano
 
-### Publicación
-- [ ] Generar activos gráficos (Iconos, Splash)
-- [ ] Configurar firma de aplicación (Keystore)
-- [ ] Generar AAB (Android App Bundle) para producción
-- [ ] Configurar ficha en Google Play Console
-- [ ] Subir versión de prueba interna
+### Fase 5: Publicación
+- [ ] Generar keystore de firma
+- [ ] Generar AAB de producción
+- [ ] Crear assets para Play Store (Icono verde, Splash)
+- [ ] Subir a Play Console y enviar a revisión
 
 ---
 

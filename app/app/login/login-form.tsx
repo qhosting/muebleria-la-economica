@@ -29,7 +29,7 @@ export function LoginForm() {
     const savedEmail = localStorage.getItem('remembered_email');
     const savedPassword = localStorage.getItem('remembered_password');
     const rememberMeStatus = localStorage.getItem('remember_me') === 'true';
-    
+
     if (savedEmail && savedPassword && rememberMeStatus) {
       setEmail(savedEmail);
       setPassword(savedPassword);
@@ -46,13 +46,13 @@ export function LoginForm() {
     };
 
     // Verificar si ya está instalada
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                         (window.navigator as any).standalone === true ||
-                         document.referrer.includes('android-app://');
-    
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+      (window.navigator as any).standalone === true ||
+      document.referrer.includes('android-app://');
+
     const isAndroid = /Android/i.test(navigator.userAgent);
     const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-    
+
     console.log('[PWA] Detección:', {
       isStandalone,
       isAndroid,
@@ -85,9 +85,9 @@ export function LoginForm() {
   }, []);
 
   const handleInstallPWA = async () => {
-    console.log('[PWA] Intento de instalación:', { 
-      hasDeferredPrompt: !!deferredPrompt, 
-      installMethod 
+    console.log('[PWA] Intento de instalación:', {
+      hasDeferredPrompt: !!deferredPrompt,
+      installMethod
     });
 
     if (deferredPrompt && installMethod === 'native') {
@@ -95,16 +95,16 @@ export function LoginForm() {
         console.log('🚀 [PWA] Mostrando prompt nativo...');
         // Mostrar el prompt de instalación
         await deferredPrompt.prompt();
-        
+
         // Esperar a que el usuario responda
         const { outcome } = await deferredPrompt.userChoice;
-        
+
         console.log('✅ [PWA] Resultado:', outcome);
-        
+
         if (outcome === 'accepted') {
           toast.success('¡Aplicación instalada correctamente!');
         }
-        
+
         // Limpiar el prompt
         setDeferredPrompt(null);
         setShowInstallButton(false);
@@ -122,12 +122,12 @@ export function LoginForm() {
 
   const showManualInstructions = () => {
     console.log('📱 [PWA] Mostrando instrucciones manuales');
-    
+
     const isChrome = /Chrome/i.test(navigator.userAgent);
     const isAndroid = /Android/i.test(navigator.userAgent);
-    
+
     let instructions = 'Para instalar la aplicación:\n\n';
-    
+
     if (isAndroid && isChrome) {
       instructions += '1. Toca el menú (⋮) en la esquina superior derecha\n';
       instructions += '2. Busca la opción "Agregar a pantalla de inicio" o "Instalar app"\n';
@@ -141,13 +141,13 @@ export function LoginForm() {
       instructions += '2. Selecciona "Agregar a pantalla de inicio"\n';
       instructions += '3. Confirma la instalación';
     }
-    
+
     alert(instructions);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !password) {
       alert('Por favor complete todos los campos');
       return;
@@ -187,13 +187,13 @@ export function LoginForm() {
         try {
           const sessionResponse = await fetch('/api/auth/session');
           const sessionData = await sessionResponse.json();
-          
+
           if (sessionData && sessionData.user) {
             const userRole = sessionData.user.role;
-            
+
             // Redireccionar según el rol del usuario
             let redirectUrl = '/dashboard';
-            
+
             switch (userRole) {
               case 'admin':
                 redirectUrl = '/dashboard';
@@ -205,10 +205,10 @@ export function LoginForm() {
                 redirectUrl = '/dashboard/reportes';
                 break;
               case 'cobrador':
-                redirectUrl = '/dashboard/cobranza-mobile';
+                redirectUrl = '/cobrador-app';
                 break;
             }
-            
+
             // Usar window.location.href para forzar navegación completa
             window.location.href = redirectUrl;
           } else {
@@ -283,7 +283,7 @@ export function LoginForm() {
                   className="h-11"
                 />
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="remember-me"
@@ -298,8 +298,8 @@ export function LoginForm() {
                   Recordar inicio de sesión
                 </label>
               </div>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full h-11"
                 disabled={isLoading}
               >
@@ -320,7 +320,7 @@ export function LoginForm() {
         </Card>
 
         {showInstallButton && (
-          <Button 
+          <Button
             type="button"
             variant="default"
             className="w-full h-11 mt-4 bg-green-600 hover:bg-green-700 text-white shadow-lg"
