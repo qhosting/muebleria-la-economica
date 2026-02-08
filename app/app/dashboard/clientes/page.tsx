@@ -12,14 +12,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ClienteModal } from '@/components/clientes/ClienteModal';
 import { ImportarClientesModal } from '@/components/clientes/ImportarClientesModal';
 import { ExportButton } from '@/components/export-button';
-import { 
-  Users, 
-  Search, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Phone, 
-  MapPin, 
+import {
+  Users,
+  Search,
+  Plus,
+  Edit,
+  Trash2,
+  Phone,
+  MapPin,
   Calendar,
   DollarSign,
   Filter,
@@ -51,8 +51,8 @@ export default function ClientesPage() {
   const [selectedDiaPago, setSelectedDiaPago] = useState(() => {
     // Obtener día actual de la semana (0=domingo, 1=lunes, ..., 6=sábado)
     const today = new Date().getDay();
-    const diasSemana = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-    return diasSemana[today];
+    const diasMap = ['7', '1', '2', '3', '4', '5', '6']; // Ajustamos para que domingo=7
+    return diasMap[today];
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pagination, setPagination] = useState({
@@ -73,7 +73,7 @@ export default function ClientesPage() {
     if (session) {
       fetchClientes();
       fetchCobradores();
-      
+
       // Inicializar filtro de cobrador según el rol del usuario
       if (userRole && userRole !== 'admin' && selectedCobrador === 'all') {
         setSelectedCobrador('');
@@ -141,18 +141,7 @@ export default function ClientesPage() {
     return <Badge variant="secondary">Inactivo</Badge>;
   };
 
-  const getDiaPagoLabel = (dia: string) => {
-    const dias: { [key: string]: string } = {
-      'lunes': 'LUNES',
-      'martes': 'MARTES',
-      'miercoles': 'MIÉRCOLES',
-      'jueves': 'JUEVES',
-      'viernes': 'VIERNES',
-      'sabado': 'SÁBADO',
-      'domingo': 'DOMINGO'
-    };
-    return dias[dia] || dia.toUpperCase();
-  };
+
 
   const getSaldoBadge = (saldo: number) => {
     if (saldo === 0) {
@@ -234,17 +223,17 @@ export default function ClientesPage() {
               {userRole === 'cobrador' ? 'Mis Clientes Asignados' : 'Gestión de Clientes'}
             </h1>
             <p className="text-gray-600 mt-1">
-              {userRole === 'admin' ? 
+              {userRole === 'admin' ?
                 'Administra la información y asignaciones de clientes' :
                 userRole === 'gestor_cobranza' ?
-                'Administra clientes y asignaciones de cobradores' :
-                'Visualiza tus clientes asignados (solo lectura)'
+                  'Administra clientes y asignaciones de cobradores' :
+                  'Visualiza tus clientes asignados (solo lectura)'
               }
             </p>
           </div>
           {(userRole === 'admin' || userRole === 'gestor_cobranza') && (
             <div className="flex space-x-2 mt-4 sm:mt-0">
-              <ExportButton 
+              <ExportButton
                 endpoint="/api/exportar/clientes"
                 filename={`clientes-${new Date().toISOString().split('T')[0]}`}
                 label="Exportar"
@@ -304,13 +293,13 @@ export default function ClientesPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="todos">TODOS</SelectItem>
-                  <SelectItem value="lunes">LUNES</SelectItem>
-                  <SelectItem value="martes">MARTES</SelectItem>
-                  <SelectItem value="miercoles">MIÉRCOLES</SelectItem>
-                  <SelectItem value="jueves">JUEVES</SelectItem>
-                  <SelectItem value="viernes">VIERNES</SelectItem>
-                  <SelectItem value="sabado">SÁBADO</SelectItem>
-                  <SelectItem value="domingo">DOMINGO</SelectItem>
+                  <SelectItem value="1">LUNES</SelectItem>
+                  <SelectItem value="2">MARTES</SelectItem>
+                  <SelectItem value="3">MIÉRCOLES</SelectItem>
+                  <SelectItem value="4">JUEVES</SelectItem>
+                  <SelectItem value="5">VIERNES</SelectItem>
+                  <SelectItem value="6">SÁBADO</SelectItem>
+                  <SelectItem value="7">DOMINGO</SelectItem>
                 </SelectContent>
               </Select>
               <div className="flex items-center text-sm text-gray-600">
@@ -357,8 +346,8 @@ export default function ClientesPage() {
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {clientes.map((cliente) => (
-              <Card 
-                key={cliente.id} 
+              <Card
+                key={cliente.id}
                 className="animate-fade-in hover:shadow-md transition-shadow"
               >
                 <CardHeader className="pb-3">
@@ -392,7 +381,7 @@ export default function ClientesPage() {
                               <Edit className="h-4 w-4 mr-2" />
                               Editar Cliente
                             </DropdownMenuItem>
-                            <DropdownMenuItem 
+                            <DropdownMenuItem
                               onClick={() => handleDeleteCliente(cliente)}
                               className="text-red-600"
                             >
@@ -412,7 +401,7 @@ export default function ClientesPage() {
                       <span>{cliente.telefono}</span>
                     </div>
                   )}
-                  
+
                   <div className="flex items-center space-x-2 text-sm text-gray-600">
                     <MapPin className="h-4 w-4" />
                     <span className="truncate">{cliente.direccionCompleta}</span>
