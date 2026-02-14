@@ -16,13 +16,15 @@ import {
     Plus,
     FileText,
     AlertTriangle,
-    ShoppingBag
+    ShoppingBag,
+    Store
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MovimientoModal } from '@/components/inventario/MovimientoModal';
 import { NuevoProductoModal } from '@/components/inventario/NuevoProductoModal';
+import { NuevaSucursalModal } from '@/components/inventario/NuevaSucursalModal';
 
 export default function InventarioPage() {
     const { data: session } = useSession();
@@ -32,6 +34,7 @@ export default function InventarioPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [isMovimientoOpen, setIsMovimientoOpen] = useState(false);
     const [isProductoOpen, setIsProductoOpen] = useState(false);
+    const [isSucursalOpen, setIsSucursalOpen] = useState(false);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
     useEffect(() => {
@@ -87,6 +90,10 @@ export default function InventarioPage() {
                         <Button onClick={() => setIsProductoOpen(true)} className="gap-2">
                             <Plus className="h-4 w-4" />
                             Nuevo Producto
+                        </Button>
+                        <Button onClick={() => setIsSucursalOpen(true)} variant="secondary" className="gap-2">
+                            <Store className="h-4 w-4" />
+                            Nueva Sucursal
                         </Button>
                     </div>
                 </div>
@@ -265,6 +272,12 @@ export default function InventarioPage() {
                 <NuevoProductoModal
                     isOpen={isProductoOpen}
                     onClose={() => setIsProductoOpen(false)}
+                    onSuccess={fetchData}
+                />
+
+                <NuevaSucursalModal
+                    isOpen={isSucursalOpen}
+                    onClose={() => setIsSucursalOpen(false)}
                     onSuccess={fetchData}
                 />
             </div>

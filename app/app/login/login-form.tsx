@@ -11,9 +11,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Building2, LogIn, Loader2, Download, Settings } from 'lucide-react';
 import { VersionInfo } from '@/components/version-info';
 import { toast } from 'sonner';
-import { guardarDatoCobrador } from '@/lib/native/storage';
+import { guardarDatoCobrador, obtenerDatoCobrador } from '@/lib/native/storage';
 import { Capacitor } from '@capacitor/core';
-import { getFullPath } from '@/lib/api-config';
+import { getFullPath, apiFetch } from '@/lib/api-config';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -56,6 +56,7 @@ export function LoginForm() {
       return;
     }
 
+    const isNative = Capacitor.isNativePlatform();
     setIsLoading(true);
 
     try {
@@ -83,16 +84,31 @@ export function LoginForm() {
           localStorage.removeItem('remember_me');
         }
 
-        // Esperar un poco para que la sesión se establezca
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // Esperar un poco para que la sesión se establezca y las cookies se sincronicen en el WebView
+        // En nativo damos un poco más de tiempo (1.5s vs 0.5s)
+        await new Promise(resolve => setTimeout(resolve, isNative ? 1500 : 500));
 
         // Obtener información del usuario para redireccionar según rol
         try {
-          // Guardar sesión manualmente si es nativo para asegurar persistencia
-          const isNative = Capacitor.isNativePlatform();
+          // Reintentar obtener sesión hasta 2 veces si falla la primera (común en primer login nativo)
+          let sessionData = null;
+          let retries = isNative ? 2 : 0;
 
-          const sessionResponse = await fetch(getFullPath('/api/auth/session'));
-          const sessionData = await sessionResponse.json();
+          while (retries >= 0) {
+            const sessionResponse = await apiFetch('/api/auth/session');
+            if (sessionResponse.ok) {
+              sessionData = await sessionResponse.json();
+              if (sessionData?.user) break;
+            }
+
+            if (retries > 0) {
+              console.log(`Reintentando obtener sesión... (quedan ${retries})`);
+              await new Promise(r => setTimeout(r, 1000));
+            }
+            retries--;
+          }
+
+          console.log('🔍 Datos de sesión recibidos:', sessionData);
 
           if (sessionData && sessionData.user) {
             const userRole = sessionData.user.role;
@@ -101,9 +117,11 @@ export function LoginForm() {
             if (isNative) {
               await guardarDatoCobrador('user_profile', {
                 ...sessionData.user,
+                email: email, // Asegurar que el email esté guardado para el login offline
                 lastLogin: new Date().toISOString()
               });
-              console.log('✅ Sesión guardada en almacenamiento nativo');
+              console.log('✅ Perfil guardado para uso Offline');
+              toast.success('Sesión iniciada correctamente');
             }
 
             // Redireccionar según el rol del usuario
@@ -126,10 +144,7 @@ export function LoginForm() {
 
             console.log(`🚀 Redirigiendo a ${redirectUrl} para rol ${userRole}`);
 
-            console.log(`🚀 Redirigiendo a ${redirectUrl} para rol ${userRole}`);
-
             // En nativo siempre usar el router de Next.js para mantener el contexto de la app
-            // window.location.href causaría que se abra el navegador del sistema si la URL se interpreta como externa
             if (isNative || userRole === 'cobrador') {
               router.replace(redirectUrl);
             } else {
@@ -137,15 +152,23 @@ export function LoginForm() {
               window.location.href = redirectUrl;
             }
           } else {
-            throw new Error('No se pudo obtener la sesión activa');
+            throw new Error('Servidor no devolvió sesión activa. Verifique cookies/CORS.');
           }
         } catch (error) {
           console.error('Error al obtener sesión:', error);
 
-          const isNative = Capacitor.isNativePlatform();
-
           if (isNative) {
-            alert('No se pudo establecer la sesión con el servidor [' + error + ']. Verifique su conexión o credenciales.');
+            // Intentar login offline si falla la conexión o la sesión
+            const savedProfile = await obtenerDatoCobrador<any>('user_profile');
+
+            if (savedProfile && savedProfile.email === email) {
+              if (confirm('No se pudo establecer conexión con el servidor. ¿Desea entrar en MODO OFFLINE con los datos guardados de la última sesión?')) {
+                router.replace(savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard');
+                return;
+              }
+            }
+
+            alert('Error de Sesión: ' + (error instanceof Error ? error.message : 'No se pudo validar el inicio de sesión.'));
             setIsLoading(false);
           } else {
             // Fallback a ruta por defecto en web
@@ -155,7 +178,19 @@ export function LoginForm() {
       }
     } catch (error) {
       console.error('Error al iniciar sesión:', error);
-      alert('Error al iniciar sesión');
+
+      // Manejo de error de red en el propio signIn
+      if (isNative) {
+        const savedProfile = await obtenerDatoCobrador<any>('user_profile');
+        if (savedProfile && savedProfile.email === email) {
+          if (confirm('El servidor no responde. ¿Desea trabajar en MODO OFFLINE con sus datos guardados?')) {
+            router.replace(savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard');
+            return;
+          }
+        }
+      }
+
+      alert('Error en la comunicación con el servidor. Verifique su internet.');
       setIsLoading(false);
     }
   };
@@ -204,27 +239,63 @@ export function LoginForm() {
                 </p>
               </div>
 
-              <div className="flex gap-2">
+              <div className="flex flex-col gap-2">
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    className="flex-1 bg-transparent text-white border-slate-700"
+                    onClick={() => setShowServerConfig(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    className="flex-1 bg-blue-600 hover:bg-blue-500"
+                    onClick={async () => {
+                      if (serverUrl) {
+                        try {
+                          // Normalizar URL (quitar slash final y espacios)
+                          const cleanUrl = serverUrl.trim().endsWith('/') ? serverUrl.trim().slice(0, -1) : serverUrl.trim();
+                          localStorage.setItem('custom_server_url', cleanUrl);
+                          toast.success('Servidor configurado');
+                          setShowServerConfig(false);
+
+                          await new Promise(r => setTimeout(r, 300));
+
+                          // Recarga forzada para asegurar que Providers se reinicie con la nueva URL
+                          if (Capacitor.isNativePlatform()) {
+                            // En Capacitor a veces la ruta base es problemática, forzamos al index
+                            window.location.href = 'index.html';
+                          } else {
+                            window.location.reload();
+                          }
+                        } catch (e) {
+                          console.error('Error reloading:', e);
+                          window.location.href = '/';
+                        }
+                      }
+                    }}
+                  >
+                    Guardar y Reiniciar
+                  </Button>
+                </div>
+
                 <Button
-                  variant="outline"
-                  className="flex-1 bg-transparent text-white border-slate-700"
-                  onClick={() => setShowServerConfig(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  className="flex-1 bg-blue-600 hover:bg-blue-500"
-                  onClick={() => {
-                    if (serverUrl) {
-                      localStorage.setItem('custom_server_url', serverUrl);
-                      toast.success('Servidor configurado');
-                      setShowServerConfig(false);
-                      // Recargar para aplicar cambios de basePath
-                      window.location.reload();
+                  variant="ghost"
+                  className="text-xs text-blue-300 hover:text-white"
+                  onClick={async () => {
+                    if (!serverUrl) return toast.error('Ingresa una URL');
+                    toast.info('Probando conexión...');
+                    try {
+                      const cleanUrl = serverUrl.trim().endsWith('/') ? serverUrl.trim().slice(0, -1) : serverUrl.trim();
+                      const res = await fetch(`${cleanUrl}/api/auth/session`, { method: 'GET' });
+                      if (res.ok) toast.success('¡Conexión exitosa!');
+                      else toast.error(`Error del servidor: ${res.status}`);
+                    } catch (e) {
+                      toast.error('No se pudo conectar al servidor. Revisa la URL y tu conexión.');
                     }
                   }}
                 >
-                  Guardar
+                  Probar Conexión
                 </Button>
               </div>
             </div>
@@ -308,6 +379,26 @@ export function LoginForm() {
                   </>
                 )}
               </Button>
+
+              {Capacitor.isNativePlatform() && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full h-11 border-blue-500/50 text-blue-100 hover:bg-blue-500/10"
+                  onClick={async () => {
+                    const savedProfile = await obtenerDatoCobrador<any>('user_profile');
+                    if (savedProfile) {
+                      toast.info('Entrando en modo offline...');
+                      const url = savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard';
+                      router.replace(url);
+                    } else {
+                      alert('No hay una sesión previa guardada. Debe iniciar sesión con internet al menos una vez.');
+                    }
+                  }}
+                >
+                  Trabajar Offline
+                </Button>
+              )}
             </form>
           </CardContent>
         </Card>

@@ -2,7 +2,7 @@
 // Servicio de sincronización para PWA de cobranza móvil
 import { db, OfflineCliente, OfflinePago, OfflineMotarorio, SyncQueue, generateLocalId } from './offline-db';
 import { toast } from 'sonner';
-import { getFullPath } from './api-config';
+import { apiFetch } from './api-config';
 
 export class SyncService {
   private static instance: SyncService;
@@ -99,7 +99,7 @@ export class SyncService {
   // Descargar clientes asignados al cobrador
   private async downloadClientes(cobradorId: string) {
     try {
-      const response = await fetch(getFullPath(`/api/sync/clientes/${cobradorId}?full=true`));
+      const response = await apiFetch(`/api/sync/clientes/${cobradorId}?full=true`);
       if (!response.ok) throw new Error('Error al descargar clientes');
 
       const clientesServidor = await response.json();
@@ -156,7 +156,7 @@ export class SyncService {
 
         console.log('Enviando pago al servidor:', payloadPago);
 
-        const response = await fetch(getFullPath('/api/pagos'), {
+        const response = await apiFetch('/api/pagos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payloadPago)

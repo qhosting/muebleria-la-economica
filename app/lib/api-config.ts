@@ -36,3 +36,19 @@ export function getFullPath(path: string) {
 
     return `${baseUrl}${normalizedPath}`;
 }
+
+/**
+ * Wrapper sobre fetch que maneja automáticamente URLs absolutas para nativo
+ * y asegura que las credenciales (cookies) se envíen en peticiones cross-origin.
+ */
+export async function apiFetch(path: string, options: RequestInit = {}) {
+    const url = getFullPath(path);
+    const isNative = Capacitor.isNativePlatform();
+
+    // En nativo, forzamos incluir credenciales para que las cookies de sesión se envíen al servidor remoto
+    if (isNative && !options.credentials) {
+        options.credentials = 'include';
+    }
+
+    return fetch(url, options);
+}
