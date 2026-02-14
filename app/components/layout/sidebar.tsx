@@ -25,6 +25,7 @@ import {
   AlertTriangle,
   Upload,
   Printer,
+  Package,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -74,6 +75,12 @@ const navigation = [
     href: '/dashboard/pagos',
     icon: Receipt,
     roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+  },
+  {
+    name: 'Inventario',
+    href: '/dashboard/inventario',
+    icon: Package,
+    roles: ['admin', 'gestor_cobranza'],
   },
   {
     name: 'Reportes',
@@ -126,7 +133,7 @@ export function Sidebar({ className, session }: SidebarProps) {
       localStorage.removeItem('remembered_password');
       localStorage.removeItem('remember_me');
     }
-    
+
     signOut({ callbackUrl: '/login' });
   };
 
@@ -146,7 +153,7 @@ export function Sidebar({ className, session }: SidebarProps) {
 
       {/* Mobile overlay */}
       {isMobileOpen && (
-        <div 
+        <div
           className="lg:hidden fixed inset-0 bg-black/50 z-40"
           onClick={() => setIsMobileOpen(false)}
         />

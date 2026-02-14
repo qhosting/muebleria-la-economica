@@ -11,8 +11,8 @@
     "cobrador:open": "npx cap open android",
     "cobrador:run": "npx cap run android",
     "cobrador:dev": "npm run build:cobrador && npx cap sync && npx cap open android",
-    "cobrador:build:apk": "cd android && ./gradlew assembleRelease",
-    "cobrador:build:aab": "cd android && ./gradlew bundleRelease"
+    "cobrador:build:apk": "cd android && gradlew assembleRelease",
+    "cobrador:build:aab": "cd android && gradlew bundleRelease"
   },
   "prisma": {
     "seed": "tsx --require dotenv/config scripts/seed.ts"

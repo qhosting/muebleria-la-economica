@@ -8,9 +8,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Building2, LogIn, Loader2, Download } from 'lucide-react';
+import { Building2, LogIn, Loader2, Download, Settings } from 'lucide-react';
 import { VersionInfo } from '@/components/version-info';
 import { toast } from 'sonner';
+import { guardarDatoCobrador } from '@/lib/native/storage';
+import { Capacitor } from '@capacitor/core';
+import { getFullPath } from '@/lib/api-config';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -18,9 +21,10 @@ export function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [showInstallButton, setShowInstallButton] = useState(false);
   const [installMethod, setInstallMethod] = useState<'native' | 'manual'>('native');
+  const [serverUrl, setServerUrl] = useState('');
+  const [showServerConfig, setShowServerConfig] = useState(false);
   const router = useRouter();
 
   useEffect(() => {
@@ -36,114 +40,13 @@ export function LoginForm() {
       setRememberMe(true);
     }
 
-    // Detectar si la PWA puede instalarse
-    const handleBeforeInstallPrompt = (e: Event) => {
-      console.log('✅ [PWA] Evento beforeinstallprompt detectado');
-      e.preventDefault();
-      setDeferredPrompt(e);
-      setShowInstallButton(true);
-      setInstallMethod('native');
-    };
-
-    // Verificar si ya está instalada
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true ||
-      document.referrer.includes('android-app://');
-
-    const isAndroid = /Android/i.test(navigator.userAgent);
-    const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-
-    console.log('[PWA] Detección:', {
-      isStandalone,
-      isAndroid,
-      isMobile,
-      userAgent: navigator.userAgent
-    });
-
-    if (isStandalone) {
-      console.log('✅ [PWA] App ya instalada - ocultando botón');
-      setShowInstallButton(false);
-      return;
+    const savedServer = localStorage.getItem('custom_server_url');
+    if (savedServer) {
+      setServerUrl(savedServer);
     }
 
-    // Agregar listener para el evento
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-
-    // Timeout de espera para el evento beforeinstallprompt
-    const timeout = setTimeout(() => {
-      if (!deferredPrompt && (isAndroid || isMobile)) {
-        console.log('⚠️ [PWA] beforeinstallprompt no detectado, usando método manual');
-        setShowInstallButton(true);
-        setInstallMethod('manual');
-      }
-    }, 2000);
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      clearTimeout(timeout);
-    };
+    setShowInstallButton(false);
   }, []);
-
-  const handleInstallPWA = async () => {
-    console.log('[PWA] Intento de instalación:', {
-      hasDeferredPrompt: !!deferredPrompt,
-      installMethod
-    });
-
-    if (deferredPrompt && installMethod === 'native') {
-      try {
-        console.log('🚀 [PWA] Mostrando prompt nativo...');
-        // Mostrar el prompt de instalación
-        await deferredPrompt.prompt();
-
-        // Esperar a que el usuario responda
-        const { outcome } = await deferredPrompt.userChoice;
-
-        console.log('✅ [PWA] Resultado:', outcome);
-
-        if (outcome === 'accepted') {
-          toast.success('¡Aplicación instalada correctamente!');
-        }
-
-        // Limpiar el prompt
-        setDeferredPrompt(null);
-        setShowInstallButton(false);
-      } catch (error) {
-        console.error('❌ [PWA] Error en instalación nativa:', error);
-        // Fallback a método manual
-        setInstallMethod('manual');
-        showManualInstructions();
-      }
-    } else {
-      // Método manual para Chrome 142 Android 13 y otros
-      showManualInstructions();
-    }
-  };
-
-  const showManualInstructions = () => {
-    console.log('📱 [PWA] Mostrando instrucciones manuales');
-
-    const isChrome = /Chrome/i.test(navigator.userAgent);
-    const isAndroid = /Android/i.test(navigator.userAgent);
-
-    let instructions = 'Para instalar la aplicación:\n\n';
-
-    if (isAndroid && isChrome) {
-      instructions += '1. Toca el menú (⋮) en la esquina superior derecha\n';
-      instructions += '2. Busca la opción "Agregar a pantalla de inicio" o "Instalar app"\n';
-      instructions += '3. Toca "Agregar" o "Instalar" para confirmar\n\n';
-      instructions += '💡 Si no ves la opción, asegúrate de:\n';
-      instructions += '   • Estar usando la última versión de Chrome\n';
-      instructions += '   • Tener conexión HTTPS activa\n';
-      instructions += '   • No haber rechazado la instalación previamente';
-    } else {
-      instructions += '1. Toca el menú del navegador (⋮ o ⋯)\n';
-      instructions += '2. Selecciona "Agregar a pantalla de inicio"\n';
-      instructions += '3. Confirma la instalación';
-    }
-
-    alert(instructions);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -185,11 +88,23 @@ export function LoginForm() {
 
         // Obtener información del usuario para redireccionar según rol
         try {
-          const sessionResponse = await fetch('/api/auth/session');
+          // Guardar sesión manualmente si es nativo para asegurar persistencia
+          const isNative = Capacitor.isNativePlatform();
+
+          const sessionResponse = await fetch(getFullPath('/api/auth/session'));
           const sessionData = await sessionResponse.json();
 
           if (sessionData && sessionData.user) {
             const userRole = sessionData.user.role;
+
+            // Si es nativo, guardamos el perfil del usuario para acceso offline/rápido
+            if (isNative) {
+              await guardarDatoCobrador('user_profile', {
+                ...sessionData.user,
+                lastLogin: new Date().toISOString()
+              });
+              console.log('✅ Sesión guardada en almacenamiento nativo');
+            }
 
             // Redireccionar según el rol del usuario
             let redirectUrl = '/dashboard';
@@ -205,19 +120,37 @@ export function LoginForm() {
                 redirectUrl = '/dashboard/reportes';
                 break;
               case 'cobrador':
-                redirectUrl = '/cobrador-app';
+                redirectUrl = '/mobile/home';
                 break;
             }
 
-            // Usar window.location.href para forzar navegación completa
-            window.location.href = redirectUrl;
+            console.log(`🚀 Redirigiendo a ${redirectUrl} para rol ${userRole}`);
+
+            console.log(`🚀 Redirigiendo a ${redirectUrl} para rol ${userRole}`);
+
+            // En nativo siempre usar el router de Next.js para mantener el contexto de la app
+            // window.location.href causaría que se abra el navegador del sistema si la URL se interpreta como externa
+            if (isNative || userRole === 'cobrador') {
+              router.replace(redirectUrl);
+            } else {
+              // En web admin, permitimos refresh completo para asegurar estado limpio
+              window.location.href = redirectUrl;
+            }
           } else {
-            throw new Error('No se pudo obtener la sesión');
+            throw new Error('No se pudo obtener la sesión activa');
           }
         } catch (error) {
           console.error('Error al obtener sesión:', error);
-          // Fallback: ir al dashboard general
-          window.location.href = '/dashboard';
+
+          const isNative = Capacitor.isNativePlatform();
+
+          if (isNative) {
+            alert('No se pudo establecer la sesión con el servidor [' + error + ']. Verifique su conexión o credenciales.');
+            setIsLoading(false);
+          } else {
+            // Fallback a ruta por defecto en web
+            window.location.href = '/dashboard';
+          }
         }
       }
     } catch (error) {
@@ -237,7 +170,67 @@ export function LoginForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center p-4">
-      <div className="w-full max-w-md animate-fade-in">
+      {/* Botón de Configuración (Solo Nativo) */}
+      {Capacitor.isNativePlatform() && (
+        <button
+          onClick={() => setShowServerConfig(!showServerConfig)}
+          className="absolute top-4 right-4 p-2 text-blue-200 hover:text-white bg-slate-800/50 rounded-full transition-colors"
+          title="Configurar Servidor"
+        >
+          <Settings className="w-6 h-6" />
+        </button>
+      )}
+
+      <div className="w-full max-w-md animate-fade-in relative">
+        {/* Modal de Configuración de Servidor */}
+        {(showServerConfig || (!serverUrl && Capacitor.isNativePlatform())) && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/95 rounded-xl border border-blue-500/30 overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="w-full space-y-4">
+              <div className="text-center">
+                <Settings className="w-12 h-12 text-blue-400 mx-auto mb-2" />
+                <h2 className="text-xl font-bold text-white">Configurar Servidor</h2>
+                <p className="text-sm text-blue-200">Ingresa la URL del servidor central</p>
+              </div>
+
+              <div className="space-y-2">
+                <Input
+                  placeholder="https://tu-servidor.com"
+                  value={serverUrl}
+                  onChange={(e) => setServerUrl(e.target.value)}
+                  className="bg-slate-800 border-slate-700 text-white"
+                />
+                <p className="text-[10px] text-slate-400">
+                  Ej: http://192.168.1.50:3000 o https://sistema.com
+                </p>
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 bg-transparent text-white border-slate-700"
+                  onClick={() => setShowServerConfig(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  className="flex-1 bg-blue-600 hover:bg-blue-500"
+                  onClick={() => {
+                    if (serverUrl) {
+                      localStorage.setItem('custom_server_url', serverUrl);
+                      toast.success('Servidor configurado');
+                      setShowServerConfig(false);
+                      // Recargar para aplicar cambios de basePath
+                      window.location.reload();
+                    }
+                  }}
+                >
+                  Guardar
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-blue-600 rounded-xl flex items-center justify-center shadow-lg">
@@ -318,19 +311,6 @@ export function LoginForm() {
             </form>
           </CardContent>
         </Card>
-
-        {showInstallButton && (
-          <Button
-            type="button"
-            variant="default"
-            className="w-full h-11 mt-4 bg-green-600 hover:bg-green-700 text-white shadow-lg"
-            onClick={handleInstallPWA}
-            disabled={isLoading}
-          >
-            <Download className="mr-2 h-4 w-4" />
-            Instalar Aplicación
-          </Button>
-        )}
 
         <div className="text-center mt-6 space-y-2">
           <div className="text-blue-200 text-sm">

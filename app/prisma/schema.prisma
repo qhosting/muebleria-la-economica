@@ -81,6 +81,8 @@ model Cliente {
   telefono            String?
   vendedor            String?
   cobradorAsignadoId  String?
+  productoId          String?       // Vinculación con inventario
+  sucursalId          String?       // Origen de la venta
   statusCuenta        StatusCuenta  @default(activo)
   direccionCompleta   String
   descripcionProducto String
@@ -96,6 +98,8 @@ model Cliente {
   updatedAt           DateTime      @updatedAt
 
   cobradorAsignado    User?         @relation("CobradorAsignado", fields: [cobradorAsignadoId], references: [id])
+  producto            Producto?     @relation(fields: [productoId], references: [id])
+  sucursal            Sucursal?     @relation(fields: [sucursalId], references: [id])
   pagos               Pago[]
   motararios          Motarario[]
 
@@ -216,4 +220,89 @@ model ConfiguracionSistema {
   updatedAt     DateTime @updatedAt
 
   @@map("configuracion_sistema")
+}
+
+// ==========================================
+// MÓDULO DE INVENTARIO
+// ==========================================
+
+enum TipoMovimiento {
+  entrada
+  salida
+  traspaso
+  ajuste
+  venta
+}
+
+model Sucursal {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  direccion   String?
+  telefono    String?
+  esBodega    Boolean  @default(false) // true = bodega, false = tienda
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  stocks                  Stock[]
+  movimientosOrigen       MovimientoInventario[] @relation("MovimientoOrigen")
+  movimientosDestino      MovimientoInventario[] @relation("MovimientoDestino")
+  clientes                Cliente[]
+
+  @@map("sucursales")
+}
+
+model Producto {
+  id              String   @id @default(cuid())
+  codigo          String   @unique
+  nombre          String
+  descripcion     String?
+  categoria       String?
+  precioCompra    Decimal  @db.Decimal(10,2)
+  precioVenta     Decimal  @db.Decimal(10,2)
+  unidadMedida    String   @default("pieza") // pieza, juego, set
+  stockMinimo     Int      @default(0)
+  imagenUrl       String?
+  isActive        Boolean  @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  stocks          Stock[]
+  movimientos     MovimientoInventario[]
+  clientes        Cliente[]
+
+  @@map("productos")
+}
+
+model Stock {
+  id          String   @id @default(cuid())
+  productoId  String
+  sucursalId  String
+  cantidad    Int      @default(0)
+  updatedAt   DateTime @updatedAt
+
+  producto    Producto @relation(fields: [productoId], references: [id])
+  sucursal    Sucursal @relation(fields: [sucursalId], references: [id])
+
+  @@unique([productoId, sucursalId])
+  @@map("stock")
+}
+
+model MovimientoInventario {
+  id                String          @id @default(cuid())
+  productoId        String
+  tipoMovimiento    TipoMovimiento
+  cantidad          Int
+  sucursalOrigenId  String?
+  sucursalDestinoId String?
+  motivo            String?
+  referencia        String?         // Número de factura, orden, etc.
+  usuarioId         String?
+  createdAt         DateTime        @default(now())
+
+  producto          Producto        @relation(fields: [productoId], references: [id])
+  sucursalOrigen    Sucursal?       @relation("MovimientoOrigen", fields: [sucursalOrigenId], references: [id])
+  sucursalDestino   Sucursal?       @relation("MovimientoDestino", fields: [sucursalDestinoId], references: [id])
+
+  @@map("movimientos_inventario")
 }

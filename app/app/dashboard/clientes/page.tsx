@@ -45,6 +45,8 @@ export default function ClientesPage() {
   const { data: session } = useSession();
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [cobradores, setCobradores] = useState<User[]>([]);
+  const [productos, setProductos] = useState<any[]>([]);
+  const [sucursales, setSucursales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCobrador, setSelectedCobrador] = useState('all');
@@ -73,6 +75,7 @@ export default function ClientesPage() {
     if (session) {
       fetchClientes();
       fetchCobradores();
+      fetchInventario();
 
       // Inicializar filtro de cobrador según el rol del usuario
       if (userRole && userRole !== 'admin' && selectedCobrador === 'all') {
@@ -131,6 +134,27 @@ export default function ClientesPage() {
       }
     } catch (error) {
       console.error('Error al obtener cobradores:', error);
+    }
+  };
+
+  const fetchInventario = async () => {
+    try {
+      const [resProductos, resSucursales] = await Promise.all([
+        fetch('/api/inventario/productos?activo=true'),
+        fetch('/api/inventario/sucursales')
+      ]);
+
+      if (resProductos.ok) {
+        const data = await resProductos.json();
+        setProductos(data.productos || []);
+      }
+
+      if (resSucursales.ok) {
+        const data = await resSucursales.json();
+        setSucursales(data.sucursales || []);
+      }
+    } catch (error) {
+      console.error('Error al cargar inventario:', error);
     }
   };
 
@@ -498,6 +522,8 @@ export default function ClientesPage() {
         onOpenChange={setClienteModalOpen}
         cliente={selectedCliente}
         cobradores={cobradores}
+        productos={productos}
+        sucursales={sucursales}
         onSuccess={handleModalSuccess}
         readOnly={userRole === 'cobrador'}
       />

@@ -17,17 +17,21 @@ interface ClienteModalProps {
   onOpenChange: (open: boolean) => void;
   cliente?: Cliente | null;
   cobradores: User[];
+  productos?: any[];
+  sucursales?: any[];
   onSuccess: () => void;
   readOnly?: boolean;
 }
 
-export function ClienteModal({ 
-  open, 
-  onOpenChange, 
-  cliente, 
-  cobradores, 
+export function ClienteModal({
+  open,
+  onOpenChange,
+  cliente,
+  cobradores,
+  productos = [],
+  sucursales = [],
   onSuccess,
-  readOnly = false 
+  readOnly = false
 }: ClienteModalProps) {
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
@@ -36,6 +40,8 @@ export function ClienteModal({
     telefono: '',
     vendedor: '',
     cobradorAsignadoId: 'sin-asignar',
+    productoId: '',
+    sucursalId: '',
     direccionCompleta: '',
     descripcionProducto: '',
     diaPago: '1',
@@ -60,6 +66,8 @@ export function ClienteModal({
         telefono: cliente.telefono || '',
         vendedor: cliente.vendedor || '',
         cobradorAsignadoId: cliente.cobradorAsignadoId || 'sin-asignar',
+        productoId: cliente.productoId || '',
+        sucursalId: cliente.sucursalId || '',
         direccionCompleta: cliente.direccionCompleta || '',
         descripcionProducto: cliente.descripcionProducto || '',
         diaPago: cliente.diaPago.toString() || '1',
@@ -80,6 +88,8 @@ export function ClienteModal({
         telefono: '',
         vendedor: '',
         cobradorAsignadoId: 'sin-asignar',
+        productoId: '',
+        sucursalId: '',
         direccionCompleta: '',
         descripcionProducto: '',
         diaPago: '1',
@@ -95,6 +105,21 @@ export function ClienteModal({
       });
     }
   }, [cliente, open]);
+
+  const handleProductChange = (prodId: string) => {
+    const producto = productos.find(p => p.id === prodId);
+    if (producto) {
+      setFormData(prev => ({
+        ...prev,
+        productoId: prodId,
+        descripcionProducto: producto.nombre,
+        montoPago: producto.precioVenta.toString(),
+        saldoActual: producto.precioVenta.toString() // Inicializa saldo con precio venta
+      }));
+    } else {
+      setFormData(prev => ({ ...prev, productoId: prodId }));
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -218,8 +243,8 @@ export function ClienteModal({
 
             <div className="space-y-2">
               <Label htmlFor="cobradorAsignadoId">Cobrador Asignado</Label>
-              <Select 
-                value={formData.cobradorAsignadoId} 
+              <Select
+                value={formData.cobradorAsignadoId}
                 onValueChange={(value) => setFormData({ ...formData, cobradorAsignadoId: value })}
                 disabled={readOnly}
               >
@@ -251,6 +276,46 @@ export function ClienteModal({
             />
           </div>
 
+          {/* Selección de Sucursal y Producto (Solo modo creación) */}
+          {!isEditMode && !readOnly && (
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="sucursalId">Sucursal de Venta</Label>
+                <Select
+                  value={formData.sucursalId}
+                  onValueChange={(v) => setFormData({ ...formData, sucursalId: v })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Seleccionar sucursal..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sucursales.map((s: any) => (
+                      <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="productoId">Producto (Inventario)</Label>
+                <Select
+                  value={formData.productoId}
+                  onValueChange={handleProductChange}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Buscar en inventario..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {productos.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.codigo} - {p.nombre} (${p.precioVenta})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="descripcionProducto">Descripción del Producto *</Label>
             <Textarea
@@ -267,8 +332,8 @@ export function ClienteModal({
           <div className="grid gap-4 md:grid-cols-3">
             <div className="space-y-2">
               <Label htmlFor="diaPago">Día de Pago *</Label>
-              <Select 
-                value={formData.diaPago} 
+              <Select
+                value={formData.diaPago}
                 onValueChange={(value) => setFormData({ ...formData, diaPago: value })}
                 disabled={readOnly}
               >
@@ -287,8 +352,8 @@ export function ClienteModal({
 
             <div className="space-y-2">
               <Label htmlFor="periodicidad">Periodicidad *</Label>
-              <Select 
-                value={formData.periodicidad} 
+              <Select
+                value={formData.periodicidad}
                 onValueChange={(value) => setFormData({ ...formData, periodicidad: value })}
                 disabled={readOnly}
               >
@@ -350,8 +415,8 @@ export function ClienteModal({
           {isEditMode && (
             <div className="space-y-2">
               <Label htmlFor="statusCuenta">Estado de Cuenta</Label>
-              <Select 
-                value={formData.statusCuenta} 
+              <Select
+                value={formData.statusCuenta}
                 onValueChange={(value) => setFormData({ ...formData, statusCuenta: value })}
                 disabled={readOnly}
               >
@@ -422,8 +487,8 @@ export function ClienteModal({
 
           <div className="flex justify-end space-x-2 pt-4">
             {readOnly ? (
-              <Button 
-                type="button" 
+              <Button
+                type="button"
                 onClick={() => onOpenChange(false)}
               >
                 <X className="h-4 w-4 mr-2" />
@@ -431,9 +496,9 @@ export function ClienteModal({
               </Button>
             ) : (
               <>
-                <Button 
-                  type="button" 
-                  variant="outline" 
+                <Button
+                  type="button"
+                  variant="outline"
                   onClick={() => onOpenChange(false)}
                   disabled={loading}
                 >

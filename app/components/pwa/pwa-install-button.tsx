@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { toast } from 'sonner';
+import { Capacitor } from '@capacitor/core';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -17,10 +18,11 @@ export function PWAInstallButton() {
 
   useEffect(() => {
     // Verificar si ya está instalado
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches 
-      || (window.navigator as any).standalone === true 
-      || document.referrer.includes('android-app://');
-    
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || (window.navigator as any).standalone === true
+      || document.referrer.includes('android-app://')
+      || Capacitor.isNativePlatform();
+
     const isAndroid = /Android/i.test(navigator.userAgent);
     const isMobile = /Mobile|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
@@ -51,6 +53,9 @@ export function PWAInstallButton() {
 
     // Timeout para fallback a método manual
     const fallbackTimeout = setTimeout(() => {
+      // Si es nativo, nunca mostrar fallback
+      if (Capacitor.isNativePlatform()) return;
+
       if (!deferredPrompt && (isAndroid || isMobile) && !isStandalone) {
         console.log('⚠️ [PWA] beforeinstallprompt no detectado, usando método manual');
         setShowInstallButton(true);
@@ -74,7 +79,7 @@ export function PWAInstallButton() {
       try {
         console.log('🚀 [PWA] Mostrando prompt nativo...');
         await deferredPrompt.prompt();
-        
+
         const { outcome } = await deferredPrompt.userChoice;
         console.log('✅ [PWA] Resultado:', outcome);
 
@@ -96,12 +101,12 @@ export function PWAInstallButton() {
 
   const showManualInstructions = () => {
     console.log('📱 [PWA] Mostrando instrucciones manuales');
-    
+
     const isChrome = /Chrome/i.test(navigator.userAgent);
     const isAndroid = /Android/i.test(navigator.userAgent);
-    
+
     let message = 'Para instalar la aplicación:\n\n';
-    
+
     if (isAndroid && isChrome) {
       message += '1. Toca el menú (⋮) en la esquina superior derecha\n';
       message += '2. Busca la opción "Agregar a pantalla de inicio" o "Instalar app"\n';
@@ -115,7 +120,7 @@ export function PWAInstallButton() {
       message += '2. Selecciona "Agregar a pantalla de inicio"\n';
       message += '3. Confirma la instalación';
     }
-    
+
     alert(message);
   };
 

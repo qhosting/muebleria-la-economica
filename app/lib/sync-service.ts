@@ -2,13 +2,14 @@
 // Servicio de sincronización para PWA de cobranza móvil
 import { db, OfflineCliente, OfflinePago, OfflineMotarorio, SyncQueue, generateLocalId } from './offline-db';
 import { toast } from 'sonner';
+import { getFullPath } from './api-config';
 
 export class SyncService {
   private static instance: SyncService;
   private syncInProgress = false;
   private autoSyncInterval?: NodeJS.Timeout;
 
-  private constructor() {}
+  private constructor() { }
 
   public static getInstance(): SyncService {
     if (!SyncService.instance) {
@@ -67,7 +68,7 @@ export class SyncService {
     }
 
     this.syncInProgress = true;
-    
+
     try {
       if (showToast) toast.info('Sincronizando datos...');
 
@@ -98,15 +99,15 @@ export class SyncService {
   // Descargar clientes asignados al cobrador
   private async downloadClientes(cobradorId: string) {
     try {
-      const response = await fetch(`/api/sync/clientes/${cobradorId}?full=true`);
+      const response = await fetch(getFullPath(`/api/sync/clientes/${cobradorId}?full=true`));
       if (!response.ok) throw new Error('Error al descargar clientes');
 
       const clientesServidor = await response.json();
-      
+
       // Limpiar clientes locales y agregar los del servidor
       await db.transaction('rw', db.clientes, async () => {
         await db.clientes.where('cobradorAsignadoId').equals(cobradorId).delete();
-        
+
         for (const cliente of clientesServidor) {
           await db.clientes.add({
             ...cliente,
@@ -138,7 +139,7 @@ export class SyncService {
     for (const pago of pagosPendientes) {
       try {
         console.log(`Sincronizando pago ${pago.localId} (${pago.tipoPago})`);
-        
+
         // Marcar como sincronizando
         await db.pagos.update(pago.localId, { syncStatus: 'syncing' });
 
@@ -155,7 +156,7 @@ export class SyncService {
 
         console.log('Enviando pago al servidor:', payloadPago);
 
-        const response = await fetch('/api/pagos', {
+        const response = await fetch(getFullPath('/api/pagos'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payloadPago)
@@ -164,7 +165,7 @@ export class SyncService {
         if (response.ok) {
           const pagoServidor = await response.json();
           console.log(`Pago ${pago.localId} sincronizado exitosamente con ID: ${pagoServidor.id}`);
-          
+
           // Actualizar con ID del servidor
           await db.pagos.update(pago.localId, {
             id: pagoServidor.id,
@@ -174,7 +175,7 @@ export class SyncService {
         } else {
           const errorText = await response.text();
           console.error(`Error en respuesta del servidor para pago ${pago.localId}:`, response.status, errorText);
-          
+
           // Marcar como fallido
           await db.pagos.update(pago.localId, { syncStatus: 'failed' });
         }
@@ -255,7 +256,7 @@ export class SyncService {
   // Agregar pago offline
   public async addPagoOffline(pagoData: Omit<OfflinePago, 'localId' | 'syncStatus' | 'createdOffline' | 'printStatus'>) {
     const localId = generateLocalId();
-    
+
     const pago: OfflinePago = {
       ...pagoData,
       localId,
@@ -266,7 +267,7 @@ export class SyncService {
 
     console.log('Agregando pago offline:', pago);
     await db.pagos.add(pago);
-    
+
     // Agregar a cola de sincronización
     await db.syncQueue.add({
       type: 'pago',
@@ -283,7 +284,7 @@ export class SyncService {
   // Agregar motarario offline
   public async addMotararioOffline(motararioData: Omit<OfflineMotarorio, 'localId' | 'syncStatus' | 'createdOffline'>) {
     const localId = generateLocalId();
-    
+
     const motarario: OfflineMotarorio = {
       ...motararioData,
       localId,
@@ -329,12 +330,12 @@ export class SyncService {
     const pagosOffline = await db.pagos
       .where('cobradorId').equals(cobradorId)
       .toArray();
-    
+
     console.log(`Pagos offline encontrados: ${pagosOffline.length}`);
     pagosOffline.forEach(pago => {
       console.log(`${pago.localId}: ${pago.tipoPago} - ${pago.monto} - Status: ${pago.syncStatus}`);
     });
-    
+
     return pagosOffline;
   }
 }

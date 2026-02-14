@@ -21,6 +21,8 @@ export interface Cliente {
   telefono?: string;
   vendedor?: string;
   cobradorAsignadoId?: string;
+  productoId?: string;
+  sucursalId?: string;
   statusCuenta: StatusCuenta;
   direccionCompleta: string;
   descripcionProducto: string;

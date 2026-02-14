@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import CobranzaMobile from '@/components/mobile/cobranza-mobile';
 import { OfflineCliente } from '@/lib/offline-db';
+import { getFullPath } from '@/lib/api-config';
 
 export default function CobranzaMobilePage() {
   const { data: session, status } = useSession();
@@ -50,12 +51,12 @@ export default function CobranzaMobilePage() {
     try {
       // Intentar cargar clientes solo si hay conexión
       if (typeof window !== 'undefined' && navigator.onLine && userId) {
-        const response = await fetch(`/api/sync/clientes/${userId}?full=true`, {
+        const response = await fetch(getFullPath(`/api/sync/clientes/${userId}?full=true`), {
           headers: {
             'Cache-Control': 'no-cache'
           }
         });
-        
+
         if (response.ok) {
           const clientes = await response.json();
           if (Array.isArray(clientes)) {

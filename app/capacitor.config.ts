@@ -8,7 +8,12 @@ const config: CapacitorConfig = {
         androidScheme: 'https',
         cleartext: true,
         // Permite que Capacitor cargue archivos locales (index.html) desde 'out'
-        url: undefined
+        url: undefined,
+        allowNavigation: [
+            "app.mueblerialaeconomica.com",
+            "*.app.mueblerialaeconomica.com",
+            "localhost"
+        ]
     },
     plugins: {
         SplashScreen: {

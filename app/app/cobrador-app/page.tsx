@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { usePlatform } from '@/hooks/usePlatform';
 import { Loader2 } from 'lucide-react';
+import { obtenerDatoCobrador } from '@/lib/native/storage';
 
 export default function CobradorAppPage() {
     const { data: session, status } = useSession();
@@ -13,39 +14,47 @@ export default function CobradorAppPage() {
     const [message, setMessage] = useState('Iniciando...');
 
     useEffect(() => {
-        if (status === 'loading') return;
+        const checkAuth = async () => {
+            if (status === 'loading') return;
 
-        if (status === 'unauthenticated') {
-            // Si no está logueado, mandar al login
-            // TODO: Podríamos hacer un login específico para cobradores aquí mismo
-            router.push('/login');
-            return;
-        }
+            let currentUser = session?.user;
 
-        if (status === 'authenticated') {
-            const userRole = (session?.user as any)?.role;
+            // Si no hay sesión de Next-Auth pero estamos en nativo, intentar recuperar del storage
+            if (!currentUser && isNative) {
+                const savedProfile = await obtenerDatoCobrador<any>('user_profile');
+                if (savedProfile) {
+                    console.log('✅ Sesión recuperada de storage nativo:', savedProfile.email);
+                    currentUser = savedProfile;
+                }
+            }
 
-            // Verificación de seguridad: Solo cobradores
-            if (userRole !== 'cobrador' && userRole !== 'admin') { // Permitimos admin para debug
-                setMessage('Acceso denegado. Esta app es solo para cobradores.');
-                setTimeout(() => router.push('/dashboard'), 3000);
+            if (!currentUser && status === 'unauthenticated') {
+                router.push('/login');
                 return;
             }
 
-            setMessage('Sincronizando datos...');
+            if (currentUser) {
+                const userRole = (currentUser as any).role;
 
-            // Si estamos en la app nativa, redirigir a la vista móvil
-            // Si estamos en web, también (para pruebas), o mostrar mensaje
-
-            // Pequeño delay para que se vea el splash/logo
-            setTimeout(() => {
-                if (isNative) {
-                    router.push('/mobile/home');
-                } else {
-                    router.push('/dashboard/cobranza-mobile');
+                if (userRole !== 'cobrador' && userRole !== 'admin') {
+                    setMessage('Acceso denegado. Esta app es solo para cobradores.');
+                    setTimeout(() => router.push('/dashboard'), 3000);
+                    return;
                 }
-            }, 1000);
-        }
+
+                setMessage('Sincronizando datos...');
+
+                setTimeout(() => {
+                    if (isNative) {
+                        router.push('/mobile/home');
+                    } else {
+                        router.push('/dashboard/cobranza-mobile');
+                    }
+                }, 1000);
+            }
+        };
+
+        checkAuth();
     }, [session, status, isNative, router]);
 
     return (
