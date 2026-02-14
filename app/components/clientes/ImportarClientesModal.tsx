@@ -25,10 +25,10 @@ interface ImportResult {
   total: number;
 }
 
-export function ImportarClientesModal({ 
-  open, 
-  onOpenChange, 
-  onSuccess 
+export function ImportarClientesModal({
+  open,
+  onOpenChange,
+  onSuccess
 }: ImportarClientesModalProps) {
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
@@ -39,7 +39,7 @@ export function ImportarClientesModal({
 
   const downloadTemplate = () => {
     setLoading(true);
-    
+
     // Crear CSV template
     const headers = [
       'codigoCliente',
@@ -104,15 +104,15 @@ export function ImportarClientesModal({
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
-    
+
     link.setAttribute('href', url);
     link.setAttribute('download', 'plantilla_clientes.csv');
     link.style.visibility = 'hidden';
-    
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-    
+
     setLoading(false);
     toast.success('Plantilla descargada exitosamente');
   };
@@ -132,88 +132,166 @@ export function ImportarClientesModal({
     }
   };
 
-  const parseCSV = (text: string): any[] => {
-    const lines = text.split('\n').filter(line => 
-      line.trim() && !line.trim().startsWith('#')
-    );
-    
-    if (lines.length < 2) return [];
-    
-    const headers = lines[0].split(',').map(h => h.trim());
+  const parseCSV = (text: string): { data: any[], errors: any[] } => {
+    // Normalizar saltos de línea y filtrar líneas vacías
+    const lines = text.replace(/\r\n/g, '\n').split('\n');
+
+    // Filtrar líneas vacías o comentarios, pero manteniendo el índice original para reportar errores correctamente
+    const activeLines = lines.map((line, index) => ({ content: line.trim(), index: index + 1 }))
+      .filter(item => item.content && !item.content.startsWith('#'));
+
+    if (activeLines.length < 2) return { data: [], errors: [{ row: 0, error: 'El archivo no contiene suficientes datos (falta cabecera o filas)' }] };
+
+    // Función robusta para separar por comas respetando comillas
+    const splitCSVLine = (line: string) => {
+      const result = [];
+      let start = 0;
+      let inQuotes = false;
+
+      for (let i = 0; i < line.length; i++) {
+        if (line[i] === '"') {
+          inQuotes = !inQuotes;
+        } else if (line[i] === ',' && !inQuotes) {
+          let value = line.substring(start, i).trim();
+          // Remover comillas si existen
+          if (value.startsWith('"') && value.endsWith('"')) {
+            value = value.substring(1, value.length - 1).replace(/""/g, '"');
+          }
+          result.push(value);
+          start = i + 1;
+        }
+      }
+
+      // Agregar el último valor
+      let lastValue = line.substring(start).trim();
+      if (lastValue.startsWith('"') && lastValue.endsWith('"')) {
+        lastValue = lastValue.substring(1, lastValue.length - 1).replace(/""/g, '"');
+      }
+      result.push(lastValue);
+
+      return result;
+    };
+
+    // Parsear headers usando la nueva función (la primera línea activa es header)
+    const headerLine = activeLines[0];
+    const headers = splitCSVLine(headerLine.content);
     const data = [];
-    
-    for (let i = 1; i < lines.length; i++) {
-      const values = lines[i].split(',').map(v => v.trim());
+    const errors = [];
+
+    for (let i = 1; i < activeLines.length; i++) {
+      const lineObj = activeLines[i];
+      const values = splitCSVLine(lineObj.content);
+
+      // Validar que la fila tenga la cantidad correcta de columnas
       if (values.length === headers.length) {
         const row: any = {};
         headers.forEach((header, index) => {
-          row[header] = values[index];
+          // Limpiar caracteres invisibles del header
+          const cleanHeader = header.replace(/^\ufeff/, '').trim();
+          row[cleanHeader] = values[index];
         });
+        // Adjuntamos el número de fila original para referencia
+        row._originalRowIndex = lineObj.index;
         data.push(row);
+      } else {
+        errors.push({
+          row: lineObj.index,
+          error: `Error de formato: La fila tiene ${values.length} columnas, se esperaban ${headers.length}. Verifique comas faltantes o sobran.`
+        });
       }
     }
-    
-    return data;
+
+    return { data, errors };
   };
 
-  const validateRow = (row: any, index: number): string | null => {
-    if (!row.nombreCompleto) return `Fila ${index + 2}: nombreCompleto es requerido`;
-    if (!row.direccionCompleta) return `Fila ${index + 2}: direccionCompleta es requerido`;
-    if (!row.descripcionProducto) return `Fila ${index + 2}: descripcionProducto es requerido`;
-    if (!row.diaPago) return `Fila ${index + 2}: diaPago es requerido`;
-    if (!row.montoPago) return `Fila ${index + 2}: montoPago es requerido`;
-    if (!row.periodicidad) return `Fila ${index + 2}: periodicidad es requerido`;
-    
+
+  const validateRow = (row: any, index: number, allRows: any[] = []): string | null => {
+    const rowNum = row._originalRowIndex || (index + 2);
+
+    // Check required fields with specific messages
+    const requiredFields = [
+      { key: 'nombreCompleto', label: 'Nombre Completo' },
+      { key: 'direccionCompleta', label: 'Dirección' },
+      { key: 'descripcionProducto', label: 'Producto' },
+      { key: 'diaPago', label: 'Día de Pago' },
+      { key: 'montoPago', label: 'Monto de Pago' },
+      { key: 'periodicidad', label: 'Periodicidad' },
+    ];
+
+    for (const field of requiredFields) {
+      if (!row[field.key]) {
+        return `Fila ${rowNum}: El campo '${field.label}' es obligatorio.`;
+      }
+    }
+
+    // Validate diaPago
     const diaPago = parseInt(row.diaPago);
     if (isNaN(diaPago) || diaPago < 1 || diaPago > 7) {
-      return `Fila ${index + 2}: diaPago debe ser un número entre 1 y 7`;
+      return `Fila ${rowNum}: 'Día de Pago' debe ser un número entre 1 (Lunes) y 7 (Domingo). Valor encontrado: ${row.diaPago}`;
     }
-    
+
+    // Validate montoPago
     const montoPago = parseFloat(row.montoPago);
     if (isNaN(montoPago) || montoPago <= 0) {
-      return `Fila ${index + 2}: montoPago debe ser un número mayor a 0`;
+      return `Fila ${rowNum}: 'Monto de Pago' debe ser un número mayor a 0. Valor encontrado: ${row.montoPago}`;
     }
-    
+
+    // Validate periodicidad
     const periodicidadValida = ['diario', 'semanal', 'quincenal', 'mensual'];
-    if (!periodicidadValida.includes(row.periodicidad)) {
-      return `Fila ${index + 2}: periodicidad debe ser: ${periodicidadValida.join(', ')}`;
+    const periodicidad = row.periodicidad?.toLowerCase().trim();
+    if (!periodicidadValida.includes(periodicidad)) {
+      return `Fila ${rowNum}: 'Periodicidad' inválida (${row.periodicidad}). Valores permitidos: ${periodicidadValida.join(', ')}`;
     }
-    
+
+    // Check for duplicate code in the file (if codigoCliente is provided)
+    if (row.codigoCliente) {
+      const code = row.codigoCliente.trim();
+      // Find earlier occurrence
+      const duplicateIndex = allRows.findIndex((r, i) => i < index && r.codigoCliente?.trim() === code);
+      if (duplicateIndex !== -1) {
+        const dupRowNum = allRows[duplicateIndex]._originalRowIndex || (duplicateIndex + 2);
+        return `Fila ${rowNum}: Código de cliente '${code}' duplicado en el archivo (repetido en fila ${dupRowNum}).`;
+      }
+    }
+
     return null;
   };
 
   const importClientes = async () => {
     if (!selectedFile) return;
-    
+
     setImporting(true);
     setProgress(0);
-    
+
     try {
       const text = await selectedFile.text();
-      const data = parseCSV(text);
-      
-      if (data.length === 0) {
+      const { data, errors: parseErrors } = parseCSV(text);
+
+      if (data.length === 0 && parseErrors.length === 0) {
         throw new Error('No se encontraron datos válidos en el archivo');
       }
-      
+
       const result: ImportResult = {
         success: 0,
         created: 0,
         updated: 0,
-        errors: [],
-        total: data.length
+        errors: [...parseErrors], // Incluir errores de parsing iniciales
+        total: data.length + parseErrors.length
       };
-      
+
+      // Procesar solo las filas válidas
       for (let i = 0; i < data.length; i++) {
         const row = data[i];
         setProgress((i / data.length) * 100);
-        
-        const validationError = validateRow(row, i);
+
+        const validationError = validateRow(row, i, data);
         if (validationError) {
-          result.errors.push({ row: i + 2, error: validationError });
+          // Usar el índice original del archivo si existe (para ser precisos con el usuario)
+          const rowNum = row._originalRowIndex || (i + 2);
+          result.errors.push({ row: rowNum, error: validationError });
           continue;
         }
-        
+
         try {
           const clienteData = {
             codigoCliente: row.codigoCliente?.trim() || null,
@@ -233,7 +311,7 @@ export function ImportarClientesModal({
             importe3: row.importe3 ? parseFloat(row.importe3) : null,
             importe4: row.importe4 ? parseFloat(row.importe4) : null,
           };
-          
+
           // Si tiene codigoCliente, verificar si existe para decidir crear o actualizar
           let shouldUpdate = false;
           if (clienteData.codigoCliente) {
@@ -247,7 +325,7 @@ export function ImportarClientesModal({
               shouldUpdate = !!existingClient;
             }
           }
-          
+
           let response;
           if (shouldUpdate && clienteData.codigoCliente) {
             // Actualizar cliente existente
@@ -261,15 +339,15 @@ export function ImportarClientesModal({
                 updateData: clienteData,
               }),
             });
-            
+
             if (response.ok) {
               result.success++;
               result.updated++;
             } else {
               const errorData = await response.json();
-              result.errors.push({ 
-                row: i + 2, 
-                error: `Error al actualizar: ${errorData.error || 'Error desconocido'}` 
+              result.errors.push({
+                row: row._originalRowIndex || (i + 2),
+                error: `Error al actualizar: ${errorData.error || 'Error desconocido'}`
               });
             }
           } else {
@@ -281,38 +359,38 @@ export function ImportarClientesModal({
               },
               body: JSON.stringify(clienteData),
             });
-            
+
             if (response.ok) {
               result.success++;
               result.created++;
             } else {
               const errorData = await response.json();
-              result.errors.push({ 
-                row: i + 2, 
-                error: `Error al crear: ${errorData.error || 'Error desconocido'}` 
+              result.errors.push({
+                row: row._originalRowIndex || (i + 2),
+                error: `Error al crear: ${errorData.error || 'Error desconocido'}`
               });
             }
           }
         } catch (error) {
-          result.errors.push({ 
-            row: i + 2, 
-            error: error instanceof Error ? error.message : 'Error desconocido' 
+          result.errors.push({
+            row: row._originalRowIndex || (i + 2),
+            error: error instanceof Error ? error.message : 'Error desconocido'
           });
         }
       }
-      
+
       setProgress(100);
       setResult(result);
-      
+
       if (result.success > 0) {
         toast.success(`${result.success} clientes importados exitosamente`);
         onSuccess();
       }
-      
+
       if (result.errors.length > 0) {
         toast.warning(`${result.errors.length} registros con errores`);
       }
-      
+
     } catch (error) {
       console.error('Error importing:', error);
       toast.error(error instanceof Error ? error.message : 'Error al importar archivo');
@@ -355,7 +433,7 @@ export function ImportarClientesModal({
               <span>1. Descargar Plantilla</span>
             </h3>
             <p className="text-sm text-gray-600 mb-3">
-              Descarga la plantilla CSV con el formato correcto para importar/actualizar clientes. 
+              Descarga la plantilla CSV con el formato correcto para importar/actualizar clientes.
               <span className="block mt-1 font-medium">
                 💡 El sistema detecta automáticamente si debe crear o actualizar según el código de cliente.
               </span>
@@ -423,19 +501,19 @@ export function ImportarClientesModal({
                   <CheckCircle className="h-4 w-4" />
                   <span>{result.success} clientes procesados exitosamente</span>
                 </div>
-                
+
                 {result.created > 0 && (
                   <div className="flex items-center space-x-2 text-blue-600 text-sm">
                     <span className="ml-6">→ {result.created} clientes creados</span>
                   </div>
                 )}
-                
+
                 {result.updated > 0 && (
                   <div className="flex items-center space-x-2 text-purple-600 text-sm">
                     <span className="ml-6">→ {result.updated} clientes actualizados</span>
                   </div>
                 )}
-                
+
                 {result.errors.length > 0 && (
                   <div className="space-y-2">
                     <div className="flex items-center space-x-2 text-orange-600">
@@ -459,14 +537,14 @@ export function ImportarClientesModal({
 
           {/* Action Buttons */}
           <div className="flex justify-end space-x-2 pt-4">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={handleClose}
               disabled={importing}
             >
               {result ? 'Cerrar' : 'Cancelar'}
             </Button>
-            
+
             {selectedFile && !result && (
               <Button
                 onClick={importClientes}
@@ -480,7 +558,7 @@ export function ImportarClientesModal({
                 Importar Clientes
               </Button>
             )}
-            
+
             {result && (
               <Button onClick={resetModal} variant="outline">
                 Nueva Importación
