@@ -86,7 +86,7 @@ export function ImportarClientesModal({
       '# 3. codigoGestor: Opcional. Código del gestor/cobrador asignado. Si existe un cobrador con este código, se asignará automáticamente',
       '# 4. diaPago: 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 7=Domingo',
       '# 5. periodicidad: diario, semanal, quincenal, mensual',
-      '# 6. fechaVenta: formato YYYY-MM-DD',
+      '# 6. fechaVenta: formato AAAA-MM-DD o DD/MM/AAAA',
       '# 7. Los campos nombreCompleto, direccionCompleta, descripcionProducto, diaPago, montoPago y periodicidad son obligatorios',
       '# 8. PARA CREAR NUEVOS CLIENTES: Deje codigoCliente vacío o use uno nuevo',
       '# 9. PARA ACTUALIZAR CLIENTES EXISTENTES: Use el mismo codigoCliente del cliente que desea actualizar',
@@ -243,14 +243,32 @@ export function ImportarClientesModal({
       return `Fila ${rowNum}: 'Periodicidad' inválida (${row.periodicidad}). Valores permitidos: ${periodicidadValida.join(', ')}`;
     }
 
-    // Check for duplicate code in the file (if codigoCliente is provided)
-    if (row.codigoCliente) {
-      const code = row.codigoCliente.trim();
-      // Find earlier occurrence
-      const duplicateIndex = allRows.findIndex((r, i) => i < index && r.codigoCliente?.trim() === code);
-      if (duplicateIndex !== -1) {
-        const dupRowNum = allRows[duplicateIndex]._originalRowIndex || (duplicateIndex + 2);
-        return `Fila ${rowNum}: Código de cliente '${code}' duplicado en el archivo (repetido en fila ${dupRowNum}).`;
+    // Validar fechaVenta (si existe)
+    if (row.fechaVenta) {
+      const dateParts = row.fechaVenta.split(/[-/]/);
+      let isValidDate = false;
+
+      // Intentar validar formatos comunes
+      const date = new Date(row.fechaVenta);
+      if (!isNaN(date.getTime())) {
+        isValidDate = true;
+      } else if (dateParts.length === 3) {
+        // Intentar manejar DD/MM/YYYY o YYYY/MM/DD
+        const d1 = parseInt(dateParts[0]);
+        const d2 = parseInt(dateParts[1]);
+        const d3 = parseInt(dateParts[2]);
+
+        if (d1 > 31 && d3 <= 31) { // Asumir YYYY/MM/DD
+          const d = new Date(d1, d2 - 1, d3);
+          isValidDate = !isNaN(d.getTime());
+        } else if (d1 <= 31 && d3 > 31) { // Asumir DD/MM/YYYY
+          const d = new Date(d3, d2 - 1, d1);
+          isValidDate = !isNaN(d.getTime());
+        }
+      }
+
+      if (!isValidDate) {
+        return `Fila ${rowNum}: El formato de 'Fecha de Venta' (${row.fechaVenta}) es inválido. Use AAAA-MM-DD o DD/MM/AAAA.`;
       }
     }
 
@@ -293,6 +311,23 @@ export function ImportarClientesModal({
         }
 
         try {
+          // Normalizar fecha para enviar al servidor
+          let normalizedFecha = row.fechaVenta || new Date().toISOString().split('T')[0];
+          if (row.fechaVenta) {
+            const dateParts = row.fechaVenta.split(/[-/]/);
+            if (dateParts.length === 3) {
+              const d1 = parseInt(dateParts[0]);
+              const d2 = parseInt(dateParts[1]);
+              const d3 = parseInt(dateParts[2]);
+
+              if (d1 <= 31 && d3 > 31) { // Formato DD/MM/YYYY -> Convertir a YYYY-MM-DD
+                normalizedFecha = `${d3}-${String(d2).padStart(2, '0')}-${String(d1).padStart(2, '0')}`;
+              } else if (d1 > 31) { // Formato YYYY/MM/DD -> Convertir a YYYY-MM-DD
+                normalizedFecha = `${d1}-${String(d2).padStart(2, '0')}-${String(d3).padStart(2, '0')}`;
+              }
+            }
+          }
+
           const clienteData = {
             codigoCliente: row.codigoCliente?.trim() || null,
             nombreCompleto: row.nombreCompleto,
@@ -305,7 +340,7 @@ export function ImportarClientesModal({
             montoPago: parseFloat(row.montoPago),
             periodicidad: row.periodicidad,
             saldoActual: row.saldoActual ? parseFloat(row.saldoActual) : parseFloat(row.montoPago),
-            fechaVenta: row.fechaVenta || new Date().toISOString().split('T')[0],
+            fechaVenta: normalizedFecha,
             importe1: row.importe1 ? parseFloat(row.importe1) : null,
             importe2: row.importe2 ? parseFloat(row.importe2) : null,
             importe3: row.importe3 ? parseFloat(row.importe3) : null,
