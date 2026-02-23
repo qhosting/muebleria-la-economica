@@ -1,7 +1,5 @@
-
-'use client';
-
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,7 +7,32 @@ import { Label } from '@/components/ui/label';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { toast } from 'sonner';
-import { Upload, Download, FileText, Loader2, CheckCircle, AlertTriangle } from 'lucide-react';
+import {
+  Upload,
+  Download,
+  FileText,
+  Loader2,
+  CheckCircle,
+  AlertTriangle,
+  Trash2
+} from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface ImportarClientesModalProps {
   open: boolean;
@@ -30,12 +53,66 @@ export function ImportarClientesModal({
   onOpenChange,
   onSuccess
 }: ImportarClientesModalProps) {
+  const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [result, setResult] = useState<ImportResult | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+
+  // Estados para eliminación por cobrador
+  const [cobradores, setCobradores] = useState<any[]>([]);
+  const [selectedCobradorDelete, setSelectedCobradorDelete] = useState<string>("");
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isAdmin = (session?.user as any)?.role === 'admin';
+
+  useEffect(() => {
+    if (open && isAdmin) {
+      fetchCobradores();
+    }
+  }, [open, isAdmin]);
+
+  const fetchCobradores = async () => {
+    try {
+      const response = await fetch('/api/users');
+      if (response.ok) {
+        const users = await response.json();
+        const filteredCobradores = users.filter((u: any) => u.role === 'cobrador');
+        setCobradores(filteredCobradores);
+      }
+    } catch (error) {
+      console.error('Error al cargar cobradores:', error);
+    }
+  };
+
+  const handleDeleteClients = async () => {
+    if (!selectedCobradorDelete) return;
+
+    setIsDeleting(true);
+    try {
+      const response = await fetch(`/api/clientes/bulk-delete?cobradorId=${selectedCobradorDelete}`, {
+        method: 'DELETE',
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        toast.success(data.message || `Se eliminaron ${data.count} clientes.`);
+        onSuccess();
+        setSelectedCobradorDelete("");
+      } else {
+        throw new Error(data.error || 'Error al eliminar clientes');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudieron eliminar los clientes');
+    } finally {
+      setIsDeleting(false);
+      setIsDeleteDialogOpen(false);
+    }
+  };
 
   const downloadTemplate = () => {
     setLoading(true);
@@ -516,6 +593,52 @@ export function ImportarClientesModal({
             </div>
           </div>
 
+          {/* Delete by Cobrador Section (Only for Admin) */}
+          {isAdmin && (
+            <div className="border border-red-200 bg-red-50/30 rounded-lg p-4">
+              <h3 className="font-medium mb-2 flex items-center space-x-2 text-red-700">
+                <Trash2 className="h-4 w-4" />
+                <span>Zona de Peligro: Limpiar Cobrador</span>
+              </h3>
+              <p className="text-xs text-red-600 mb-3">
+                Esta acción eliminará <strong>TODOS</strong> los clientes, pagos y registros asociados al cobrador seleccionado.
+              </p>
+              <div className="flex items-end space-x-2">
+                <div className="flex-1 space-y-2">
+                  <Label htmlFor="cobrador-select" className="text-xs">Seleccionar Cobrador (Ruta)</Label>
+                  <Select
+                    value={selectedCobradorDelete}
+                    onValueChange={setSelectedCobradorDelete}
+                    disabled={isDeleting}
+                  >
+                    <SelectTrigger id="cobrador-select" className="bg-white">
+                      <SelectValue placeholder="Seleccione un cobrador..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cobradores.length === 0 ? (
+                        <SelectItem value="none" disabled>No hay cobradores disponibles</SelectItem>
+                      ) : (
+                        cobradores.map((c) => (
+                          <SelectItem key={c.id} value={c.id}>
+                            {c.name} {c.codigoGestor ? `(${c.codigoGestor})` : ''}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  disabled={!selectedCobradorDelete || isDeleting}
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                >
+                  {isDeleting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Limpiar Ruta"}
+                </Button>
+              </div>
+            </div>
+          )}
+
           {/* Import Progress */}
           {importing && (
             <div className="border rounded-lg p-4">
@@ -602,6 +725,27 @@ export function ImportarClientesModal({
           </div>
         </div>
       </DialogContent>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-red-600">¿Está absolutamente seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción <strong>no se puede deshacer</strong>. Se eliminarán permanentemente todos los clientes
+              asignados a este cobrador, junto con su historial de pagos y visitas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteClients}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              Sí, eliminar todo
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }
