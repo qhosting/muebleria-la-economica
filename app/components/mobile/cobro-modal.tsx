@@ -12,10 +12,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { 
-  X, 
-  DollarSign, 
-  CreditCard, 
+import {
+  X,
+  DollarSign,
+  CreditCard,
   Calculator,
   Save,
   Wifi,
@@ -86,14 +86,14 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   useEffect(() => {
     const montoNum = parseFloat(monto) || 0;
     const moratorioNum = parseFloat(montoMoratorio) || 0;
-    
+
     // Validar que el moratorio no sea mayor al monto total
     const moratorioFinal = Math.min(moratorioNum, montoNum);
     const montoParaSaldo = montoNum - moratorioFinal;
-    
+
     if (montoNum > 0) {
       const nuevoSaldo = Math.max(0, cliente.saldoPendiente - montoParaSaldo);
-      
+
       setCalculatedValues({
         saldoAnterior: cliente.saldoPendiente,
         saldoNuevo: nuevoSaldo,
@@ -124,7 +124,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         id: userId
       },
       pago: {
-        monto: parseFloat(monto),
+        monto: parseFloat(monto) || 0,
+        montoMoratorio: calculatedValues.montoMoratorio,
+        montoNeto: calculatedValues.montoParaSaldo,
         tipoPago: tipoPago,
         metodoPago: metodoPago,
         concepto: concepto,
@@ -144,7 +146,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!monto || parseFloat(monto) <= 0) {
       toast.error('Por favor ingrese un monto válido');
       return;
@@ -207,10 +209,10 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
           }
         }
 
-        const mensaje = pagoMoratorio 
+        const mensaje = pagoMoratorio
           ? `Pago registrado exitosamente: ${formatCurrency(calculatedValues.montoParaSaldo)} al saldo + ${formatCurrency(calculatedValues.montoMoratorio)} moratorio`
           : 'Pago registrado exitosamente';
-        
+
         toast.success(mensaje);
 
         // Imprimir ticket si está habilitado y la impresora está conectada
@@ -223,21 +225,21 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             toast.error('El pago se registró correctamente, pero hubo un error al imprimir el ticket');
           }
         }
-        
+
       } else {
         // Si está offline, guardar localmente
         console.log('Guardando pago regular offline:', pagoRegular);
         await syncService.addPagoOffline(pagoRegular);
-        
+
         if (pagoMoratorio) {
           console.log('Guardando pago moratorio offline:', pagoMoratorio);
           await syncService.addPagoOffline(pagoMoratorio);
         }
-        
-        const mensaje = pagoMoratorio 
+
+        const mensaje = pagoMoratorio
           ? `Pagos guardados offline: Regular (${formatCurrency(calculatedValues.montoParaSaldo)}) + Moratorio (${formatCurrency(calculatedValues.montoMoratorio)})`
           : 'Pago guardado offline';
-        
+
         toast.success(mensaje, {
           description: 'Se sincronizará cuando tengas conexión'
         });
@@ -274,7 +276,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   const getQuickAmounts = () => {
     const acordado = cliente.montoAcordado;
     const pendiente = cliente.saldoPendiente;
-    
+
     const amounts = [
       acordado,
       acordado * 0.5, // Mitad del pago acordado
@@ -295,7 +297,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             <DialogTitle className="text-lg">
               Registrar Cobro
             </DialogTitle>
-            
+
             <div className="flex items-center gap-2">
               <Badge variant={isOnline ? 'default' : 'secondary'} className="text-xs">
                 {isOnline ? (
@@ -468,7 +470,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
                     {formatCurrency(parseFloat(monto) || 0)}
                   </span>
                 </div>
-                
+
                 {calculatedValues.montoMoratorio > 0 && (
                   <>
                     <div className="flex justify-between text-sm text-orange-600">
@@ -485,7 +487,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
                     </div>
                   </>
                 )}
-                
+
                 {calculatedValues.montoMoratorio === 0 && (
                   <div className="flex justify-between text-sm">
                     <span>Aplicado al saldo:</span>
@@ -494,23 +496,22 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
                     </span>
                   </div>
                 )}
-                
+
                 <div className="flex justify-between text-sm pt-2 border-t">
                   <span>Nuevo Saldo:</span>
-                  <span className={`font-semibold ${
-                    calculatedValues.saldoNuevo > 0 ? 'text-red-600' : 'text-green-600'
-                  }`}>
+                  <span className={`font-semibold ${calculatedValues.saldoNuevo > 0 ? 'text-red-600' : 'text-green-600'
+                    }`}>
                     {formatCurrency(calculatedValues.saldoNuevo)}
                   </span>
                 </div>
-                
+
                 {calculatedValues.saldoNuevo === 0 && (
                   <div className="flex items-center gap-1 text-green-600 text-sm mt-2">
                     <CheckCircle className="w-4 h-4" />
                     ¡Cliente quedará al día!
                   </div>
                 )}
-                
+
                 {calculatedValues.montoMoratorio > 0 && (
                   <div className="p-2 bg-orange-50 rounded text-xs text-orange-700 mt-2">
                     <AlertTriangle className="w-3 h-3 inline mr-1" />
@@ -588,7 +589,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             >
               Cancelar
             </Button>
-            
+
             <Button
               type="submit"
               disabled={loading || !monto || parseFloat(monto) <= 0}

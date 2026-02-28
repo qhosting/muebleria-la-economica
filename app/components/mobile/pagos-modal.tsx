@@ -13,8 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { 
-  Receipt, 
+import {
+  Receipt,
   Calendar,
   DollarSign,
   User,
@@ -63,7 +63,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
   const [selectedPago, setSelectedPago] = useState<Pago | null>(null);
   const [printingRecibo, setPrintingRecibo] = useState<string | null>(null);
   const [showPrinterConfig, setShowPrinterConfig] = useState(false);
-  
+
   const userId = (session?.user as any)?.id;
   const userRole = (session?.user as any)?.role;
   const { isConnected: isPrinterConnected, printTicket } = useBluetoothPrinter();
@@ -87,13 +87,13 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
     setLoading(true);
     try {
       const response = await fetch(`/api/pagos/cliente/${cliente.id}?limit=50`);
-      
+
       if (!response.ok) {
         throw new Error('Error al obtener historial de pagos');
       }
 
       const pagosData: Pago[] = await response.json();
-      
+
       // Serializar los datos de Decimal a number si es necesario
       const pagosSerializados = pagosData.map(pago => ({
         ...pago,
@@ -101,9 +101,9 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
         saldoAnterior: typeof pago.saldoAnterior === 'string' ? parseFloat(pago.saldoAnterior) : pago.saldoAnterior,
         saldoNuevo: typeof pago.saldoNuevo === 'string' ? parseFloat(pago.saldoNuevo) : pago.saldoNuevo,
       }));
-      
+
       setPagos(pagosSerializados);
-      
+
     } catch (error) {
       console.error('Error loading pagos:', error);
       toast.error('Error al cargar historial de pagos');
@@ -117,7 +117,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
 
     // Filtro por búsqueda (concepto, cobrador)
     if (searchTerm) {
-      filtered = filtered.filter(pago => 
+      filtered = filtered.filter(pago =>
         pago.concepto?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         pago.cobrador?.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         pago.numeroRecibo?.toLowerCase().includes(searchTerm.toLowerCase())
@@ -179,7 +179,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
     }
 
     setPrintingRecibo(pago.id);
-    
+
     try {
       // Crear datos del ticket para reimpresión
       const ticketData = createReimpresionTicketData(pago);
@@ -193,7 +193,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
           // Aquí se podría actualizar el estado en el servidor
           // pero para reimpresiones no es crítico
         }
-        
+
         toast.success('Ticket reimpreso exitosamente', {
           description: `Recibo #${ticketData.numeroRecibo} - ${formatCurrency(pago.monto)}`
         });
@@ -211,11 +211,14 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
     const variants: { [key: string]: any } = {
       regular: { variant: 'default', label: 'Regular' },
       moratorio: { variant: 'secondary', label: 'Moratorio' },
+      mora: { variant: 'secondary', label: 'Moratorio (Mora)' },
       adelanto: { variant: 'outline', label: 'Adelanto' },
+      abono: { variant: 'outline', label: 'Abono' },
+      liquidacion: { variant: 'success', label: 'Liquidación' },
     };
-    
+
     const config = variants[tipoPago] || { variant: 'secondary', label: tipoPago };
-    
+
     return (
       <Badge variant={config.variant} className="text-xs">
         {config.label}
@@ -257,7 +260,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                 <Receipt className="w-5 h-5 text-blue-500" />
                 Historial de Pagos
               </DialogTitle>
-              
+
               <div className="flex items-center gap-2">
                 <Badge variant={isOnline ? 'default' : 'secondary'} className="text-xs">
                   {isOnline ? (
@@ -266,12 +269,12 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                     <><WifiOff className="w-3 h-3 mr-1" />Offline</>
                   )}
                 </Badge>
-                
+
                 <Badge variant={isPrinterConnected ? 'default' : 'secondary'} className="text-xs">
                   <Printer className="w-3 h-3 mr-1" />
                   {isPrinterConnected ? 'Imp. OK' : 'Sin Imp.'}
                 </Badge>
-                
+
                 <Button
                   variant="ghost"
                   size="sm"
@@ -299,7 +302,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                     <MapPin className="w-3 h-3" />
                     {cliente.direccion}
                   </div>
-                  
+
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
                       <span className="text-muted-foreground">Saldo Actual: </span>
@@ -327,7 +330,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                     <div className="text-xs text-muted-foreground">Este mes ({pagosMes.length})</div>
                   </CardContent>
                 </Card>
-                
+
                 <Card className="text-center">
                   <CardContent className="p-3">
                     <div className="text-sm font-semibold text-blue-600">
@@ -451,17 +454,17 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                                   <CheckCircle className="w-3 h-3 text-green-500" />
                                 )}
                               </div>
-                              
+
                               <p className="text-xs text-muted-foreground line-clamp-2">
                                 {pago.concepto || 'Pago de cuota'}
                               </p>
-                              
+
                               <div className="flex items-center gap-4 mt-2 text-xs text-muted-foreground">
                                 <span className="flex items-center gap-1">
                                   <Calendar className="w-3 h-3" />
                                   {format(new Date(pago.fechaPago), 'dd/MM/yyyy', { locale: es })}
                                 </span>
-                                
+
                                 <span className="flex items-center gap-1">
                                   <User className="w-3 h-3" />
                                   {pago.cobrador?.name || 'N/A'}
@@ -529,7 +532,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                                   </span>
                                 </div>
                               </div>
-                              
+
                               <div>
                                 <span className="text-muted-foreground block">ID de transacción:</span>
                                 <span className="font-mono text-xs">{pago.id}</span>
@@ -564,7 +567,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
               >
                 Cerrar
               </Button>
-              
+
               {isOnline && (
                 <Button
                   variant="outline"

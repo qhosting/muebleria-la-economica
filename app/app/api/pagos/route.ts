@@ -9,7 +9,7 @@ import { prisma } from '@/lib/db';
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     const tipoPago = searchParams.get('tipoPago');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '50');
-    
+
     const skip = (page - 1) * limit;
     const where: any = {};
 
@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -161,8 +161,11 @@ export async function POST(request: NextRequest) {
     const saldoAnterior = parseFloat(cliente.saldoActual.toString());
     let saldoNuevo = saldoAnterior;
 
-    // Solo los pagos regulares afectan el saldo principal
-    if (tipoPago === 'regular') {
+    // Los pagos regulares, abonos y liquidaciones afectan el saldo principal
+    // Los pagos de mora/moratorios NO afectan el saldo de la deuda principal
+    const afectaSaldo = ['regular', 'abono', 'liquidacion'].includes(tipoPago);
+
+    if (afectaSaldo) {
       saldoNuevo = Math.max(0, saldoAnterior - montoNumerico);
     }
 
@@ -197,8 +200,8 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Actualizar saldo del cliente si es pago regular
-      if (tipoPago === 'regular') {
+      // Actualizar saldo del cliente si el tipo de pago afecta el saldo
+      if (afectaSaldo) {
         await prisma.cliente.update({
           where: { id: clienteId },
           data: { saldoActual: saldoNuevo },

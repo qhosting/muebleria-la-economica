@@ -78,6 +78,8 @@ export interface TicketData {
   };
   pago: {
     monto: number;
+    montoMoratorio?: number; // Nuevo: Desglose de moratorio
+    montoNeto?: number;     // Nuevo: Monto aplicado al saldo
     tipoPago: string;
     metodoPago: string;
     concepto?: string;
@@ -391,14 +393,16 @@ class BluetoothPrinterService {
   }
 
   private centerText(text: string, width: number = 32): string {
-    if (text.length >= width) return text;
-    const padding = Math.floor((width - text.length) / 2);
-    return ' '.repeat(padding) + text;
+    const safeText = text || '';
+    if (safeText.length >= width) return safeText.substring(0, width);
+    const padding = Math.floor((width - safeText.length) / 2);
+    return ' '.repeat(padding) + safeText;
   }
 
   private rightAlignText(text: string, width: number = 32): string {
-    if (text.length >= width) return text;
-    return ' '.repeat(width - text.length) + text;
+    const safeText = text || '';
+    if (safeText.length >= width) return safeText.substring(0, width);
+    return ' '.repeat(width - safeText.length) + safeText;
   }
 
   private createDivider(char: string = '-', length: number = 32): string {
@@ -485,7 +489,16 @@ class BluetoothPrinterService {
       ticket += this.COMMANDS.BOLD_OFF;
 
       ticket += 'Saldo Anterior:' + this.rightAlignText(this.formatCurrency(ticketData.saldos.anterior)) + this.LF;
-      ticket += 'Pago Recibido:' + this.rightAlignText(this.formatCurrency(ticketData.pago.monto)) + this.LF;
+
+      // Si hay moratorio, mostrar el desglose
+      if (ticketData.pago.montoMoratorio && ticketData.pago.montoMoratorio > 0) {
+        ticket += 'Moratorio:' + this.rightAlignText(this.formatCurrency(ticketData.pago.montoMoratorio)) + this.LF;
+        const montoNeto = ticketData.pago.montoNeto || (ticketData.pago.monto - (ticketData.pago.montoMoratorio || 0));
+        ticket += 'Aplicado Saldo:' + this.rightAlignText(this.formatCurrency(montoNeto)) + this.LF;
+        ticket += '-----------' + this.LF;
+      }
+
+      ticket += 'Total Recibido:' + this.rightAlignText(this.formatCurrency(ticketData.pago.monto)) + this.LF;
       ticket += this.createDivider() + this.LF;
       ticket += this.COMMANDS.BOLD_ON;
       ticket += 'Saldo Actual:' + this.rightAlignText(this.formatCurrency(ticketData.saldos.nuevo)) + this.LF;
@@ -496,7 +509,7 @@ class BluetoothPrinterService {
         ticket += this.LF;
         ticket += this.COMMANDS.CENTER;
         ticket += this.COMMANDS.BOLD_ON;
-        ticket += '*** CLIENTE AL DIA ***' + this.LF;
+        ticket += '*** CUENTA LIQUIDADA ***' + this.LF;
         ticket += this.COMMANDS.BOLD_OFF;
       }
 
