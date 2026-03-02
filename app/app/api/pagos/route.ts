@@ -136,7 +136,7 @@ export async function POST(request: NextRequest) {
 
     console.log('Recibiendo pago:', { clienteId, monto, tipoPago, concepto, metodoPago, numeroRecibo, localId });
 
-    if (!clienteId || !monto) {
+    if (!clienteId || monto === undefined || monto === null) {
       return NextResponse.json(
         { error: 'Cliente y monto son requeridos' },
         { status: 400 }

@@ -160,7 +160,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     setLoading(true);
 
     try {
-      const pagoRegular = {
+      const crearPagoRegular = calculatedValues.montoParaSaldo > 0 || calculatedValues.montoMoratorio === 0;
+
+      const pagoRegular = crearPagoRegular ? {
         id: '', // Se generará en el servidor
         clienteId: cliente.id,
         cobradorId: userId,
@@ -170,7 +172,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         fechaPago: new Date().toISOString(),
         metodoPago,
         numeroRecibo: numeroRecibo || undefined
-      };
+      } : null;
 
       const pagoMoratorio = calculatedValues.montoMoratorio > 0 ? {
         id: '', // Se generará en el servidor
@@ -185,15 +187,17 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
       } : null;
 
       if (isOnline) {
-        // Registrar pago regular
-        const responsePrincipal = await fetch('/api/pagos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pagoRegular)
-        });
+        // Registrar pago regular si existe
+        if (pagoRegular) {
+          const responsePrincipal = await fetch('/api/pagos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(pagoRegular)
+          });
 
-        if (!responsePrincipal.ok) {
-          throw new Error('Error al procesar el pago regular');
+          if (!responsePrincipal.ok) {
+            throw new Error('Error al procesar el pago regular');
+          }
         }
 
         // Registrar pago moratorio si existe
@@ -218,7 +222,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         // Imprimir ticket si está habilitado y la impresora está conectada
         if (imprimirTicket && isPrinterConnected) {
           try {
-            const ticketData = createTicketData(pagoRegular.fechaPago, pagoRegular.numeroRecibo || '');
+            const fechaTicket = pagoRegular ? pagoRegular.fechaPago : (pagoMoratorio ? pagoMoratorio.fechaPago : new Date().toISOString());
+            const reciboTicket = (pagoRegular ? pagoRegular.numeroRecibo : (pagoMoratorio ? pagoMoratorio.numeroRecibo : '')) || '';
+            const ticketData = createTicketData(fechaTicket, reciboTicket);
             await printTicket(ticketData);
           } catch (error) {
             console.error('Error imprimiendo ticket:', error);
@@ -228,8 +234,10 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
 
       } else {
         // Si está offline, guardar localmente
-        console.log('Guardando pago regular offline:', pagoRegular);
-        await syncService.addPagoOffline(pagoRegular);
+        if (pagoRegular) {
+          console.log('Guardando pago regular offline:', pagoRegular);
+          await syncService.addPagoOffline(pagoRegular);
+        }
 
         if (pagoMoratorio) {
           console.log('Guardando pago moratorio offline:', pagoMoratorio);
@@ -249,7 +257,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         // Imprimir ticket si está habilitado y la impresora está conectada (también offline)
         if (imprimirTicket && isPrinterConnected) {
           try {
-            const ticketData = createTicketData(pagoRegular.fechaPago, pagoRegular.numeroRecibo || '');
+            const fechaTicket = pagoRegular ? pagoRegular.fechaPago : (pagoMoratorio ? pagoMoratorio.fechaPago : new Date().toISOString());
+            const reciboTicket = (pagoRegular ? pagoRegular.numeroRecibo : (pagoMoratorio ? pagoMoratorio.numeroRecibo : '')) || '';
+            const ticketData = createTicketData(fechaTicket, reciboTicket);
             await printTicket(ticketData);
           } catch (error) {
             console.error('Error imprimiendo ticket:', error);
