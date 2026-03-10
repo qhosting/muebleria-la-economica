@@ -47,7 +47,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   const { data: session } = useSession();
   const [monto, setMonto] = useState('');
   const [montoMoratorio, setMontoMoratorio] = useState('');
-  const [tipoPago, setTipoPago] = useState<'regular' | 'abono' | 'liquidacion' | 'mora'>('regular');
+  const [tipoPago, setTipoPago] = useState<'regular' | 'abono' | 'liquidacion' | 'mora' | 'cobro_mora'>('regular');
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia' | 'cheque'>('efectivo');
   const [concepto, setConcepto] = useState('');
   const [numeroRecibo, setNumeroRecibo] = useState('');
@@ -82,12 +82,24 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     }
   }, [isOpen, cliente]);
 
-  // Calcular nuevo saldo cuando cambia el monto o moratorio
+  // Calcular nuevo saldo cuando cambia el monto, moratorio o tipo
   useEffect(() => {
     const montoNum = parseFloat(monto) || 0;
     const moratorioNum = parseFloat(montoMoratorio) || 0;
 
-    // Validar que el moratorio no sea mayor al monto total
+    // Si es cobro de mora (aumenta saldo), la lógica es diferente
+    if (tipoPago === 'cobro_mora') {
+      const nuevoSaldo = cliente.saldoPendiente + montoNum;
+      setCalculatedValues({
+        saldoAnterior: cliente.saldoPendiente,
+        saldoNuevo: nuevoSaldo,
+        montoParaSaldo: montoNum,
+        montoMoratorio: 0
+      });
+      return;
+    }
+
+    // Lógica para pagos normales (reducen saldo)
     const moratorioFinal = Math.min(moratorioNum, montoNum);
     const montoParaSaldo = montoNum - moratorioFinal;
 
@@ -108,7 +120,16 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         montoMoratorio: 0
       });
     }
-  }, [monto, montoMoratorio, cliente.saldoPendiente]);
+  }, [monto, montoMoratorio, cliente.saldoPendiente, tipoPago]);
+
+  // Cambiar concepto por defecto según tipo de pago
+  useEffect(() => {
+    if (tipoPago === 'cobro_mora') {
+      setConcepto('Recargo por Mora');
+    } else if (concepto === 'Recargo por Mora') {
+      setConcepto('Pago de cuota');
+    }
+  }, [tipoPago]);
 
   const createTicketData = (fechaPago: string, numeroReciboFinal: string): TicketData => {
     return {
@@ -414,7 +435,8 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
               <SelectContent>
                 <SelectItem value="regular">Pago Regular</SelectItem>
                 <SelectItem value="abono">Abono</SelectItem>
-                <SelectItem value="mora">Pago de Mora</SelectItem>
+                <SelectItem value="mora">Pago de Mora (Sin afectar saldo)</SelectItem>
+                <SelectItem value="cobro_mora">Cobro de Mora (Aumenta Saldo)</SelectItem>
                 <SelectItem value="liquidacion">Liquidación</SelectItem>
               </SelectContent>
             </Select>

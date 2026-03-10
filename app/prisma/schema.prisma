@@ -33,6 +33,7 @@ enum TipoPago {
   abono
   liquidacion
   mora
+  cobro_mora
 }
 
 enum MotivoMotarario {

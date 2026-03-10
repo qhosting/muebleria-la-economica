@@ -161,12 +161,17 @@ export async function POST(request: NextRequest) {
     const saldoAnterior = parseFloat(cliente.saldoActual.toString());
     let saldoNuevo = saldoAnterior;
 
-    // Los pagos regulares, abonos y liquidaciones afectan el saldo principal
-    // Los pagos de mora/moratorios NO afectan el saldo de la deuda principal
-    const afectaSaldo = ['regular', 'abono', 'liquidacion'].includes(tipoPago);
+    // Calcular nuevo saldo
+    // regular, abono, liquidacion -> REDUCEN el saldo (son pagos a la deuda)
+    // cobro_mora -> AUMENTA el saldo (es un recargo que se suma a la deuda)
+    const reduceSaldo = ['regular', 'abono', 'liquidacion'].includes(tipoPago);
+    const aumentaSaldo = tipoPago === 'cobro_mora';
+    const afectaSaldo = reduceSaldo || aumentaSaldo;
 
-    if (afectaSaldo) {
+    if (reduceSaldo) {
       saldoNuevo = Math.max(0, saldoAnterior - montoNumerico);
+    } else if (aumentaSaldo) {
+      saldoNuevo = saldoAnterior + montoNumerico;
     }
 
     // Crear el pago en una transacción

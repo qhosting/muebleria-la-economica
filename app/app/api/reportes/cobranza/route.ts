@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
 
     // Definir qué tipos son de cuenta y cuáles son moras
     const tiposCuenta = ['regular', 'abono', 'liquidacion'];
-    const tiposMora = ['moratorio', 'mora'];
+    const tiposMora = ['moratorio', 'mora', 'cobro_mora'];
 
     // Organizar datos por cobrador
     const reportePorCobrador = cobradores.map((cobrador: any) => {
@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       SELECT 
         DATE("fechaPago") as fecha,
         SUM(CASE WHEN "tipoPago" IN ('regular', 'abono', 'liquidacion') THEN "monto" ELSE 0 END) as pagos_regulares,
-        SUM(CASE WHEN "tipoPago" IN ('moratorio', 'mora') THEN "monto" ELSE 0 END) as pagos_moratorios,
+        SUM(CASE WHEN "tipoPago" IN ('moratorio', 'mora', 'cobro_mora') THEN "monto" ELSE 0 END) as pagos_moratorios,
         COUNT(*) as total_pagos
       FROM "pagos" 
       WHERE "fechaPago" >= ${new Date(fechaDesde)} 

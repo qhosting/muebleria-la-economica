@@ -212,6 +212,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
       regular: { variant: 'default', label: 'Regular' },
       moratorio: { variant: 'secondary', label: 'Moratorio' },
       mora: { variant: 'secondary', label: 'Moratorio (Mora)' },
+      cobro_mora: { variant: 'destructive', label: 'Mora (+ Saldo)' },
       adelanto: { variant: 'outline', label: 'Adelanto' },
       abono: { variant: 'outline', label: 'Abono' },
       liquidacion: { variant: 'success', label: 'Liquidación' },
