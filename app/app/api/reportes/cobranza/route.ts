@@ -5,11 +5,12 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
+import { Prisma } from '@prisma/client';
 
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    
+
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
@@ -37,7 +38,7 @@ export async function GET(request: NextRequest) {
       where.cobradorId = cobradorId;
     }
 
-    // Reporte general de cobranza
+    // Reporte general de cobranza agrupado
     const reporteGeneral = await prisma.pago.groupBy({
       by: ['cobradorId', 'tipoPago'],
       where,
@@ -49,16 +50,32 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Listado detallado de pagos para "Evolución Diaria"
+    const pagosDetallados = await prisma.pago.findMany({
+      where,
+      include: {
+        cliente: {
+          select: {
+            nombreCompleto: true,
+            codigoCliente: true,
+          }
+        },
+        cobrador: {
+          select: {
+            name: true,
+          }
+        }
+      },
+      orderBy: {
+        fechaPago: 'desc',
+      },
+    });
+
     // Obtener información de cobradores
     let cobradoresQuery: any = {
       role: 'cobrador',
       isActive: true,
     };
-
-    // Si se especifica un cobrador, solo obtener ese
-    if (cobradorId && cobradorId !== 'all') {
-      cobradoresQuery.id = cobradorId;
-    }
 
     const cobradores = await prisma.user.findMany({
       where: cobradoresQuery,
@@ -68,66 +85,67 @@ export async function GET(request: NextRequest) {
       },
     });
 
+    // Definir qué tipos son de cuenta y cuáles son moras
+    const tiposCuenta = ['regular', 'abono', 'liquidacion'];
+    const tiposMora = ['moratorio', 'mora'];
+
     // Organizar datos por cobrador
     const reportePorCobrador = cobradores.map((cobrador: any) => {
-      const pagosRegulares = reporteGeneral.find(
-        (r: any) => r.cobradorId === cobrador.id && r.tipoPago === 'regular'
-      ) || { _sum: { monto: 0 }, _count: { _all: 0 } };
+      const pagosReg = reporteGeneral.filter(
+        (r: any) => r.cobradorId === cobrador.id && tiposCuenta.includes(r.tipoPago)
+      );
 
-      const pagosMoratorios = reporteGeneral.find(
-        (r: any) => r.cobradorId === cobrador.id && r.tipoPago === 'moratorio'
-      ) || { _sum: { monto: 0 }, _count: { _all: 0 } };
+      const pagosMor = reporteGeneral.filter(
+        (r: any) => r.cobradorId === cobrador.id && tiposMora.includes(r.tipoPago)
+      );
 
-      const totalCobrado = Number(pagosRegulares._sum.monto || 0) + Number(pagosMoratorios._sum.monto || 0);
-      const cantidadPagos = pagosRegulares._count._all + pagosMoratorios._count._all;
+      const totalReg = pagosReg.reduce((sum, r) => sum + Number(r._sum.monto || 0), 0);
+      const cantReg = pagosReg.reduce((sum, r) => sum + r._count._all, 0);
+
+      const totalMor = pagosMor.reduce((sum, r) => sum + Number(r._sum.monto || 0), 0);
+      const cantMor = pagosMor.reduce((sum, r) => sum + r._count._all, 0);
 
       return {
         cobrador: cobrador.name,
         cobradorId: cobrador.id,
-        totalCobrado,
-        pagosRegulares: Number(pagosRegulares._sum.monto || 0),
-        pagosMoratorios: Number(pagosMoratorios._sum.monto || 0),
-        cantidadPagos,
+        totalCobrado: totalReg + totalMor,
+        pagosRegulares: totalReg,
+        pagosMoratorios: totalMor,
+        cantidadPagos: cantReg + cantMor,
       };
     }).filter((cobrador: any) => cobrador.totalCobrado > 0 || cobrador.cantidadPagos > 0);
 
-    // Reporte por día
-    let reportePorDia;
-    if (cobradorId && cobradorId !== 'all') {
-      reportePorDia = await prisma.$queryRaw`
-        SELECT 
-          DATE("fechaPago") as fecha,
-          SUM(CASE WHEN "tipoPago" = 'regular' THEN "monto" ELSE 0 END) as pagos_regulares,
-          SUM(CASE WHEN "tipoPago" = 'moratorio' THEN "monto" ELSE 0 END) as pagos_moratorios,
-          COUNT(*) as total_pagos
-        FROM "pagos" 
-        WHERE "fechaPago" >= ${new Date(fechaDesde)} 
-          AND "fechaPago" <= ${new Date(fechaHasta)}
-          AND "cobradorId" = ${cobradorId}
-        GROUP BY DATE("fechaPago")
-        ORDER BY fecha DESC
-      `;
-    } else {
-      reportePorDia = await prisma.$queryRaw`
-        SELECT 
-          DATE("fechaPago") as fecha,
-          SUM(CASE WHEN "tipoPago" = 'regular' THEN "monto" ELSE 0 END) as pagos_regulares,
-          SUM(CASE WHEN "tipoPago" = 'moratorio' THEN "monto" ELSE 0 END) as pagos_moratorios,
-          COUNT(*) as total_pagos
-        FROM "pagos" 
-        WHERE "fechaPago" >= ${new Date(fechaDesde)} 
-          AND "fechaPago" <= ${new Date(fechaHasta)}
-        GROUP BY DATE("fechaPago")
-        ORDER BY fecha DESC
-      `;
-    }
+    // Reporte por día (agregado)
+    const reportePorDia = await prisma.$queryRaw`
+      SELECT 
+        DATE("fechaPago") as fecha,
+        SUM(CASE WHEN "tipoPago" IN ('regular', 'abono', 'liquidacion') THEN "monto" ELSE 0 END) as pagos_regulares,
+        SUM(CASE WHEN "tipoPago" IN ('moratorio', 'mora') THEN "monto" ELSE 0 END) as pagos_moratorios,
+        COUNT(*) as total_pagos
+      FROM "pagos" 
+      WHERE "fechaPago" >= ${new Date(fechaDesde)} 
+        AND "fechaPago" <= ${new Date(fechaHasta)}
+        ${cobradorId && cobradorId !== 'all' ? Prisma.sql`AND "cobradorId" = ${cobradorId}` : Prisma.sql``}
+      GROUP BY DATE("fechaPago")
+      ORDER BY fecha DESC
+    `;
 
     const totales = {
-      totalCobrado: reportePorCobrador.reduce((sum: any, r: any) => sum + r.totalCobrado, 0),
-      pagosRegulares: reportePorCobrador.reduce((sum: any, r: any) => sum + r.pagosRegulares, 0),
-      pagosMoratorios: reportePorCobrador.reduce((sum: any, r: any) => sum + r.pagosMoratorios, 0),
+      totalCobrado: reportePorCobrador.reduce((sum: any, r: any) => sum + r.pagosRegulares, 0),
+      totalMora: reportePorCobrador.reduce((sum: any, r: any) => sum + r.pagosMoratorios, 0),
+      totalGeneral: reportePorCobrador.reduce((sum: any, r: any) => sum + r.totalCobrado, 0),
       totalPagos: reportePorCobrador.reduce((sum: any, r: any) => sum + r.cantidadPagos, 0),
     };
+
+    // Serializar pagos detallados
+    const pagosFormatted = pagosDetallados.map(p => ({
+      fecha: p.fechaPago,
+      cliente: p.cliente.nombreCompleto,
+      concepto: p.concepto,
+      tipo: p.tipoPago,
+      monto: Number(p.monto),
+      cobrador: p.cobrador.name
+    }));
 
     // Convertir BigInt a Number para serialización JSON
     const reportePorDiaFormatted = (reportePorDia as any[]).map((row: any) => ({
@@ -141,6 +159,7 @@ export async function GET(request: NextRequest) {
       totales,
       reportePorCobrador,
       reportePorDia: reportePorDiaFormatted,
+      pagos: pagosFormatted,
       periodo: {
         desde: fechaDesde,
         hasta: fechaHasta,
