@@ -24,7 +24,7 @@ export interface OfflinePago {
   id: string;
   clienteId: string;
   monto: number;
-  tipoPago: 'regular' | 'abono' | 'liquidacion' | 'mora';
+  tipoPago: 'regular' | 'abono' | 'liquidacion' | 'mora' | 'cobro_mora';
   concepto: string;
   fechaPago: string;
   cobradorId: string;
