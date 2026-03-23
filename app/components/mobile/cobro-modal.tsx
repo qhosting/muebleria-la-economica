@@ -366,70 +366,19 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             </CardContent>
           </Card>
 
-          {/* Botones de monto rápido */}
-          <div className="space-y-2">
-            <Label className="text-sm">Montos Rápidos</Label>
-            <div className="grid grid-cols-2 gap-2">
-              {getQuickAmounts().map((amount, index) => (
-                <Button
-                  key={index}
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleQuickAmount(amount)}
-                  className="text-xs h-8"
-                >
-                  {formatCurrency(amount)}
-                </Button>
-              ))}
-            </div>
-          </div>
-
-          {/* Monto personalizado */}
-          <div className="space-y-2">
-            <Label htmlFor="monto">Monto a Cobrar *</Label>
-            <div className="relative">
-              <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input
-                id="monto"
-                type="number"
-                step="0.01"
-                min="0"
-                value={monto}
-                onChange={(e) => setMonto(e.target.value)}
-                placeholder="0.00"
-                className="pl-9"
-                required
-              />
-            </div>
-          </div>
-
-          {/* Monto Moratorio */}
-          <div className="space-y-2">
-            <Label htmlFor="montoMoratorio">Monto Moratorio (Opcional)</Label>
-            <div className="relative">
-              <AlertTriangle className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-500" />
-              <Input
-                id="montoMoratorio"
-                type="number"
-                step="0.01"
-                min="0"
-                max={monto || "0"}
-                value={montoMoratorio}
-                onChange={(e) => setMontoMoratorio(e.target.value)}
-                placeholder="0.00"
-                className="pl-9"
-              />
-            </div>
-            <div className="text-xs text-muted-foreground">
-              El monto moratorio se registra por separado y NO se aplica al saldo pendiente
-            </div>
-          </div>
-
           {/* Tipo de pago */}
           <div className="space-y-2">
             <Label htmlFor="tipoPago">Tipo de Pago</Label>
-            <Select value={tipoPago} onValueChange={(value: any) => setTipoPago(value)}>
+            <Select 
+              value={tipoPago} 
+              onValueChange={(value: any) => {
+                setTipoPago(value);
+                if (value === 'mora') {
+                  setMonto('0');
+                  setMontoMoratorio('');
+                }
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -442,6 +391,72 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
               </SelectContent>
             </Select>
           </div>
+
+          {/* Botones de monto rápido - Solo se muestran si NO es Pago de Mora */}
+          {tipoPago !== 'mora' && (
+            <div className="space-y-2">
+              <Label className="text-sm">Montos Rápidos</Label>
+              <div className="grid grid-cols-2 gap-2">
+                {getQuickAmounts().map((amount, index) => (
+                  <Button
+                    key={index}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuickAmount(amount)}
+                    className="text-xs h-8"
+                  >
+                    {formatCurrency(amount)}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Monto personalizado - Solo se muestra si NO es Pago de Mora */}
+          {tipoPago !== 'mora' && (
+            <div className="space-y-2">
+              <Label htmlFor="monto">Monto a Cobrar *</Label>
+              <div className="relative">
+                <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  id="monto"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={monto}
+                  onChange={(e) => setMonto(e.target.value)}
+                  placeholder="0.00"
+                  className="pl-9"
+                  required
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Monto Moratorio - Solo se muestra para regular o abono */}
+          {(tipoPago === 'regular' || tipoPago === 'abono') && (
+            <div className="space-y-2">
+              <Label htmlFor="montoMoratorio">Monto Moratorio (Opcional)</Label>
+              <div className="relative">
+                <AlertTriangle className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-500" />
+                <Input
+                  id="montoMoratorio"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max={monto || "0"}
+                  value={montoMoratorio}
+                  onChange={(e) => setMontoMoratorio(e.target.value)}
+                  placeholder="0.00"
+                  className="pl-9"
+                />
+              </div>
+              <div className="text-xs text-muted-foreground">
+                El monto moratorio se registra por separado y NO se aplica al saldo pendiente
+              </div>
+            </div>
+          )}
 
           {/* Método de pago */}
           <div className="space-y-2">
