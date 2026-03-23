@@ -99,11 +99,22 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
       return;
     }
 
+    // Si es pago de mora (no afecta saldo), el monto total viene de montoMoratorio
+    if (tipoPago === 'mora') {
+      setCalculatedValues({
+        saldoAnterior: cliente.saldoPendiente,
+        saldoNuevo: cliente.saldoPendiente,
+        montoParaSaldo: 0,
+        montoMoratorio: moratorioNum
+      });
+      return;
+    }
+
     // Lógica para pagos normales (reducen saldo)
     const moratorioFinal = Math.min(moratorioNum, montoNum);
     const montoParaSaldo = montoNum - moratorioFinal;
 
-    if (montoNum > 0) {
+    if (montoNum > 0 || moratorioNum > 0) {
       const nuevoSaldo = Math.max(0, cliente.saldoPendiente - montoParaSaldo);
 
       setCalculatedValues({
@@ -169,7 +180,14 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     e.preventDefault();
 
     const montoNum = parseFloat(monto) || 0;
-    if (montoNum < 0 || (montoNum === 0 && tipoPago !== 'cobro_mora')) {
+    const moratorioNum = parseFloat(montoMoratorio) || 0;
+
+    if (tipoPago === 'mora' && moratorioNum <= 0) {
+      toast.error('Por favor ingrese el monto de la mora');
+      return;
+    }
+
+    if (tipoPago !== 'mora' && montoNum < 0 || (montoNum === 0 && tipoPago !== 'cobro_mora' && tipoPago !== 'mora')) {
       toast.error('Por favor ingrese un monto válido');
       return;
     }
@@ -434,26 +452,31 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             </div>
           )}
 
-          {/* Monto Moratorio - Solo se muestra para regular o abono */}
-          {(tipoPago === 'regular' || tipoPago === 'abono') && (
+          {/* Monto Moratorio o Pago de Mora */}
+          {(tipoPago === 'regular' || tipoPago === 'abono' || tipoPago === 'mora') && (
             <div className="space-y-2">
-              <Label htmlFor="montoMoratorio">Monto Moratorio (Opcional)</Label>
+              <Label htmlFor="montoMoratorio">
+                {tipoPago === 'mora' ? 'Monto Pago de Mora *' : 'Monto Moratorio (Opcional)'}
+              </Label>
               <div className="relative">
                 <AlertTriangle className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-orange-500" />
                 <Input
                   id="montoMoratorio"
                   type="number"
                   step="0.01"
-                  min="0"
-                  max={monto || "0"}
+                  min={tipoPago === 'mora' ? "0.01" : "0"}
+                  max={tipoPago === 'mora' ? undefined : (monto || "0")}
                   value={montoMoratorio}
                   onChange={(e) => setMontoMoratorio(e.target.value)}
                   placeholder="0.00"
                   className="pl-9"
+                  required={tipoPago === 'mora'}
                 />
               </div>
               <div className="text-xs text-muted-foreground">
-                El monto moratorio se registra por separado y NO se aplica al saldo pendiente
+                {tipoPago === 'mora' 
+                  ? 'Este monto se registra como cobro de mora y NO afecta el saldo pendiente'
+                  : 'El monto moratorio se registra por separado y NO se aplica al saldo pendiente'}
               </div>
             </div>
           )}
@@ -515,7 +538,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
                 <div className="flex justify-between text-sm">
                   <span>Monto Total Cobrado:</span>
                   <span className="font-medium text-blue-600">
-                    {formatCurrency(parseFloat(monto) || 0)}
+                    {formatCurrency((parseFloat(monto) || 0) + (parseFloat(montoMoratorio) || 0))}
                   </span>
                 </div>
 
