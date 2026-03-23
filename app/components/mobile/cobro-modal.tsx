@@ -434,7 +434,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
           {/* Monto personalizado - Solo se muestra si NO es Pago de Mora */}
           {tipoPago !== 'mora' && (
             <div className="space-y-2">
-              <Label htmlFor="monto">Monto a Cobrar *</Label>
+              <Label htmlFor="monto">
+                {tipoPago === 'cobro_mora' ? 'Monto Recargo Mora (Aumenta Saldo) *' : 'Monto a Cobrar *'}
+              </Label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -452,7 +454,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             </div>
           )}
 
-          {/* Monto Moratorio o Pago de Mora */}
+          {/* Monto Moratorio o Pago de Mora - Solo para regular, abono o pago de mora (no cobro_mora) */}
           {(tipoPago === 'regular' || tipoPago === 'abono' || tipoPago === 'mora') && (
             <div className="space-y-2">
               <Label htmlFor="montoMoratorio">
