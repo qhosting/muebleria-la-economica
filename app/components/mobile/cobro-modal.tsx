@@ -168,7 +168,8 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!monto || parseFloat(monto) <= 0) {
+    const montoNum = parseFloat(monto) || 0;
+    if (montoNum < 0 || (montoNum === 0 && tipoPago !== 'cobro_mora')) {
       toast.error('Por favor ingrese un monto válido');
       return;
     }
