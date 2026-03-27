@@ -21,17 +21,24 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const fechaDesde = searchParams.get('fechaDesde') || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-    const fechaHasta = searchParams.get('fechaHasta') || new Date().toISOString();
+    const fechaDesdeParam = searchParams.get('fechaDesde');
+    const fechaHastaParam = searchParams.get('fechaHasta');
     const cobradorId = searchParams.get('cobradorId');
 
-    console.log('Parámetros recibidos:', { fechaDesde, fechaHasta, cobradorId });
-
-    const start = new Date(fechaDesde);
+    // Validación de fechas para evitar "Invalid Date"
+    let start = new Date(fechaDesdeParam || Date.now() - 30 * 24 * 60 * 60 * 1000);
+    if (isNaN(start.getTime())) {
+      start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    }
     start.setHours(0, 0, 0, 0);
 
-    const end = new Date(fechaHasta);
+    let end = new Date(fechaHastaParam || Date.now());
+    if (isNaN(end.getTime())) {
+      end = new Date();
+    }
     end.setHours(23, 59, 59, 999);
+
+    console.log('Parámetros procesados:', { start, end, cobradorId });
 
     const where: any = {
       fechaPago: {
@@ -167,8 +174,8 @@ export async function GET(request: NextRequest) {
       reportePorDia: reportePorDiaFormatted,
       pagos: pagosFormatted,
       periodo: {
-        desde: fechaDesde,
-        hasta: fechaHasta,
+        desde: start.toISOString(),
+        hasta: end.toISOString(),
       },
     });
   } catch (error) {
