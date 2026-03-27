@@ -27,10 +27,16 @@ export async function GET(request: NextRequest) {
 
     console.log('Parámetros recibidos:', { fechaDesde, fechaHasta, cobradorId });
 
+    const start = new Date(fechaDesde);
+    start.setHours(0, 0, 0, 0);
+
+    const end = new Date(fechaHasta);
+    end.setHours(23, 59, 59, 999);
+
     const where: any = {
       fechaPago: {
-        gte: new Date(fechaDesde),
-        lte: new Date(fechaHasta),
+        gte: start,
+        lte: end,
       },
     };
 
@@ -123,8 +129,8 @@ export async function GET(request: NextRequest) {
         SUM(CASE WHEN "tipoPago" IN ('moratorio', 'mora', 'cobro_mora') THEN "monto" ELSE 0 END) as pagos_moratorios,
         COUNT(*) as total_pagos
       FROM "pagos" 
-      WHERE "fechaPago" >= ${new Date(fechaDesde)} 
-        AND "fechaPago" <= ${new Date(fechaHasta)}
+      WHERE "fechaPago" >= ${start} 
+        AND "fechaPago" <= ${end}
         ${cobradorId && cobradorId !== 'all' ? Prisma.sql`AND "cobradorId" = ${cobradorId}` : Prisma.sql``}
       GROUP BY DATE("fechaPago")
       ORDER BY fecha DESC
