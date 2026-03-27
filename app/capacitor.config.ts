@@ -7,8 +7,8 @@ const config: CapacitorConfig = {
     server: {
         androidScheme: 'https',
         cleartext: true,
-        // Permite que Capacitor cargue archivos locales (index.html) desde 'out'
-        url: undefined,
+        // Carga directamente el sitio de producción
+        url: 'https://app.mueblerialaeconomica.com',
         allowNavigation: [
             "app.mueblerialaeconomica.com",
             "*.app.mueblerialaeconomica.com",
