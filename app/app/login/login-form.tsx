@@ -205,8 +205,8 @@ export function LoginForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center p-4">
-      {/* Botón de Configuración (Solo Nativo) */}
-      {Capacitor.isNativePlatform() && (
+      {/* Botón de Configuración (Oculto en producción) */}
+      {/* Capacitor.isNativePlatform() && (
         <button
           onClick={() => setShowServerConfig(!showServerConfig)}
           className="absolute top-4 right-4 p-2 text-blue-200 hover:text-white bg-slate-800/50 rounded-full transition-colors"
@@ -214,93 +214,14 @@ export function LoginForm() {
         >
           <Settings className="w-6 h-6" />
         </button>
-      )}
+      ) */}
 
       <div className="w-full max-w-md animate-fade-in relative">
         {/* Modal de Configuración de Servidor */}
-        {(showServerConfig || (!serverUrl && Capacitor.isNativePlatform())) && (
-          <div className="absolute inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/95 rounded-xl border border-blue-500/30 overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="w-full space-y-4">
-              <div className="text-center">
-                <Settings className="w-12 h-12 text-blue-400 mx-auto mb-2" />
-                <h2 className="text-xl font-bold text-white">Configurar Servidor</h2>
-                <p className="text-sm text-blue-200">Ingresa la URL del servidor central</p>
-              </div>
-
-              <div className="space-y-2">
-                <Input
-                  placeholder="https://tu-servidor.com"
-                  value={serverUrl}
-                  onChange={(e) => setServerUrl(e.target.value)}
-                  className="bg-slate-800 border-slate-700 text-white"
-                />
-                <p className="text-[10px] text-slate-400">
-                  Ej: http://192.168.1.50:3000 o https://sistema.com
-                </p>
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    className="flex-1 bg-transparent text-white border-slate-700"
-                    onClick={() => setShowServerConfig(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button
-                    className="flex-1 bg-blue-600 hover:bg-blue-500"
-                    onClick={async () => {
-                      if (serverUrl) {
-                        try {
-                          // Normalizar URL (quitar slash final y espacios)
-                          const cleanUrl = serverUrl.trim().endsWith('/') ? serverUrl.trim().slice(0, -1) : serverUrl.trim();
-                          localStorage.setItem('custom_server_url', cleanUrl);
-                          toast.success('Servidor configurado');
-                          setShowServerConfig(false);
-
-                          await new Promise(r => setTimeout(r, 300));
-
-                          // Recarga forzada para asegurar que Providers se reinicie con la nueva URL
-                          if (Capacitor.isNativePlatform()) {
-                            // En Capacitor a veces la ruta base es problemática, forzamos al index
-                            window.location.href = 'index.html';
-                          } else {
-                            window.location.reload();
-                          }
-                        } catch (e) {
-                          console.error('Error reloading:', e);
-                          window.location.href = '/';
-                        }
-                      }
-                    }}
-                  >
-                    Guardar y Reiniciar
-                  </Button>
-                </div>
-
-                <Button
-                  variant="ghost"
-                  className="text-xs text-blue-300 hover:text-white"
-                  onClick={async () => {
-                    if (!serverUrl) return toast.error('Ingresa una URL');
-                    toast.info('Probando conexión...');
-                    try {
-                      const cleanUrl = serverUrl.trim().endsWith('/') ? serverUrl.trim().slice(0, -1) : serverUrl.trim();
-                      const res = await fetch(`${cleanUrl}/api/auth/session`, { method: 'GET' });
-                      if (res.ok) toast.success('¡Conexión exitosa!');
-                      else toast.error(`Error del servidor: ${res.status}`);
-                    } catch (e) {
-                      toast.error('No se pudo conectar al servidor. Revisa la URL y tu conexión.');
-                    }
-                  }}
-                >
-                  Probar Conexión
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Modal de Configuración de Servidor (Deshabilitado) */}
+        {/* (showServerConfig || (!serverUrl && Capacitor.isNativePlatform())) && (
+          ...
+        ) */}
 
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
