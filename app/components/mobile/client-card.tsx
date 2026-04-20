@@ -162,8 +162,8 @@ export function ClientCard({
         {/* Información financiera */}
         <div className="grid grid-cols-2 gap-3 p-3 bg-muted/50 rounded-lg">
           <div className="text-center">
-            <div className="text-xs text-muted-foreground">Saldo Pendiente</div>
-            <div className={`text-sm font-semibold ${getSaldoColor()}`}>
+            <div className="text-xs text-muted-foreground uppercase font-bold tracking-wider mb-1">Saldo Actual</div>
+            <div className={`text-lg font-bold ${getSaldoColor()}`}>
               {formatCurrency(cliente.saldoPendiente)}
             </div>
           </div>

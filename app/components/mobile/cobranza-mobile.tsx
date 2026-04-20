@@ -38,6 +38,10 @@ import { formatCurrency, getDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FooterVersion } from '@/components/version-info';
 import { PWAInstallButton } from '@/components/pwa/pwa-install-button';
+import { CorteModal } from './corte-modal';
+import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
+import { Printer, Calculator, Receipt } from 'lucide-react';
+import { TicketData } from '@/lib/bluetooth-printer';
 
 interface CobranzaMobileProps {
   initialClientes?: OfflineCliente[];
@@ -59,13 +63,16 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
   const [selectedCliente, setSelectedCliente] = useState<OfflineCliente | null>(null);
   const [showCobroModal, setShowCobroModal] = useState(false);
   const [showPagosModal, setShowPagosModal] = useState(false);
+  const [showCorteModal, setShowCorteModal] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [printingLast, setPrintingLast] = useState(false);
   const [clientesOffline, setClientesOffline] = useState<OfflineCliente[]>([]);
 
   const userRole = (session?.user as any)?.role;
   const userId = (session?.user as any)?.id;
+  const { isConnected: isPrinterConnected, printTicket } = useBluetoothPrinter();
 
   const diasSemana = [
     { value: '1', label: 'LUNES' },
@@ -321,6 +328,79 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
     setSortOrder(prevOrder => prevOrder === 'asc' ? 'desc' : 'asc');
   };
 
+  const handleReimprimirUltimo = async () => {
+    if (!userId) return;
+    if (!isPrinterConnected) {
+      toast.error('Impresora no conectada');
+      return;
+    }
+
+    setPrintingLast(true);
+    try {
+      // Buscar el último pago realizado por este cobrador
+      const pagos = await db.pagos
+        .where('cobradorId')
+        .equals(userId)
+        .reverse()
+        .sortBy('fechaPago');
+
+      if (!pagos || pagos.length === 0) {
+        toast.error('No se encontraron pagos recientes');
+        return;
+      }
+
+      const lastPago = pagos[0];
+      
+      // Buscar información del cliente para el ticket
+      const cliente = await db.clientes.get(lastPago.clienteId);
+      if (!cliente) {
+        toast.error('No se pudo encontrar la información del cliente');
+        return;
+      }
+
+      // Preparar datos del ticket
+      const ticketData: TicketData = {
+        numeroRecibo: lastPago.numeroRecibo || `REC-${lastPago.localId.slice(-8)}`,
+        cliente: {
+          nombreCompleto: cliente.nombreCompleto,
+          telefono: cliente.telefono,
+          direccion: cliente.direccion,
+          diaPago: cliente.diaPago
+        },
+        cobrador: {
+          nombre: session?.user?.name || 'Cobrador',
+          id: userId
+        },
+        pago: {
+          monto: lastPago.monto,
+          tipoPago: lastPago.tipoPago,
+          metodoPago: lastPago.metodoPago,
+          concepto: lastPago.concepto,
+          fechaPago: lastPago.fechaPago
+        },
+        saldos: {
+          anterior: lastPago.saldoAnterior,
+          nuevo: lastPago.saldoNuevo
+        },
+        empresa: {
+          nombre: 'MUEBLERIA LA ECONOMICA',
+          direccion: 'Dirección de la empresa',
+          telefono: 'Tel: (555) 123-4567'
+        }
+      };
+
+      const success = await printTicket(ticketData);
+      if (success) {
+        toast.success('Último ticket reimpreso correctamente');
+      }
+    } catch (error) {
+      console.error('Error al reimprimir último ticket:', error);
+      toast.error('Error al reimprimir');
+    } finally {
+      setPrintingLast(false);
+    }
+  };
+
   if (userRole !== 'cobrador') {
     if (disableLayout) {
       return (
@@ -358,11 +438,36 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
           </div>
 
           <div className="flex items-center gap-2">
-            <Badge variant={isOnline ? 'default' : 'secondary'}>
-              {isOnline ? (
-                <><Wifi className="w-3 h-3 mr-1" />Online</>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowCorteModal(true)}
+              className="h-9 w-9 bg-white text-blue-600 border-blue-600 hover:bg-blue-50"
+              title="Corte del Día"
+            >
+              <Calculator className="w-5 h-5" />
+            </Button>
+            
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleReimprimirUltimo}
+              disabled={printingLast || !isPrinterConnected}
+              className="h-9 w-9 bg-white text-green-600 border-green-600 hover:bg-green-50"
+              title="Reimprimir Último Ticket"
+            >
+              {printingLast ? (
+                <RefreshCw className="w-5 h-5 animate-spin" />
               ) : (
-                <><WifiOff className="w-3 h-3 mr-1" />Offline</>
+                <Receipt className="w-5 h-5" />
+              )}
+            </Button>
+
+            <Badge variant={isOnline ? 'default' : 'secondary'} className="h-9">
+              {isOnline ? (
+                <><Wifi className="w-4 h-4 mr-1" />Online</>
+              ) : (
+                <><WifiOff className="w-4 h-4 mr-1" />Offline</>
               )}
             </Badge>
           </div>
@@ -503,6 +608,12 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
             />
           </>
         )}
+
+        <CorteModal 
+          isOpen={showCorteModal}
+          onClose={() => setShowCorteModal(false)}
+          isOnline={isOnline}
+        />
 
         {/* Footer con información de versión */}
         <div className="mt-8 pt-4 border-t">

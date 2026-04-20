@@ -29,6 +29,37 @@ export function LoginForm() {
 
   useEffect(() => {
     setMounted(true);
+    
+    // 🌐 DETECCIÓN AUTOMÁTICA DE OFFLINE
+    const checkConnectivity = async () => {
+      if (Capacitor.isNativePlatform()) {
+        try {
+          // Probar conexión contra el endpoint de salud con un timeout corto
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          
+          const response = await fetch(getFullPath('/api/health'), { 
+            signal: controller.signal,
+            cache: 'no-store'
+          });
+          
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) throw new Error('Servidor no disponible');
+        } catch (error) {
+          console.warn('⚠️ Servidor no disponible, intentando modo offline automático:', error);
+          const savedProfile = await obtenerDatoCobrador<any>('user_profile');
+          if (savedProfile) {
+            toast.info('Sin conexión. Entrando en modo offline automáticamente...');
+            const url = savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard';
+            router.replace(url);
+          }
+        }
+      }
+    };
+
+    checkConnectivity();
+
     // Cargar credenciales recordadas si existen
     const savedEmail = localStorage.getItem('remembered_email');
     const savedPassword = localStorage.getItem('remembered_password');
@@ -67,8 +98,9 @@ export function LoginForm() {
       });
 
       if (result?.error) {
-        alert('Credenciales incorrectas');
         setIsLoading(false);
+        const errorMsg = result.error === 'CredentialsSignin' ? 'Credenciales incorrectas' : result.error;
+        toast.error('Error: ' + errorMsg);
         return;
       }
 
@@ -125,22 +157,12 @@ export function LoginForm() {
             }
 
             // Redireccionar según el rol del usuario
-            let redirectUrl = '/dashboard';
+            let redirectUrl = '/mobile/home'; // Default para cobradores
 
-            switch (userRole) {
-              case 'admin':
-                redirectUrl = '/dashboard';
-                break;
-              case 'gestor_cobranza':
-                redirectUrl = '/dashboard/clientes';
-                break;
-              case 'reporte_cobranza':
-                redirectUrl = '/dashboard/reportes';
-                break;
-              case 'cobrador':
-                redirectUrl = '/mobile/home';
-                break;
-            }
+            if (userRole === 'admin') redirectUrl = '/dashboard';
+            else if (userRole === 'gestor_cobranza') redirectUrl = '/dashboard/clientes';
+            else if (userRole === 'reporte_cobranza') redirectUrl = '/dashboard/reportes';
+            else if (userRole === 'cobrador') redirectUrl = '/mobile/home';
 
             console.log(`🚀 Redirigiendo a ${redirectUrl} para rol ${userRole}`);
 
@@ -183,10 +205,9 @@ export function LoginForm() {
       if (isNative) {
         const savedProfile = await obtenerDatoCobrador<any>('user_profile');
         if (savedProfile && savedProfile.email === email) {
-          if (confirm('El servidor no responde. ¿Desea trabajar en MODO OFFLINE con sus datos guardados?')) {
-            router.replace(savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard');
-            return;
-          }
+          toast.info('Sin conexión. Entrando en modo offline...');
+          router.replace(savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard');
+          return;
         }
       }
 
@@ -205,16 +226,6 @@ export function LoginForm() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-slate-800 flex items-center justify-center p-4">
-      {/* Botón de Configuración (Oculto en producción) */}
-      {/* Capacitor.isNativePlatform() && (
-        <button
-          onClick={() => setShowServerConfig(!showServerConfig)}
-          className="absolute top-4 right-4 p-2 text-blue-200 hover:text-white bg-slate-800/50 rounded-full transition-colors"
-          title="Configurar Servidor"
-        >
-          <Settings className="w-6 h-6" />
-        </button>
-      ) */}
 
       <div className="w-full max-w-md animate-fade-in relative">
         {/* Modal de Configuración de Servidor */}
@@ -300,26 +311,6 @@ export function LoginForm() {
                   </>
                 )}
               </Button>
-
-              {Capacitor.isNativePlatform() && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full h-11 border-blue-500/50 text-blue-100 hover:bg-blue-500/10"
-                  onClick={async () => {
-                    const savedProfile = await obtenerDatoCobrador<any>('user_profile');
-                    if (savedProfile) {
-                      toast.info('Entrando en modo offline...');
-                      const url = savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard';
-                      router.replace(url);
-                    } else {
-                      alert('No hay una sesión previa guardada. Debe iniciar sesión con internet al menos una vez.');
-                    }
-                  }}
-                >
-                  Trabajar Offline
-                </Button>
-              )}
             </form>
           </CardContent>
         </Card>

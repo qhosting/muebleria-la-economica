@@ -369,8 +369,8 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
             <CardContent className="space-y-2">
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-muted-foreground">Saldo Actual:</span>
-                  <div className="font-semibold text-red-600">
+                  <span className="text-muted-foreground uppercase text-[10px] font-bold">Saldo Actual:</span>
+                  <div className="font-bold text-lg text-red-600">
                     {formatCurrency(cliente.saldoPendiente)}
                   </div>
                 </div>

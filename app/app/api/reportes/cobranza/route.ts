@@ -16,14 +16,21 @@ export async function GET(request: NextRequest) {
     }
 
     const userRole = (session.user as any).role;
-    if (!['admin', 'gestor_cobranza', 'reporte_cobranza'].includes(userRole)) {
+    const userId = (session.user as any).id;
+    
+    if (!['admin', 'gestor_cobranza', 'reporte_cobranza', 'cobrador'].includes(userRole)) {
       return NextResponse.json({ error: 'Permisos insuficientes' }, { status: 403 });
     }
 
     const { searchParams } = new URL(request.url);
     const fechaDesdeParam = searchParams.get('fechaDesde');
     const fechaHastaParam = searchParams.get('fechaHasta');
-    const cobradorId = searchParams.get('cobradorId');
+    let cobradorId = searchParams.get('cobradorId');
+
+    // 🔒 RESTRICCIÓN DE SEGURIDAD: Cobreardores solo ven sus propios datos
+    if (userRole === 'cobrador') {
+      cobradorId = userId;
+    }
 
     // Validación de fechas para evitar "Invalid Date"
     let start = new Date(fechaDesdeParam || Date.now() - 30 * 24 * 60 * 60 * 1000);

@@ -575,6 +575,81 @@ class BluetoothPrinterService {
       throw error;
     }
   }
+  async printCorte(corteData: {
+    cobrador: string;
+    fechaDesde: string;
+    fechaHasta: string;
+    totalGeneral: number;
+    totalEfectivo: number;
+    totalTransferencia: number;
+    cantidadPagos: number;
+    detalles?: {
+      tipo: string;
+      monto: number;
+    }[];
+  }): Promise<void> {
+    if (!this.connection.isConnected) {
+      throw new Error('Impresora no conectada');
+    }
+
+    try {
+      let ticket = '';
+
+      // Inicializar impresora
+      ticket += this.COMMANDS.INIT;
+
+      // Encabezado
+      ticket += this.COMMANDS.CENTER;
+      ticket += this.COMMANDS.BOLD_ON;
+      ticket += 'MUEBLERIA LA ECONOMICA' + this.LF;
+      ticket += 'CORTE DE CAJA' + this.LF;
+      ticket += this.COMMANDS.BOLD_OFF;
+      ticket += this.LF;
+
+      ticket += this.COMMANDS.LEFT;
+      ticket += 'Cobrador: ' + corteData.cobrador + this.LF;
+      ticket += 'Desde: ' + this.formatDate(corteData.fechaDesde).split(' ')[0] + this.LF;
+      ticket += 'Hasta: ' + this.formatDate(corteData.fechaHasta).split(' ')[0] + this.LF;
+      ticket += 'Fecha Imp: ' + this.formatDate(new Date().toISOString()) + this.LF;
+      ticket += this.createDivider() + this.LF;
+
+      // Resumen de Totales
+      ticket += this.COMMANDS.BOLD_ON;
+      ticket += 'RESUMEN DE COBROS:' + this.LF;
+      ticket += this.COMMANDS.BOLD_OFF;
+      
+      ticket += 'Cant. Pagos:' + this.rightAlignText(corteData.cantidadPagos.toString()) + this.LF;
+      ticket += this.LF;
+
+      ticket += 'EFECTIVO:' + this.rightAlignText(this.formatCurrency(corteData.totalEfectivo)) + this.LF;
+      ticket += 'TRANSFERENCIA:' + this.rightAlignText(this.formatCurrency(corteData.totalTransferencia)) + this.LF;
+      
+      ticket += this.createDivider('-') + this.LF;
+      ticket += this.COMMANDS.BOLD_ON;
+      ticket += 'TOTAL GENERAL:' + this.rightAlignText(this.formatCurrency(corteData.totalGeneral)) + this.LF;
+      ticket += this.COMMANDS.BOLD_OFF;
+      
+      ticket += this.createDivider('=') + this.LF;
+      ticket += this.LF;
+
+      // Mensaje final
+      ticket += this.COMMANDS.CENTER;
+      ticket += 'FIN DE REPORTE' + this.LF;
+      
+      // Alimentar papel y cortar
+      ticket += this.COMMANDS.FEED;
+      ticket += this.COMMANDS.CUT;
+
+      // Enviar a imprimir
+      await this.sendData(ticket);
+
+      console.log('Reporte de corte impreso exitosamente');
+
+    } catch (error) {
+      console.error('Error imprimiendo corte:', error);
+      throw error;
+    }
+  }
 }
 
 // Instancia singleton del servicio
