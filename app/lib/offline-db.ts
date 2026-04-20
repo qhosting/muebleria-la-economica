@@ -30,6 +30,8 @@ export interface OfflinePago {
   cobradorId: string;
   metodoPago: 'efectivo' | 'transferencia' | 'cheque';
   numeroRecibo?: string;
+  saldoAnterior: number;
+  saldoNuevo: number;
   // Metadatos offline
   localId: string; // ID temporal local hasta sincronizar
   syncStatus: 'pending' | 'syncing' | 'synced' | 'failed';

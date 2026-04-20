@@ -211,7 +211,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         concepto: concepto || `Pago ${tipoPago}`,
         fechaPago: new Date().toISOString(),
         metodoPago,
-        numeroRecibo: numeroRecibo || undefined
+        numeroRecibo: numeroRecibo || undefined,
+        saldoAnterior: calculatedValues.saldoAnterior,
+        saldoNuevo: calculatedValues.saldoNuevo
       } : null;
 
       const pagoMoratorio = calculatedValues.montoMoratorio > 0 ? {
@@ -223,7 +225,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         concepto: `Moratorio - ${concepto || 'Recargo por mora'}`,
         fechaPago: new Date().toISOString(),
         metodoPago,
-        numeroRecibo: numeroRecibo ? `${numeroRecibo}-M` : undefined
+        numeroRecibo: numeroRecibo ? `${numeroRecibo}-M` : undefined,
+        saldoAnterior: calculatedValues.saldoAnterior, // Nota: El moratorio técnicamente no cambia el saldo de la deuda de mercancía
+        saldoNuevo: calculatedValues.saldoAnterior
       } : null;
 
       if (isOnline) {
