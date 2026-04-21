@@ -86,12 +86,13 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   useEffect(() => {
     const montoNum = parseFloat(monto) || 0;
     const moratorioNum = parseFloat(montoMoratorio) || 0;
+    const saldoPendienteNum = Number(cliente.saldoPendiente) || 0;
 
     // Si es cobro de mora (aumenta saldo), la lógica es diferente
     if (tipoPago === 'cobro_mora') {
-      const nuevoSaldo = cliente.saldoPendiente + montoNum;
+      const nuevoSaldo = saldoPendienteNum + montoNum;
       setCalculatedValues({
-        saldoAnterior: cliente.saldoPendiente,
+        saldoAnterior: saldoPendienteNum,
         saldoNuevo: nuevoSaldo,
         montoParaSaldo: montoNum,
         montoMoratorio: 0
@@ -102,8 +103,8 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     // Si es pago de mora (no afecta saldo), el monto total viene de montoMoratorio
     if (tipoPago === 'mora') {
       setCalculatedValues({
-        saldoAnterior: cliente.saldoPendiente,
-        saldoNuevo: cliente.saldoPendiente,
+        saldoAnterior: saldoPendienteNum,
+        saldoNuevo: saldoPendienteNum,
         montoParaSaldo: 0,
         montoMoratorio: moratorioNum
       });
@@ -115,18 +116,18 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     const montoParaSaldo = montoNum - moratorioFinal;
 
     if (montoNum > 0 || moratorioNum > 0) {
-      const nuevoSaldo = Math.max(0, cliente.saldoPendiente - montoParaSaldo);
+      const nuevoSaldo = Math.max(0, saldoPendienteNum - montoParaSaldo);
 
       setCalculatedValues({
-        saldoAnterior: cliente.saldoPendiente,
+        saldoAnterior: saldoPendienteNum,
         saldoNuevo: nuevoSaldo,
         montoParaSaldo: montoParaSaldo,
         montoMoratorio: moratorioFinal
       });
     } else {
       setCalculatedValues({
-        saldoAnterior: cliente.saldoPendiente,
-        saldoNuevo: cliente.saldoPendiente,
+        saldoAnterior: saldoPendienteNum,
+        saldoNuevo: saldoPendienteNum,
         montoParaSaldo: 0,
         montoMoratorio: 0
       });
@@ -571,20 +572,20 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
                         {formatCurrency(calculatedValues.montoMoratorio)}
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span>└ Aplicado al saldo:</span>
+                    <div className={`flex justify-between text-sm ${tipoPago === 'cobro_mora' ? 'text-red-500' : 'text-green-600'}`}>
+                      <span>{tipoPago === 'cobro_mora' ? '├ Recargo al saldo:' : '├ Aplicado al saldo:'}</span>
                       <span className="font-medium">
-                        -{formatCurrency(calculatedValues.montoParaSaldo)}
+                        {tipoPago === 'cobro_mora' ? '+' : '-'}{formatCurrency(calculatedValues.montoParaSaldo)}
                       </span>
                     </div>
                   </>
                 )}
 
                 {calculatedValues.montoMoratorio === 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Aplicado al saldo:</span>
-                    <span className="font-medium text-green-600">
-                      -{formatCurrency(calculatedValues.montoParaSaldo)}
+                  <div className={`flex justify-between text-sm ${tipoPago === 'cobro_mora' ? 'text-red-500' : 'text-green-600'}`}>
+                    <span>{tipoPago === 'cobro_mora' ? 'Recargo al saldo:' : 'Aplicado al saldo:'}</span>
+                    <span className="font-medium">
+                      {tipoPago === 'cobro_mora' ? '+' : '-'}{formatCurrency(calculatedValues.montoParaSaldo)}
                     </span>
                   </div>
                 )}
