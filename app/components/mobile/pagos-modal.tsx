@@ -33,7 +33,7 @@ import {
   CheckCircle,
   Clock
 } from 'lucide-react';
-import { OfflineCliente } from '@/lib/offline-db';
+import { OfflineCliente, db, OfflinePago } from '@/lib/offline-db';
 import { Pago } from '@/lib/types';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { format } from 'date-fns';
@@ -79,30 +79,92 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
   }, [pagos, searchTerm, fechaDesde, fechaHasta]);
 
   const loadPagosCliente = async () => {
-    if (!cliente.id || !isOnline) {
-      toast.error('Se requiere conexión para ver el historial de pagos');
-      return;
-    }
-
+    if (!cliente.id) return;
+    
     setLoading(true);
     try {
-      const response = await fetch(`/api/pagos/cliente/${cliente.id}?limit=50`);
+      if (isOnline) {
+        // MODO ONLINE: Fetch del servidor y actualizar cache local
+        const response = await fetch(`/api/pagos/cliente/${cliente.id}?limit=20`);
 
-      if (!response.ok) {
-        throw new Error('Error al obtener historial de pagos');
+        if (!response.ok) {
+          throw new Error('Error al obtener historial de pagos');
+        }
+
+        const pagosData: Pago[] = await response.json();
+
+        // Serializar los datos de Decimal a number
+        const pagosSerializados: Pago[] = pagosData.map(pago => ({
+          ...pago,
+          monto: typeof pago.monto === 'string' ? parseFloat(pago.monto) : pago.monto,
+          saldoAnterior: typeof pago.saldoAnterior === 'string' ? parseFloat(pago.saldoAnterior) : pago.saldoAnterior,
+          saldoNuevo: typeof pago.saldoNuevo === 'string' ? parseFloat(pago.saldoNuevo) : pago.saldoNuevo,
+        }));
+
+        setPagos(pagosSerializados);
+
+        // 🚀 OPTIMIZACIÓN: Guardar en Dexie para acceso offline (Sincronización por cliente)
+        const pagosACachear = pagosSerializados.slice(0, 10);
+        
+        await db.transaction('rw', db.pagos, async () => {
+          // 1. Eliminar pagos locales antiguos de ESTE cliente para no saturar memoria
+          // Solo mantenemos los más recientes que acabamos de bajar
+          await db.pagos.where('clienteId').equals(cliente.id).delete();
+
+          // 2. Guardar los nuevos pagos (limitado a los últimos 10 para ahorrar memoria)
+          for (const pago of pagosACachear) {
+            await db.pagos.add({
+              ...pago,
+              localId: pago.id, // Usamos el ID real como localId para el cache
+              syncStatus: 'synced',
+              createdOffline: false,
+              printStatus: pago.ticketImpreso ? 'printed' : 'pending',
+              lastSync: Date.now()
+            } as any);
+          }
+        });
+        
+        console.log(`Cache local actualizado para cliente ${cliente.id}: ${pagosACachear.length} registros`);
+      } else {
+        // MODO OFFLINE: Leer de Dexie
+        const pagosLocales = await db.pagos
+          .where('clienteId')
+          .equals(cliente.id)
+          .reverse()
+          .sortBy('fechaPago');
+
+        // Mapear de OfflinePago a Pago (para la UI)
+        const pagosMapeados: Pago[] = pagosLocales.map((p: any) => ({
+          id: p.id || p.localId,
+          clienteId: p.clienteId,
+          cobradorId: p.cobradorId,
+          monto: p.monto,
+          tipoPago: p.tipoPago,
+          concepto: p.concepto,
+          fechaPago: p.fechaPago instanceof Date ? p.fechaPago : new Date(p.fechaPago),
+          metodoPago: p.metodoPago,
+          numeroRecibo: p.numeroRecibo,
+          saldoAnterior: p.saldoAnterior,
+          saldoNuevo: p.saldoNuevo,
+          ticketImpreso: p.printStatus === 'printed' || p.printStatus === 'reprinted',
+          sincronizado: p.syncStatus === 'synced',
+          createdAt: p.fechaPago instanceof Date ? p.fechaPago : new Date(p.fechaPago),
+          cobrador: { 
+            name: session?.user?.name || 'Cobrador',
+            id: p.cobradorId,
+            email: '',
+            role: 'cobrador' as any,
+            isActive: true,
+            createdAt: new Date(),
+            updatedAt: new Date()
+          }
+        }));
+
+        setPagos(pagosMapeados);
+        if (pagosMapeados.length > 0) {
+          toast.info('Mostrando historial guardado localmente');
+        }
       }
-
-      const pagosData: Pago[] = await response.json();
-
-      // Serializar los datos de Decimal a number si es necesario
-      const pagosSerializados = pagosData.map(pago => ({
-        ...pago,
-        monto: typeof pago.monto === 'string' ? parseFloat(pago.monto) : pago.monto,
-        saldoAnterior: typeof pago.saldoAnterior === 'string' ? parseFloat(pago.saldoAnterior) : pago.saldoAnterior,
-        saldoNuevo: typeof pago.saldoNuevo === 'string' ? parseFloat(pago.saldoNuevo) : pago.saldoNuevo,
-      }));
-
-      setPagos(pagosSerializados);
 
     } catch (error) {
       console.error('Error loading pagos:', error);
@@ -407,21 +469,18 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                     <RefreshCw className="w-6 h-6 animate-spin mr-2" />
                     <span className="text-muted-foreground">Cargando pagos...</span>
                   </div>
-                ) : !isOnline ? (
-                  <div className="flex items-center justify-center h-32 text-center">
-                    <div>
-                      <WifiOff className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-                      <p className="text-muted-foreground text-sm">
-                        Se requiere conexión para ver el historial
-                      </p>
-                    </div>
-                  </div>
                 ) : filteredPagos.length === 0 ? (
                   <div className="flex items-center justify-center h-32 text-center">
                     <div>
-                      <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      {isOnline ? (
+                        <FileText className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
+                      ) : (
+                        <WifiOff className="w-8 h-8 mx-auto mb-2 text-orange-400" />
+                      )}
                       <p className="text-muted-foreground text-sm">
-                        {pagos.length === 0 ? 'No hay pagos registrados' : 'No se encontraron pagos con los filtros aplicados'}
+                        {pagos.length === 0 
+                          ? (isOnline ? 'No hay pagos registrados' : 'No hay pagos guardados localmente para este cliente') 
+                          : 'No se encontraron pagos con los filtros aplicados'}
                       </p>
                       {searchTerm || fechaDesde || fechaHasta ? (
                         <Button

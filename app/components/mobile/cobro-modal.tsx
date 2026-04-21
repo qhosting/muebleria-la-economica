@@ -176,11 +176,26 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     };
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, forceConfirm = false) => {
     e.preventDefault();
 
     const montoNum = parseFloat(monto) || 0;
     const moratorioNum = parseFloat(montoMoratorio) || 0;
+
+    // VALIDACIÓN DE SEGURIDAD: Prevenir errores de dedo (Saldos de millones)
+    if (!forceConfirm) {
+      if (tipoPago === 'cobro_mora' && montoNum > 5000) {
+        if (!window.confirm(`⚠️ EL MONTO DE MORA (${formatCurrency(montoNum)}) ES MUY ALTO.\n\n¿Está seguro de que desea AUMENTAR la deuda del cliente por esta cantidad?`)) {
+          return;
+        }
+      }
+      
+      if (tipoPago !== 'cobro_mora' && montoNum > 10000) {
+        if (!window.confirm(`⚠️ ESTÁ REGISTRANDO UN PAGO DE ${formatCurrency(montoNum)}.\n\n¿El monto es correcto?`)) {
+          return;
+        }
+      }
+    }
 
     if (tipoPago === 'mora' && moratorioNum <= 0) {
       toast.error('Por favor ingrese el monto de la mora');

@@ -166,6 +166,22 @@ export async function POST(request: NextRequest) {
     // cobro_mora -> AUMENTA el saldo (es un recargo que se suma a la deuda)
     const reduceSaldo = ['regular', 'abono', 'liquidacion'].includes(tipoPago);
     const aumentaSaldo = tipoPago === 'cobro_mora';
+
+    // Sanity check para cobro_mora: no permitir montos absurdos que inflen el saldo
+    if (aumentaSaldo) {
+      const montoNumerico = parseFloat(monto);
+      const saldoActual = parseFloat(cliente.saldoActual.toString());
+      
+      // Si el monto de mora es mayor al 50% del saldo actual y mayor a 1000, o mayor a 5000 absoluto
+      if ((montoNumerico > saldoActual * 0.5 && montoNumerico > 1000) || montoNumerico > 5000) {
+        console.error(`Intento de cobro de mora inusual: Cliente ${clienteId}, Saldo: ${saldoActual}, Mora: ${montoNumerico}`);
+        // No bloqueamos totalmente, pero podrías querer registrar esto o requerir un flag 'confirmado'
+        // Por ahora, limitemos o retornemos error si es exagerado (más de 100k por ejemplo)
+        if (montoNumerico > 10000) {
+           return NextResponse.json({ error: 'Monto de mora fuera de límites razonables' }, { status: 400 });
+        }
+      }
+    }
     const afectaSaldo = reduceSaldo || aumentaSaldo;
 
     if (reduceSaldo) {

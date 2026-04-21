@@ -65,9 +65,11 @@ export async function POST(request: NextRequest) {
         const saldoAnterior = parseFloat(pagoData.saldoAnterior) || parseFloat(cliente.saldoActual.toString());
         let saldoNuevo = saldoAnterior;
 
-        // Solo los pagos regulares afectan el saldo principal
-        if (pagoData.tipoPago === 'regular') {
+        // Lógica de saldo según tipo de pago
+        if (pagoData.tipoPago === 'regular' || pagoData.tipoPago === 'abono' || pagoData.tipoPago === 'liquidacion') {
           saldoNuevo = Math.max(0, saldoAnterior - montoNumerico);
+        } else if (pagoData.tipoPago === 'cobro_mora') {
+          saldoNuevo = saldoAnterior + montoNumerico;
         }
 
         // Crear el pago en una transacción
@@ -87,8 +89,9 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Actualizar saldo del cliente si es pago regular
-          if (pagoData.tipoPago === 'regular') {
+          // Actualizar saldo del cliente si el pago afecta el saldo
+          const tiposAfectanSaldo = ['regular', 'abono', 'liquidacion', 'cobro_mora'];
+          if (tiposAfectanSaldo.includes(pagoData.tipoPago)) {
             await prisma.cliente.update({
               where: { id: pagoData.clienteId },
               data: { saldoActual: saldoNuevo },
