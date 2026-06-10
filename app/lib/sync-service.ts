@@ -268,6 +268,17 @@ export class SyncService {
     console.log('Agregando pago offline:', pago);
     await db.pagos.add(pago);
 
+    // Actualizar cliente localmente
+    const cliente = await db.clientes.get(pago.clienteId);
+    if (cliente) {
+      await db.clientes.update(pago.clienteId, {
+        saldoPendiente: pago.saldoNuevo,
+        fechaUltimoPago: pago.fechaPago,
+        syncStatus: 'pending'
+      });
+      console.log(`Cliente local actualizado. Nuevo saldo: ${pago.saldoNuevo}`);
+    }
+
     // Agregar a cola de sincronización
     await db.syncQueue.add({
       type: 'pago',

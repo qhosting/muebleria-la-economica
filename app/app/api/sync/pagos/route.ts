@@ -61,15 +61,16 @@ export async function POST(request: NextRequest) {
           continue;
         }
 
-        const montoNumerico = parseFloat(pagoData.monto);
-        const saldoAnterior = parseFloat(pagoData.saldoAnterior) || parseFloat(cliente.saldoActual.toString());
+        const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
+        const montoNumerico = round2(parseFloat(pagoData.monto));
+        const saldoAnterior = round2(parseFloat(pagoData.saldoAnterior) || parseFloat(cliente.saldoActual.toString()));
         let saldoNuevo = saldoAnterior;
 
         // Lógica de saldo según tipo de pago
         if (pagoData.tipoPago === 'regular' || pagoData.tipoPago === 'abono' || pagoData.tipoPago === 'liquidacion') {
-          saldoNuevo = Math.max(0, saldoAnterior - montoNumerico);
+          saldoNuevo = Math.max(0, round2(saldoAnterior - montoNumerico));
         } else if (pagoData.tipoPago === 'cobro_mora') {
-          saldoNuevo = saldoAnterior + montoNumerico;
+          saldoNuevo = round2(saldoAnterior + montoNumerico);
         }
 
         // Crear el pago en una transacción

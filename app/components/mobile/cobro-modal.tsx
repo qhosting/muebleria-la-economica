@@ -82,15 +82,17 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     }
   }, [isOpen, cliente]);
 
+  const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
+
   // Calcular nuevo saldo cuando cambia el monto, moratorio o tipo
   useEffect(() => {
-    const montoNum = parseFloat(monto) || 0;
-    const moratorioNum = parseFloat(montoMoratorio) || 0;
-    const saldoPendienteNum = Number(cliente.saldoPendiente) || 0;
+    const montoNum = round2(parseFloat(monto) || 0);
+    const moratorioNum = round2(parseFloat(montoMoratorio) || 0);
+    const saldoPendienteNum = round2(Number(cliente.saldoPendiente) || 0);
 
     // Si es cobro de mora (aumenta saldo), la lógica es diferente
     if (tipoPago === 'cobro_mora') {
-      const nuevoSaldo = saldoPendienteNum + montoNum;
+      const nuevoSaldo = round2(saldoPendienteNum + montoNum);
       setCalculatedValues({
         saldoAnterior: saldoPendienteNum,
         saldoNuevo: nuevoSaldo,
@@ -112,11 +114,11 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     }
 
     // Lógica para pagos normales (reducen saldo)
-    const moratorioFinal = Math.min(moratorioNum, montoNum);
-    const montoParaSaldo = montoNum - moratorioFinal;
+    const moratorioFinal = round2(Math.min(moratorioNum, montoNum));
+    const montoParaSaldo = round2(montoNum - moratorioFinal);
 
     if (montoNum > 0 || moratorioNum > 0) {
-      const nuevoSaldo = Math.max(0, saldoPendienteNum - montoParaSaldo);
+      const nuevoSaldo = round2(Math.max(0, saldoPendienteNum - montoParaSaldo));
 
       setCalculatedValues({
         saldoAnterior: saldoPendienteNum,
@@ -542,7 +544,7 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
           </div>
 
           {/* Cálculo del nuevo saldo */}
-          {monto && parseFloat(monto) > 0 && (
+          {((monto && parseFloat(monto) > 0) || (montoMoratorio && parseFloat(montoMoratorio) > 0)) && (
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm flex items-center gap-2">
@@ -560,7 +562,11 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
                 <div className="flex justify-between text-sm">
                   <span>Monto Total Cobrado:</span>
                   <span className="font-medium text-blue-600">
-                    {formatCurrency((parseFloat(monto) || 0) + (parseFloat(montoMoratorio) || 0))}
+                    {formatCurrency(
+                      tipoPago === 'mora'
+                        ? (parseFloat(montoMoratorio) || 0)
+                        : (parseFloat(monto) || 0)
+                    )}
                   </span>
                 </div>
 

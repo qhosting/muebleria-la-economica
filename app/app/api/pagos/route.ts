@@ -157,8 +157,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
     }
 
-    const montoNumerico = parseFloat(monto);
-    const saldoAnterior = parseFloat(cliente.saldoActual.toString());
+    const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
+    const montoNumerico = round2(parseFloat(monto));
+    const saldoAnterior = round2(parseFloat(cliente.saldoActual.toString()));
     let saldoNuevo = saldoAnterior;
 
     // Calcular nuevo saldo
@@ -169,12 +170,9 @@ export async function POST(request: NextRequest) {
 
     // Sanity check para cobro_mora: no permitir montos absurdos que inflen el saldo
     if (aumentaSaldo) {
-      const montoNumerico = parseFloat(monto);
-      const saldoActual = parseFloat(cliente.saldoActual.toString());
-      
       // Si el monto de mora es mayor al 50% del saldo actual y mayor a 1000, o mayor a 5000 absoluto
-      if ((montoNumerico > saldoActual * 0.5 && montoNumerico > 1000) || montoNumerico > 5000) {
-        console.error(`Intento de cobro de mora inusual: Cliente ${clienteId}, Saldo: ${saldoActual}, Mora: ${montoNumerico}`);
+      if ((montoNumerico > saldoAnterior * 0.5 && montoNumerico > 1000) || montoNumerico > 5000) {
+        console.error(`Intento de cobro de mora inusual: Cliente ${clienteId}, Saldo: ${saldoAnterior}, Mora: ${montoNumerico}`);
         // No bloqueamos totalmente, pero podrías querer registrar esto o requerir un flag 'confirmado'
         // Por ahora, limitemos o retornemos error si es exagerado (más de 100k por ejemplo)
         if (montoNumerico > 10000) {
@@ -185,9 +183,9 @@ export async function POST(request: NextRequest) {
     const afectaSaldo = reduceSaldo || aumentaSaldo;
 
     if (reduceSaldo) {
-      saldoNuevo = Math.max(0, saldoAnterior - montoNumerico);
+      saldoNuevo = Math.max(0, round2(saldoAnterior - montoNumerico));
     } else if (aumentaSaldo) {
-      saldoNuevo = saldoAnterior + montoNumerico;
+      saldoNuevo = round2(saldoAnterior + montoNumerico);
     }
 
     // Crear el pago en una transacción

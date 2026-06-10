@@ -116,21 +116,20 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
 
       // Solo actualizar si hay cambios para evitar re-renders innecesarios
       setClientesOffline(prevClientes => {
-        // Comparación simple por longitud y algunos IDs
         if (prevClientes.length !== clientes.length) {
           return clientes;
         }
 
-        // Verificar algunos IDs para detectar cambios
-        const prevIds = prevClientes.slice(0, 5).map(c => c.id).sort();
-        const newIds = clientes.slice(0, 5).map(c => c.id).sort();
+        const prevMap = new Map(prevClientes.map(c => [c.id, c]));
+        const hasChanges = clientes.some(c => {
+          const prev = prevMap.get(c.id);
+          if (!prev) return true;
+          return prev.saldoPendiente !== c.saldoPendiente ||
+                 prev.syncStatus !== c.syncStatus ||
+                 prev.fechaUltimoPago !== c.fechaUltimoPago;
+        });
 
-        if (JSON.stringify(prevIds) !== JSON.stringify(newIds)) {
-          return clientes;
-        }
-
-        // Si no hay cambios significativos, mantener el estado anterior
-        return prevClientes;
+        return hasChanges ? clientes : prevClientes;
       });
     } catch (error) {
       console.error('Error loading clientes offline:', error);

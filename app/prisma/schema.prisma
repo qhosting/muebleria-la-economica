@@ -127,6 +127,9 @@ model Pago {
   cliente         Cliente   @relation(fields: [clienteId], references: [id])
   cobrador        User      @relation(fields: [cobradorId], references: [id])
 
+  @@index([clienteId])
+  @@index([cobradorId])
+  @@index([fechaPago])
   @@map("pagos")
 }
 
