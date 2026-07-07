@@ -16,10 +16,28 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            storeFile file('vertexerp-prod.jks')
+            storePassword 'vertexerp2026'
+            keyAlias 'vertexerp'
+            keyPassword 'vertexerp2026'
+        }
+    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            signingConfig signingConfigs.release
+        }
+    }
+    applicationVariants.all { variant ->
+        variant.outputs.all { output ->
+            if (variant.name == "release") {
+                output.outputFileName = "LaEconomica.apk"
+            } else if (variant.name == "debug") {
+                output.outputFileName = "LaEconomica-Debug.apk"
+            }
         }
     }
 }

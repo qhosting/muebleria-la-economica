@@ -1,8 +1,8 @@
 {
-    "name": "VertexERP Cobrador",
+    "name": "LaEconomica",
     "short_name": "Cobrador",
     "version": "1.0.0",
-    "description": "App de cobranza en campo para VertexERP Muebles",
+    "description": "App de cobranza en campo para LaEconomica",
     "theme_color": "#0F172A",
     "background_color": "#0F172A",
     "display": "standalone",

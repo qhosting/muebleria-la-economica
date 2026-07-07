@@ -2,7 +2,7 @@ import { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
     appId: 'com.vertexerp.cobrador',
-    appName: 'VertexERP Cobrador',
+    appName: 'LaEconomica',
     webDir: 'out',
     server: {
         androidScheme: 'https',

@@ -1,11 +1,49 @@
 'use client';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { signOut, useSession } from 'next-auth/react';
-import { Settings, Printer, LogOut, RefreshCw } from 'lucide-react';
+import { Settings, Printer, LogOut, RefreshCw, Loader2 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
+import { PrinterConfigModal } from '@/components/mobile/printer-config-modal';
+import { syncService } from '@/lib/sync-service';
+import { toast } from 'sonner';
 
 export default function MobilePerfilPage() {
     const { data: session } = useSession();
+    const [showPrinterModal, setShowPrinterModal] = useState(false);
+    const [syncing, setSyncing] = useState(false);
+
+    const userId = (session?.user as any)?.id;
+
+    const handleSync = async () => {
+        if (!userId || syncing) return;
+
+        if (typeof window !== 'undefined' && !navigator.onLine) {
+            toast.error('Sin conexión', {
+                description: 'Debes estar conectado a internet para sincronizar datos'
+            });
+            return;
+        }
+
+        setSyncing(true);
+        try {
+            const success = await syncService.syncAll(userId, true);
+            if (success) {
+                toast.success('Sincronización completada con éxito');
+            } else {
+                toast.error('Advertencia', {
+                    description: 'Algunos datos no pudieron ser sincronizados'
+                });
+            }
+        } catch (error) {
+            console.error('Error al sincronizar:', error);
+            toast.error('Error al sincronizar', {
+                description: 'Ocurrió un error inesperado al intentar sincronizar'
+            });
+        } finally {
+            setSyncing(false);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -30,6 +68,7 @@ export default function MobilePerfilPage() {
                 <div className="text-xs text-slate-500 uppercase font-bold ml-1">Configuración</div>
 
                 <Button
+                    onClick={() => setShowPrinterModal(true)}
                     className="w-full bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white justify-start h-12"
                     variant="outline"
                 >
@@ -38,11 +77,17 @@ export default function MobilePerfilPage() {
                 </Button>
 
                 <Button
+                    onClick={handleSync}
+                    disabled={syncing}
                     className="w-full bg-slate-900 border border-slate-800 hover:bg-slate-800 text-white justify-start h-12"
                     variant="outline"
                 >
-                    <RefreshCw className="w-5 h-5 mr-3 text-slate-400" />
-                    Sincronizar Datos
+                    {syncing ? (
+                        <Loader2 className="w-5 h-5 mr-3 text-slate-400 animate-spin" />
+                    ) : (
+                        <RefreshCw className="w-5 h-5 mr-3 text-slate-400" />
+                    )}
+                    {syncing ? 'Sincronizando...' : 'Sincronizar Datos'}
                 </Button>
             </div>
 
@@ -60,6 +105,11 @@ export default function MobilePerfilPage() {
                     Version 1.0.0 (Build 100)
                 </div>
             </div>
+
+            <PrinterConfigModal
+                isOpen={showPrinterModal}
+                onClose={() => setShowPrinterModal(false)}
+            />
         </div>
     );
 }

@@ -5,9 +5,10 @@ const path = require('path');
 // Ajuste de rutas basándose en que el script está en app/scripts/
 // La carpeta de la aplicación Next.js está en app/app/
 const rootDir = path.join(__dirname, '../');
+const workspaceRootDir = path.join(rootDir, '../');
 const appRouterDir = path.join(rootDir, 'app');
 const apiDir = path.join(appRouterDir, 'api');
-const apiBackupDir = path.join(appRouterDir, '_api_backup');
+const apiBackupDir = path.join(workspaceRootDir, '_api_backup');
 
 console.log('🚀 Iniciando build nativo optimizado...');
 console.log('📁 Directorio Root:', rootDir);
@@ -35,7 +36,7 @@ try {
     // 2. Ejecutar el build de Next.js
     console.log('🏗️  Compilando Next.js (Static Export)...');
 
-    execSync('npx next build', {
+    execSync('npx --no-install next build', {
         stdio: 'inherit',
         shell: true,
         env: {
@@ -50,7 +51,7 @@ try {
 
 } catch (error) {
     console.error('❌ Error durante el build:', error.message);
-    process.exit(1);
+    process.exitCode = 1;
 } finally {
     // 3. Restaurar la carpeta API siempre
     if (apiOcultado && fs.existsSync(apiBackupDir)) {

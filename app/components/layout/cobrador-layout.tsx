@@ -28,9 +28,9 @@ export function CobradorLayout({ children }: CobradorLayoutProps) {
                 <div className="px-4 py-3 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 bg-emerald-600 rounded-lg flex items-center justify-center">
-                            <span className="font-bold text-white text-xs">V</span>
+                            <span className="font-bold text-white text-xs">L</span>
                         </div>
-                        <h1 className="text-lg font-bold text-white tracking-tight">Cobrador</h1>
+                        <h1 className="text-lg font-bold text-white tracking-tight">LaEconomica</h1>
                     </div>
 
                     <div className="flex items-center gap-2">
