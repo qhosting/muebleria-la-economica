@@ -42,6 +42,7 @@ import { toast } from 'sonner';
 import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
 import { TicketData } from '@/lib/bluetooth-printer';
 import { PrinterConfigModal } from './printer-config-modal';
+import { TicketModal } from './ticket-modal';
 import { Settings } from 'lucide-react';
 
 interface PagosModalProps {
@@ -63,6 +64,8 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
   const [selectedPago, setSelectedPago] = useState<Pago | null>(null);
   const [printingRecibo, setPrintingRecibo] = useState<string | null>(null);
   const [showPrinterConfig, setShowPrinterConfig] = useState(false);
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [activeTicketData, setActiveTicketData] = useState<TicketData | null>(null);
 
   const userId = (session?.user as any)?.id;
   const userRole = (session?.user as any)?.role;
@@ -234,36 +237,32 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
   };
 
   const handleReimprimirRecibo = async (pago: Pago) => {
-    if (!isPrinterConnected) {
-      toast.error('Impresora no conectada');
-      setShowPrinterConfig(true);
-      return;
-    }
-
     setPrintingRecibo(pago.id);
+    const ticketData = createReimpresionTicketData(pago);
+    setActiveTicketData(ticketData);
 
     try {
-      // Crear datos del ticket para reimpresión
-      const ticketData = createReimpresionTicketData(pago);
+      if (isPrinterConnected) {
+        // Intentar imprimir directamente por Bluetooth si está conectada
+        const success = await printTicket(ticketData);
 
-      // Imprimir usando la impresora Bluetooth
-      const success = await printTicket(ticketData);
-
-      if (success) {
-        // Marcar como reimpreso si no estaba marcado
-        if (!pago.ticketImpreso) {
-          // Aquí se podría actualizar el estado en el servidor
-          // pero para reimpresiones no es crítico
+        if (success) {
+          toast.success('Ticket reimpreso exitosamente', {
+            description: `Recibo #${ticketData.numeroRecibo} - ${formatCurrency(pago.monto)}`
+          });
+        } else {
+          // Si falló el envío Bluetooth, abrir el modal de ticket como respaldo
+          setShowTicketModal(true);
         }
-
-        toast.success('Ticket reimpreso exitosamente', {
-          description: `Recibo #${ticketData.numeroRecibo} - ${formatCurrency(pago.monto)}`
-        });
+      } else {
+        // Si no hay Bluetooth conectado, abrir modal de previsualización / impresión web
+        setShowTicketModal(true);
       }
-
     } catch (error) {
       console.error('Error reimprimiendo ticket:', error);
       toast.error('Error al reimprimir el ticket');
+      // Mostrar modal como alternativa
+      setShowTicketModal(true);
     } finally {
       setPrintingRecibo(null);
     }
@@ -556,7 +555,7 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
                               size="sm"
                               variant="outline"
                               onClick={() => handleReimprimirRecibo(pago)}
-                              disabled={printingRecibo === pago.id || !isPrinterConnected}
+                              disabled={printingRecibo === pago.id}
                               className="flex-1 h-7 text-xs"
                             >
                               {printingRecibo === pago.id ? (
@@ -660,6 +659,15 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
         <PrinterConfigModal
           isOpen={showPrinterConfig}
           onClose={() => setShowPrinterConfig(false)}
+        />
+
+        {/* Modal de Previsualización e Impresión de Ticket */}
+        <TicketModal
+          ticketData={activeTicketData}
+          isOpen={showTicketModal}
+          onClose={() => setShowTicketModal(false)}
+          isPrinterConnected={isPrinterConnected}
+          onPrintBluetooth={activeTicketData ? () => printTicket(activeTicketData) : undefined}
         />
       </DialogContent>
     </Dialog>

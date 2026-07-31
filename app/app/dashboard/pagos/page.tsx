@@ -21,6 +21,8 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
+import { TicketModal } from '@/components/mobile/ticket-modal';
+import { TicketData } from '@/lib/bluetooth-printer';
 
 interface Pago {
   id: string;
@@ -59,6 +61,9 @@ export default function PagosPage() {
   const [selectedTipo, setSelectedTipo] = useState('all');
   const [selectedCobrador, setSelectedCobrador] = useState('all');
   const [selectedFecha, setSelectedFecha] = useState('');
+  const [showTicketModal, setShowTicketModal] = useState(false);
+  const [activeTicketData, setActiveTicketData] = useState<TicketData | null>(null);
+  const [printingId, setPrintingId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchCobradores();
@@ -108,17 +113,27 @@ export default function PagosPage() {
 
   const reimprimir = async (pagoId: string) => {
     try {
+      setPrintingId(pagoId);
       const response = await fetch(`/api/pagos/${pagoId}/reimprimir`, {
         method: 'POST',
       });
 
-      if (response.ok) {
-        toast.success('Ticket reimpreso exitosamente');
+      const data = await response.json();
+
+      if (response.ok && data.ticketData) {
+        setActiveTicketData(data.ticketData);
+        setShowTicketModal(true);
+        // Actualizar ticketImpreso en el estado local
+        setPagos(prev =>
+          prev.map(p => (p.id === pagoId ? { ...p, ticketImpreso: true } : p))
+        );
       } else {
-        throw new Error('Error al reimprimir');
+        throw new Error(data.error || 'Error al reimprimir');
       }
-    } catch (error) {
-      toast.error('Error al reimprimir ticket');
+    } catch (error: any) {
+      toast.error(error.message || 'Error al reimprimir ticket');
+    } finally {
+      setPrintingId(null);
     }
   };
 
@@ -367,6 +382,13 @@ export default function PagosPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Modal para visualizar e imprimir ticket */}
+      <TicketModal
+        ticketData={activeTicketData}
+        isOpen={showTicketModal}
+        onClose={() => setShowTicketModal(false)}
+      />
     </DashboardLayout>
   );
 }
