@@ -1,13 +1,14 @@
 
-import { UserRole, StatusCuenta, Periodicidad, TipoPago, MotivoMotarario } from '@prisma/client';
+import { UserRole, StatusCuenta, Periodicidad, TipoPago, MotivoMotarario, TipoVenta } from '@prisma/client';
 
-export { UserRole, StatusCuenta, Periodicidad, TipoPago, MotivoMotarario };
+export { UserRole, StatusCuenta, Periodicidad, TipoPago, MotivoMotarario, TipoVenta };
 
 export interface User {
   id: string;
   email: string;
   name: string;
   role: UserRole;
+  codigoGestor?: string;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -141,4 +142,54 @@ export interface ClienteMoroso {
   montoVencido: number;
   telefono?: string;
   cobrador?: string;
+}
+
+export interface DetalleVenta {
+  id: string;
+  ventaId: string;
+  productoId?: string;
+  cantidad: number;
+  concepto: string;
+  precioUnitario: number;
+  importe: number;
+}
+
+export interface Venta {
+  id: string;
+  folio: number;
+  tipoVenta: TipoVenta;
+  fecha: Date | string;
+  clienteId?: string;
+  cliente?: Cliente;
+  nombreCliente: string;
+  direccionCliente?: string;
+  ciudadCliente?: string;
+  telefonoCliente?: string;
+  sucursalId?: string;
+  vendedor?: string;
+  subtotal: number;
+  descuento: number;
+  total: number;
+  enganche: number;
+  saldoFinanciado: number;
+  periodicidad?: Periodicidad;
+  plazoSemanas?: number;
+  montoCuota?: number;
+  diaPago?: string;
+  interesMoratorioMensual: number;
+  firmaCliente?: string;
+  observaciones?: string;
+  estado: string;
+  detalles: DetalleVenta[];
+  createdAt: Date | string;
+}
+
+export interface CartItem {
+  productoId?: string;
+  codigo?: string;
+  concepto: string;
+  categoria?: string;
+  precioUnitario: number;
+  cantidad: number;
+  importe: number;
 }

@@ -26,6 +26,7 @@ import {
   Upload,
   Printer,
   Package,
+  Store,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -39,6 +40,12 @@ const navigation = [
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['admin', 'gestor_cobranza', 'reporte_cobranza', 'cobrador'],
+  },
+  {
+    name: 'Kiosco de Ventas',
+    href: '/dashboard/kiosco',
+    icon: Store,
+    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
   },
   {
     name: 'Clientes',

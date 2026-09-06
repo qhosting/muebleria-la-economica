@@ -27,6 +27,11 @@ enum Periodicidad {
   mensual
 }
 
+enum TipoVenta {
+  contado
+  credito
+}
+
 enum TipoPago {
   regular
   moratorio
@@ -103,6 +108,7 @@ model Cliente {
   sucursal            Sucursal?     @relation(fields: [sucursalId], references: [id])
   pagos               Pago[]
   motararios          Motarario[]
+  ventas              Venta[]
 
   @@map("clientes")
 }
@@ -252,6 +258,7 @@ model Sucursal {
   movimientosOrigen       MovimientoInventario[] @relation("MovimientoOrigen")
   movimientosDestino      MovimientoInventario[] @relation("MovimientoDestino")
   clientes                Cliente[]
+  ventas                  Venta[]
 
   @@map("sucursales")
 }
@@ -274,6 +281,7 @@ model Producto {
   stocks          Stock[]
   movimientos     MovimientoInventario[]
   clientes        Cliente[]
+  detallesVenta   DetalleVenta[]
 
   @@map("productos")
 }
@@ -309,4 +317,65 @@ model MovimientoInventario {
   sucursalDestino   Sucursal?       @relation("MovimientoDestino", fields: [sucursalDestinoId], references: [id])
 
   @@map("movimientos_inventario")
+}
+
+model Venta {
+  id                      String         @id @default(cuid())
+  folio                   Int            @unique // Consecutivo de remisión ej: 454
+  tipoVenta               TipoVenta      @default(credito)
+  fecha                   DateTime       @default(now())
+
+  clienteId               String?
+  cliente                 Cliente?       @relation(fields: [clienteId], references: [id])
+
+  nombreCliente           String
+  direccionCliente        String?
+  ciudadCliente           String?        @default("Aculco, Edo. de Méx.")
+  telefonoCliente         String?
+
+  sucursalId              String?
+  sucursal                Sucursal?      @relation(fields: [sucursalId], references: [id])
+
+  vendedor                String?        @default("TIENDA")
+
+  subtotal                Decimal        @db.Decimal(10,2)
+  descuento               Decimal        @default(0) @db.Decimal(10,2)
+  total                   Decimal        @db.Decimal(10,2)
+
+  // Financiamiento / Crédito
+  enganche                Decimal        @default(0) @db.Decimal(10,2)
+  saldoFinanciado         Decimal        @default(0) @db.Decimal(10,2)
+  periodicidad            Periodicidad?  @default(semanal)
+  plazoSemanas            Int?
+  montoCuota              Decimal?       @db.Decimal(10,2)
+  diaPago                 String?        // 1=Lunes ... 7=Domingo
+  interesMoratorioMensual Decimal        @default(10) @db.Decimal(5,2)
+
+  // Firma y control
+  firmaCliente            String?        @db.Text
+  observaciones           String?
+  estado                  String         @default("completada") // completada, cancelada
+
+  detalles                DetalleVenta[]
+  createdAt               DateTime       @default(now())
+  updatedAt               DateTime       @updatedAt
+
+  @@index([folio])
+  @@index([fecha])
+  @@map("ventas")
+}
+
+model DetalleVenta {
+  id              String    @id @default(cuid())
+  ventaId         String
+  venta           Venta     @relation(fields: [ventaId], references: [id], onDelete: Cascade)
+  productoId      String?
+  producto        Producto? @relation(fields: [productoId], references: [id])
+
+  cantidad        Int       @default(1)
+  concepto        String    // Descripción comercial del producto
+  precioUnitario  Decimal   @db.Decimal(10,2)
+  importe         Decimal   @db.Decimal(10,2)
+
+  @@map("detalles_venta")
 }
