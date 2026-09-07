@@ -130,10 +130,11 @@ export default function KioscoVentasPage() {
 
   // Búsqueda de clientes existentes
   const handleBuscarCliente = async (query: string) => {
-    setNombreCliente(query);
-    if (query.length > 2) {
+    const valorMayus = query.toUpperCase();
+    setNombreCliente(valorMayus);
+    if (valorMayus.length > 2) {
       try {
-        const res = await fetch(`/api/clientes?search=${encodeURIComponent(query)}&limit=5`);
+        const res = await fetch(`/api/clientes?search=${encodeURIComponent(valorMayus)}&limit=5`);
         if (res.ok) {
           const data = await res.json();
           setClientesExistentes(data.clientes || []);
@@ -148,9 +149,9 @@ export default function KioscoVentasPage() {
 
   const seleccionarCliente = (c: Cliente) => {
     setClienteIdExistente(c.id);
-    setNombreCliente(c.nombreCompleto);
-    setTelefonoCliente(c.telefono || '');
-    setDireccionCliente(c.direccionCompleta || '');
+    setNombreCliente((c.nombreCompleto || '').toUpperCase());
+    setTelefonoCliente((c.telefono || '').toUpperCase());
+    setDireccionCliente((c.direccionCompleta || '').toUpperCase());
     if (c.cobradorAsignadoId) setCobradorAsignadoId(c.cobradorAsignadoId);
     if (c.diaPago) setDiaPago(c.diaPago.toString());
     setClientesExistentes([]);
@@ -195,7 +196,7 @@ export default function KioscoVentasPage() {
     setCarrito([
       ...carrito,
       {
-        concepto: customProduct.concepto.trim(),
+        concepto: customProduct.concepto.trim().toUpperCase(),
         categoria: 'Personalizado',
         precioUnitario: precio,
         cantidad: 1,
@@ -280,10 +281,10 @@ export default function KioscoVentasPage() {
       setLoading(true);
       const payload = {
         tipoVenta,
-        nombreCliente: nombreCliente.trim(),
-        direccionCliente: direccionCliente.trim(),
-        ciudadCliente: ciudadCliente.trim(),
-        telefonoCliente: telefonoCliente.trim(),
+        nombreCliente: nombreCliente.trim().toUpperCase(),
+        direccionCliente: direccionCliente.trim().toUpperCase(),
+        ciudadCliente: ciudadCliente.trim().toUpperCase(),
+        telefonoCliente: telefonoCliente.trim().toUpperCase(),
         clienteIdExistente: clienteIdExistente || undefined,
         sucursalId: sucursalSeleccionada || undefined,
         subtotal: totalBruto,
@@ -320,10 +321,10 @@ export default function KioscoVentasPage() {
         folio: data.folioFormateado,
         fecha: new Date(),
         tipoVenta,
-        nombreCliente: nombreCliente.trim(),
-        direccionCliente: direccionCliente.trim(),
-        ciudadCliente: ciudadCliente.trim(),
-        telefonoCliente: telefonoCliente.trim(),
+        nombreCliente: nombreCliente.trim().toUpperCase(),
+        direccionCliente: direccionCliente.trim().toUpperCase(),
+        ciudadCliente: ciudadCliente.trim().toUpperCase(),
+        telefonoCliente: telefonoCliente.trim().toUpperCase(),
         codigoCliente: data.codigoCliente || 'CL-NUEVO',
         total: totalBruto,
         enganche: tipoVenta === 'credito' ? planCredito.enganche : 0,
@@ -435,8 +436,8 @@ export default function KioscoVentasPage() {
                     <Input
                       placeholder="Buscar por nombre, marca (Whirlpool, Mabe, Oster...), modelo..."
                       value={busqueda}
-                      onChange={e => setBusqueda(e.target.value)}
-                      className="pl-9 h-10 bg-slate-50 border-slate-200 focus:bg-white text-sm"
+                      onChange={e => setBusqueda(e.target.value.toUpperCase())}
+                      className="pl-9 h-10 bg-slate-50 border-slate-200 focus:bg-white text-sm uppercase placeholder:normal-case"
                     />
                   </div>
                 </CardHeader>
@@ -656,8 +657,8 @@ export default function KioscoVentasPage() {
                       <Input
                         placeholder="Nombre Completo del Cliente *"
                         value={nombreCliente}
-                        onChange={e => handleBuscarCliente(e.target.value)}
-                        className="h-9 text-xs"
+                        onChange={e => handleBuscarCliente(e.target.value.toUpperCase())}
+                        className="h-9 text-xs uppercase placeholder:normal-case"
                       />
                       {clientesExistentes.length > 0 && (
                         <div className="absolute top-10 left-0 right-0 z-30 bg-white border rounded-lg shadow-xl max-h-40 overflow-y-auto divide-y">
@@ -667,7 +668,7 @@ export default function KioscoVentasPage() {
                               onClick={() => seleccionarCliente(c)}
                               className="p-2 text-xs hover:bg-blue-50 cursor-pointer flex justify-between items-center"
                             >
-                              <span className="font-bold">{c.nombreCompleto}</span>
+                              <span className="font-bold">{c.nombreCompleto.toUpperCase()}</span>
                               <span className="text-[10px] text-gray-500">{c.codigoCliente}</span>
                             </div>
                           ))}
@@ -679,22 +680,22 @@ export default function KioscoVentasPage() {
                       <Input
                         placeholder="Teléfono (ej. 427 123 4567)"
                         value={telefonoCliente}
-                        onChange={e => setTelefonoCliente(e.target.value)}
-                        className="h-9 text-xs"
+                        onChange={e => setTelefonoCliente(e.target.value.toUpperCase())}
+                        className="h-9 text-xs uppercase placeholder:normal-case"
                       />
                       <Input
                         placeholder="Ciudad / Municipio"
                         value={ciudadCliente}
-                        onChange={e => setCiudadCliente(e.target.value)}
-                        className="h-9 text-xs"
+                        onChange={e => setCiudadCliente(e.target.value.toUpperCase())}
+                        className="h-9 text-xs uppercase placeholder:normal-case"
                       />
                     </div>
 
                     <Input
                       placeholder="Dirección Completa (Calle, Número, Colonia)"
                       value={direccionCliente}
-                      onChange={e => setDireccionCliente(e.target.value)}
-                      className="h-9 text-xs"
+                      onChange={e => setDireccionCliente(e.target.value.toUpperCase())}
+                      className="h-9 text-xs uppercase placeholder:normal-case"
                     />
                   </div>
 
@@ -968,8 +969,8 @@ export default function KioscoVentasPage() {
                 <Input
                   placeholder="ej. Ropero Caoba con luna especial"
                   value={customProduct.concepto}
-                  onChange={e => setCustomProduct({ ...customProduct, concepto: e.target.value })}
-                  className="h-9 text-xs mt-1"
+                  onChange={e => setCustomProduct({ ...customProduct, concepto: e.target.value.toUpperCase() })}
+                  className="h-9 text-xs mt-1 uppercase placeholder:normal-case"
                 />
               </div>
               <div>
