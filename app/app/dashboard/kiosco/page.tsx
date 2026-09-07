@@ -32,7 +32,7 @@ import {
   History,
   FileText
 } from 'lucide-react';
-import { formatCurrency, getDayName } from '@/lib/utils';
+import { formatCurrency, getDayName, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, calcularPlanCredito } from '@/lib/catalogo-kiosco';
 import { RemisionPagarePrint } from '@/components/ventas/RemisionPagarePrint';
@@ -372,16 +372,24 @@ export default function KioscoVentasPage() {
 
           <div className="flex items-center gap-2">
             <Button
-              variant={tabPrincipal === 'kiosco' ? 'secondary' : 'outline'}
-              className="gap-2 font-bold"
+              className={cn(
+                "gap-2 font-bold transition-all border",
+                tabPrincipal === 'kiosco'
+                  ? "bg-white text-blue-950 border-white hover:bg-blue-50 shadow-sm"
+                  : "bg-white/15 text-white border-white/40 hover:bg-white/25 hover:text-white"
+              )}
               onClick={() => setTabPrincipal('kiosco')}
             >
               <ShoppingCart className="h-4 w-4" />
               Mostrador
             </Button>
             <Button
-              variant={tabPrincipal === 'historial' ? 'secondary' : 'outline'}
-              className="gap-2 font-bold"
+              className={cn(
+                "gap-2 font-bold transition-all border",
+                tabPrincipal === 'historial'
+                  ? "bg-white text-blue-950 border-white hover:bg-blue-50 shadow-sm"
+                  : "bg-white/15 text-white border-white/40 hover:bg-white/25 hover:text-white"
+              )}
               onClick={() => {
                 setTabPrincipal('historial');
                 cargarHistorial();

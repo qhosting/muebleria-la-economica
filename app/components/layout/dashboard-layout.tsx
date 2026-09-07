@@ -3,7 +3,7 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar } from './sidebar';
 import { BusquedaGlobal } from '@/components/busqueda-global';
 import { cn } from '@/lib/utils';
@@ -17,9 +17,32 @@ interface DashboardLayoutProps {
 export function DashboardLayout({ children, className }: DashboardLayoutProps) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [isCollapsed, setIsCollapsed] = useState(false);
   
   // Activar atajos de teclado
   useKeyboardShortcuts();
+
+  // Restaurar preferencia guardada de colapso de menú
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('sidebar_collapsed');
+      if (saved !== null) {
+        setIsCollapsed(saved === 'true');
+      }
+    } catch (e) {
+      // Ignorar error de acceso a localStorage
+    }
+  }, []);
+
+  const handleToggleCollapse = () => {
+    setIsCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem('sidebar_collapsed', String(next));
+      } catch (e) {}
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -44,8 +67,17 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Sidebar session={session} />
-      <div className="lg:pl-64 flex flex-col min-h-screen">
+      <Sidebar
+        session={session}
+        isCollapsed={isCollapsed}
+        onToggleCollapse={handleToggleCollapse}
+      />
+      <div
+        className={cn(
+          "flex flex-col min-h-screen transition-all duration-300 ease-in-out",
+          isCollapsed ? "lg:pl-16" : "lg:pl-64"
+        )}
+      >
         {/* Header con búsqueda global */}
         <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
           <div className="flex items-center justify-between px-4 lg:px-8 h-16">
@@ -58,7 +90,7 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
           </div>
         </header>
         
-        <main className={cn("flex-1 p-4 lg:p-8", className)}>
+        <main className={cn("flex-1 p-4 lg:p-8 transition-all duration-300", className)}>
           {children}
         </main>
       </div>
