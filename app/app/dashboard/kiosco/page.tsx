@@ -290,8 +290,47 @@ export default function KioscoVentasPage() {
     'Cocinas y Muebles'
   ];
 
+  // Combinar catálogo inicial con productos registrados / actualizados en BD
+  const catalogoCombinado = React.useMemo(() => {
+    if (productosDB && productosDB.length > 0) {
+      const mapaDB = new Map(productosDB.map((p: any) => [p.codigo?.toUpperCase(), p]));
+      
+      const catalogoActualizado = CATALOGO_PRODUCTOS_INICIAL.map(item => {
+        const prodDB = mapaDB.get(item.codigo?.toUpperCase());
+        if (prodDB) {
+          mapaDB.delete(item.codigo?.toUpperCase());
+          return {
+            ...item,
+            id: prodDB.id || item.id,
+            nombre: prodDB.nombre || item.nombre,
+            precioVenta: prodDB.precioVenta || item.precioVenta,
+            precioContado: prodDB.precioCompra || item.precioContado,
+            categoria: (prodDB.categoria || item.categoria) as any,
+            descripcion: prodDB.descripcion || item.descripcion
+          };
+        }
+        return item;
+      });
+
+      // Agregar cualquier producto nuevo creado en BD que no esté en el catálogo inicial
+      const nuevosDeBD: CatalogoItem[] = Array.from(mapaDB.values()).map((p: any) => ({
+        id: p.id,
+        codigo: p.codigo,
+        nombre: p.nombre,
+        categoria: (p.categoria || 'Cocinas y Muebles') as any,
+        marca: 'General',
+        precioContado: p.precioCompra || p.precioVenta,
+        precioVenta: p.precioVenta,
+        descripcion: p.descripcion || ''
+      }));
+
+      return [...catalogoActualizado, ...nuevosDeBD];
+    }
+    return CATALOGO_PRODUCTOS_INICIAL;
+  }, [productosDB]);
+
   // Filtrado de catálogo
-  const catalogoFiltrado = CATALOGO_PRODUCTOS_INICIAL.filter(item => {
+  const catalogoFiltrado = catalogoCombinado.filter(item => {
     const matchCat = categoriaSeleccionada === 'Todos' || item.categoria === categoriaSeleccionada;
     const matchSearch =
       item.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||

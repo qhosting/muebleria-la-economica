@@ -17,7 +17,8 @@ import {
     FileText,
     AlertTriangle,
     ShoppingBag,
-    Store
+    Store,
+    Pencil
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -25,6 +26,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MovimientoModal } from '@/components/inventario/MovimientoModal';
 import { NuevoProductoModal } from '@/components/inventario/NuevoProductoModal';
 import { NuevaSucursalModal } from '@/components/inventario/NuevaSucursalModal';
+import { EditarProductoModal } from '@/components/inventario/EditarProductoModal';
 
 export default function InventarioPage() {
     const { data: session } = useSession();
@@ -36,6 +38,8 @@ export default function InventarioPage() {
     const [isMovimientoOpen, setIsMovimientoOpen] = useState(false);
     const [isProductoOpen, setIsProductoOpen] = useState(false);
     const [isSucursalOpen, setIsSucursalOpen] = useState(false);
+    const [isEditarOpen, setIsEditarOpen] = useState(false);
+    const [productoAEditar, setProductoAEditar] = useState<any>(null);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
 
     useEffect(() => {
@@ -199,6 +203,7 @@ export default function InventarioPage() {
                                                     <th className="p-3 font-medium text-gray-600 text-center">Total Stock</th>
                                                     <th className="p-3 font-medium text-gray-600">Estado</th>
                                                     <th className="p-3 font-medium text-gray-600">Distribución</th>
+                                                    <th className="p-3 font-medium text-gray-600 text-center">Acciones</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -234,6 +239,21 @@ export default function InventarioPage() {
                                                                 ))}
                                                             </div>
                                                         </td>
+                                                        <td className="p-3 text-center">
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                className="h-8 gap-1.5 text-xs text-blue-700 hover:text-blue-900 border-blue-200 hover:bg-blue-50 font-semibold"
+                                                                onClick={() => {
+                                                                    setProductoAEditar(producto);
+                                                                    setIsEditarOpen(true);
+                                                                }}
+                                                                title="Modificar precio y detalles"
+                                                            >
+                                                                <Pencil className="h-3.5 w-3.5 text-blue-600" />
+                                                                Editar
+                                                            </Button>
+                                                        </td>
                                                     </tr>
                                                 ))}
                                             </tbody>
@@ -253,28 +273,21 @@ export default function InventarioPage() {
                     </TabsContent>
 
                     <TabsContent value="bodegas">
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {sucursales.map((sucursal) => (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {sucursales.map(sucursal => (
                                 <Card key={sucursal.id}>
                                     <CardHeader className="pb-2">
-                                        <div className="flex justify-between items-start">
-                                            <div>
-                                                <CardTitle className="text-lg">{sucursal.nombre}</CardTitle>
-                                                <CardDescription>{sucursal.direccion || 'Sin dirección'}</CardDescription>
-                                            </div>
-                                            <Badge variant={sucursal.esBodega ? "default" : "outline"}>
-                                                {sucursal.esBodega ? 'Bodega' : 'Tienda'}
+                                        <div className="flex justify-between items-center">
+                                            <CardTitle className="text-lg">{sucursal.nombre}</CardTitle>
+                                            <Badge variant={sucursal.esBodega ? "secondary" : "default"}>
+                                                {sucursal.esBodega ? "Bodega" : "Tienda"}
                                             </Badge>
                                         </div>
+                                        <CardDescription>{sucursal.direccion || 'Sin dirección registrada'}</CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="flex items-center gap-2 text-sm text-gray-600 mb-2">
-                                            <MapPin className="h-4 w-4" />
-                                            {sucursal.telefono || 'Sin teléfono'}
-                                        </div>
-                                        <div className="mt-4 pt-4 border-t flex justify-between items-center text-sm">
-                                            <span className="text-gray-500">Productos distintos:</span>
-                                            <span className="font-bold">{sucursal._count?.stocks || 0}</span>
+                                        <div className="text-sm text-gray-600">
+                                            Teléfono: {sucursal.telefono || 'N/A'}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -302,6 +315,14 @@ export default function InventarioPage() {
                     isOpen={isSucursalOpen}
                     onClose={() => setIsSucursalOpen(false)}
                     onSuccess={fetchData}
+                />
+
+                <EditarProductoModal
+                    isOpen={isEditarOpen}
+                    onClose={() => setIsEditarOpen(false)}
+                    onSuccess={fetchData}
+                    producto={productoAEditar}
+                    sucursales={sucursales}
                 />
             </div>
         </DashboardLayout>

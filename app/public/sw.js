@@ -13,6 +13,8 @@ const urlsToCache = [
   '/dashboard/plantillas',
   '/dashboard/configuracion',
   '/dashboard/morosidad',
+  '/dashboard/kiosco',
+  '/dashboard/inventario',
   '/manifest.json',
   '/icon-192x192.png',
   '/icon-512x512.png',
