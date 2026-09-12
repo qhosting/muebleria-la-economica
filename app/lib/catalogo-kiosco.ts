@@ -59,6 +59,13 @@ export interface CatalogoItem {
   precioVenta: number;
   precioContado: number;
   stockSugerido?: number;
+  stockTotal?: number;
+  stockPorSucursal?: Array<{
+    sucursalId?: string;
+    sucursalNombre?: string;
+    cantidad: number;
+    esBodega?: boolean;
+  }>;
   sucursal?: string;
   sucursalNombre?: string;
 }

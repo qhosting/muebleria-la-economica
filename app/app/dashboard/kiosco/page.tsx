@@ -194,10 +194,43 @@ export default function KioscoVentasPage() {
     toast.success(`Cliente seleccionado: ${c.nombreCompleto} (${c.codigoCliente})`);
   };
 
+  // Función para obtener la existencia real de un producto en la sucursal activa
+  const obtenerStockSucursal = (item: CatalogoItem): number => {
+    // 1. Revisar stock por sucursal si viene de la base de datos
+    if (item.stockPorSucursal && Array.isArray(item.stockPorSucursal) && item.stockPorSucursal.length > 0) {
+      const reg = item.stockPorSucursal.find((s: any) => 
+        (s.sucursalId && sucursalSeleccionada && s.sucursalId === sucursalSeleccionada) ||
+        (s.sucursalNombre && sucursalActual?.nombre && 
+         s.sucursalNombre.toUpperCase().trim() === sucursalActual.nombre.toUpperCase().trim())
+      );
+      if (reg !== undefined) {
+        return Number(reg.cantidad) || 0;
+      }
+    }
+
+    // 2. Si no hay registro explícito en BD para esta sucursal:
+    // Los productos cargados primero del catálogo físico pertenecen exclusivamente a SAN LUCAS 3ER CUARTEL
+    const esSanLucas = sucursalActual?.nombre?.toUpperCase().includes('SAN LUCAS');
+    if (esSanLucas) {
+      return item.stockSugerido || item.stockTotal || 5;
+    }
+
+    // Para cualquier otra sucursal (AMEALCO, LA ESTANCIA SJR, SAN ILDEFONSO), si no tiene stock asignado en la BD, la existencia es 0
+    return 0;
+  };
+
   // Agregar producto del catálogo al carrito
   const agregarAlCarrito = (item: CatalogoItem) => {
-    const precio = tipoVenta === 'contado' ? item.precioContado : item.precioVenta;
+    const stockDisp = obtenerStockSucursal(item);
     const existenteIndex = carrito.findIndex(c => c.concepto === item.nombre);
+    const cantActual = existenteIndex >= 0 ? carrito[existenteIndex].cantidad : 0;
+
+    if (cantActual >= stockDisp) {
+      toast.error(`Existencia insuficiente: Solo hay ${stockDisp} unidad(es) de "${item.nombre}" en ${sucursalActual?.nombre || 'esta sucursal'}`);
+      return;
+    }
+
+    const precio = tipoVenta === 'contado' ? item.precioContado : item.precioVenta;
 
     if (existenteIndex >= 0) {
       const nuevoCarrito = [...carrito];
@@ -306,10 +339,22 @@ export default function KioscoVentasPage() {
             precioVenta: prodDB.precioVenta || item.precioVenta,
             precioContado: prodDB.precioCompra || item.precioContado,
             categoria: (prodDB.categoria || item.categoria) as any,
-            descripcion: prodDB.descripcion || item.descripcion
+            descripcion: prodDB.descripcion || item.descripcion,
+            stockTotal: prodDB.stockTotal,
+            stockPorSucursal: prodDB.stockPorSucursal || []
           };
         }
-        return item;
+        return {
+          ...item,
+          stockTotal: item.stockSugerido || 5,
+          stockPorSucursal: [
+            {
+              sucursalId: 'sucursal-san-lucas-3er-cuartel',
+              sucursalNombre: 'SAN LUCAS 3ER CUARTEL',
+              cantidad: item.stockSugerido || 5
+            }
+          ]
+        };
       });
 
       // Agregar cualquier producto nuevo creado en BD que no esté en el catálogo inicial
@@ -321,23 +366,48 @@ export default function KioscoVentasPage() {
         marca: 'General',
         precioContado: p.precioCompra || p.precioVenta,
         precioVenta: p.precioVenta,
-        descripcion: p.descripcion || ''
+        descripcion: p.descripcion || '',
+        stockTotal: p.stockTotal || 0,
+        stockPorSucursal: p.stockPorSucursal || []
       }));
 
       return [...catalogoActualizado, ...nuevosDeBD];
     }
-    return CATALOGO_PRODUCTOS_INICIAL;
+    
+    // Si aún no carga productosDB, asumir catálogo inicial con existencia en SAN LUCAS 3ER CUARTEL
+    return CATALOGO_PRODUCTOS_INICIAL.map(item => ({
+      ...item,
+      stockTotal: item.stockSugerido || 5,
+      stockPorSucursal: [
+        {
+          sucursalId: 'sucursal-san-lucas-3er-cuartel',
+          sucursalNombre: 'SAN LUCAS 3ER CUARTEL',
+          cantidad: item.stockSugerido || 5
+        }
+      ]
+    }));
   }, [productosDB]);
 
-  // Filtrado de catálogo
+  // Filtrado de catálogo: SOLO mostrar productos con existencia disponible en la sucursal activa
   const catalogoFiltrado = catalogoCombinado.filter(item => {
+    // 1. Filtrar estrictamente por existencia en la sucursal seleccionada
+    const stockDisponible = obtenerStockSucursal(item);
+    if (stockDisponible <= 0) {
+      return false; // NO MOSTRAR si no hay existencia en esta sucursal
+    }
+
+    // 2. Filtro por categoría
     const matchCat = categoriaSeleccionada === 'Todos' || item.categoria === categoriaSeleccionada;
+    if (!matchCat) return false;
+
+    // 3. Filtro por búsqueda
     const matchSearch =
       item.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
       item.marca.toLowerCase().includes(busqueda.toLowerCase()) ||
       (item.modelo && item.modelo.toLowerCase().includes(busqueda.toLowerCase())) ||
+      (item.codigo && item.codigo.toLowerCase().includes(busqueda.toLowerCase())) ||
       (item.descripcion && item.descripcion.toLowerCase().includes(busqueda.toLowerCase()));
-    return matchCat && matchSearch;
+    return matchSearch;
   });
 
   // Procesar Venta / Levantamiento de Crédito
@@ -570,11 +640,21 @@ export default function KioscoVentasPage() {
                   {/* Grid de Productos */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[560px] overflow-y-auto pr-1">
                     {catalogoFiltrado.length === 0 ? (
-                      <div className="col-span-2 text-center py-10 text-gray-400 text-sm">
-                        No se encontraron productos coincidentes con "{busqueda}"
+                      <div className="col-span-2 text-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-gray-500 text-sm space-y-2">
+                        <Package className="h-8 w-8 mx-auto text-gray-400" />
+                        <p className="font-semibold text-gray-700">
+                          No hay productos con existencia disponible en {sucursalActual?.nombre || 'esta sucursal'}.
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {busqueda
+                            ? `Sin coincidencias para "${busqueda}".`
+                            : 'Esta sucursal aún no cuenta con stock cargado o traspasado.'}
+                        </p>
                       </div>
                     ) : (
-                      catalogoFiltrado.map(prod => (
+                      catalogoFiltrado.map(prod => {
+                        const stockDisp = obtenerStockSucursal(prod);
+                        return (
                         <div
                           key={prod.id}
                           onClick={() => agregarAlCarrito(prod)}
@@ -588,6 +668,9 @@ export default function KioscoVentasPage() {
                                 </Badge>
                                 <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/80">
                                   {sucursalActual?.nombre || 'SAN LUCAS'}
+                                </span>
+                                <span className="text-[10px] font-extrabold text-blue-800 bg-blue-100/70 px-1.5 py-0.5 rounded border border-blue-200">
+                                  📦 {stockDisp} disp.
                                 </span>
                               </div>
                               {prod.tamano && (
@@ -624,7 +707,7 @@ export default function KioscoVentasPage() {
                             </Button>
                           </div>
                         </div>
-                      ))
+                      ); })
                     )}
                   </div>
                 </CardContent>
