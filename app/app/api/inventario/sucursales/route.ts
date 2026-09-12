@@ -6,6 +6,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
+import { SUCURSALES_SISTEMA } from '@/lib/catalogo-kiosco';
+
 // GET - Listar sucursales/bodegas
 export async function GET(request: NextRequest) {
     try {
@@ -26,7 +28,7 @@ export async function GET(request: NextRequest) {
             where.esBodega = false;
         }
 
-        const sucursales = await prisma.sucursal.findMany({
+        let sucursales = await prisma.sucursal.findMany({
             where,
             include: {
                 _count: {
@@ -35,6 +37,40 @@ export async function GET(request: NextRequest) {
             },
             orderBy: { nombre: 'asc' }
         });
+
+        // Asegurar existencia de las 4 sucursales oficiales del sistema
+        if (sucursales.length < SUCURSALES_SISTEMA.length) {
+            try {
+                for (const suc of SUCURSALES_SISTEMA) {
+                    await prisma.sucursal.upsert({
+                        where: { nombre: suc.nombre },
+                        update: {
+                            direccion: suc.direccion,
+                            telefono: suc.telefono,
+                            isActive: true
+                        },
+                        create: {
+                            nombre: suc.nombre,
+                            direccion: suc.direccion,
+                            telefono: suc.telefono,
+                            esBodega: suc.esBodega,
+                            isActive: true
+                        }
+                    });
+                }
+                sucursales = await prisma.sucursal.findMany({
+                    where,
+                    include: {
+                        _count: {
+                            select: { stocks: true }
+                        }
+                    },
+                    orderBy: { nombre: 'asc' }
+                });
+            } catch (createErr) {
+                console.warn('Advertencia asegurando sucursales oficiales:', createErr);
+            }
+        }
 
         return NextResponse.json(sucursales);
     } catch (error) {

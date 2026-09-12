@@ -30,11 +30,12 @@ import {
   Sparkles,
   Package,
   History,
-  FileText
+  FileText,
+  UserCheck
 } from 'lucide-react';
 import { formatCurrency, getDayName, cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, calcularPlanCredito } from '@/lib/catalogo-kiosco';
+import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, SUCURSALES_SISTEMA, SUCURSAL_SAN_LUCAS, calcularPlanCredito } from '@/lib/catalogo-kiosco';
 import { RemisionPagarePrint } from '@/components/ventas/RemisionPagarePrint';
 import { SignaturePadModal } from '@/components/ventas/SignaturePadModal';
 import { CartItem, Cliente, User as UserType } from '@/lib/types';
@@ -49,6 +50,10 @@ export default function KioscoVentasPage() {
   const [cobradores, setCobradores] = useState<UserType[]>([]);
   const [sucursales, setSucursales] = useState<any[]>([]);
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
+  const [vendedores, setVendedores] = useState<any[]>([]);
+  const [vendedorSeleccionadoId, setVendedorSeleccionadoId] = useState<string>('tienda');
+  const [vendedorNombre, setVendedorNombre] = useState<string>('VENTA MOSTRADOR');
+  const [vendedorManual, setVendedorManual] = useState<string>('');
   const [clientesExistentes, setClientesExistentes] = useState<Cliente[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -88,10 +93,11 @@ export default function KioscoVentasPage() {
   const cargarDatosIniciales = async () => {
     try {
       setLoading(true);
-      const [resCobradores, resSucursales, resProductos] = await Promise.all([
+      const [resCobradores, resSucursales, resProductos, resVendedores] = await Promise.all([
         fetch('/api/users/cobradores'),
         fetch('/api/inventario/sucursales'),
-        fetch('/api/inventario/productos')
+        fetch('/api/inventario/productos'),
+        fetch('/api/users/vendedores')
       ]);
 
       if (resCobradores.ok) {
@@ -99,10 +105,20 @@ export default function KioscoVentasPage() {
         setCobradores(data || []);
       }
 
+      if (resVendedores.ok) {
+        const data = await resVendedores.json();
+        setVendedores(data || []);
+      }
+
       if (resSucursales.ok) {
         const data = await resSucursales.json();
         setSucursales(data || []);
-        if (data.length > 0) setSucursalSeleccionada(data[0].id);
+        // Priorizar por defecto la sucursal SAN LUCAS 3ER CUARTEL
+        const sanLucas = data?.find((s: any) => 
+          s.nombre?.toUpperCase().includes('SAN LUCAS')
+        );
+        const inicialId = sanLucas ? sanLucas.id : (data.length > 0 ? data[0].id : '');
+        setSucursalSeleccionada(inicialId);
       }
 
       if (resProductos.ok) {
@@ -113,6 +129,26 @@ export default function KioscoVentasPage() {
       console.error('Error al cargar datos:', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const sucursalActual = sucursales.find(s => s.id === sucursalSeleccionada) ||
+    SUCURSALES_SISTEMA.find(s => s.id === sucursalSeleccionada) ||
+    SUCURSAL_SAN_LUCAS;
+
+  const handleCambiarSucursal = (id: string) => {
+    setSucursalSeleccionada(id);
+    const suc = sucursales.find(s => s.id === id);
+    if (suc) {
+      toast.info(`Sucursal seleccionada: ${suc.nombre}`);
+      const vendSuc = vendedores.find(v => v.sucursalId === id);
+      if (vendSuc) {
+        setVendedorSeleccionadoId(vendSuc.id);
+        setVendedorNombre(vendSuc.name);
+      } else {
+        setVendedorSeleccionadoId('tienda');
+        setVendedorNombre('VENTA MOSTRADOR');
+      }
     }
   };
 
@@ -279,6 +315,10 @@ export default function KioscoVentasPage() {
 
     try {
       setLoading(true);
+      const nombreVendedorFinal = vendedorSeleccionadoId === 'otro'
+        ? (vendedorManual.trim().toUpperCase() || 'MOSTRADOR')
+        : (vendedorNombre || vendedores.find(v => v.id === vendedorSeleccionadoId)?.name || session?.user?.name || 'MOSTRADOR');
+
       const payload = {
         tipoVenta,
         nombreCliente: nombreCliente.trim().toUpperCase(),
@@ -287,6 +327,9 @@ export default function KioscoVentasPage() {
         telefonoCliente: telefonoCliente.trim().toUpperCase(),
         clienteIdExistente: clienteIdExistente || undefined,
         sucursalId: sucursalSeleccionada || undefined,
+        sucursalNombre: sucursalActual?.nombre || 'SAN LUCAS 3ER CUARTEL',
+        vendedor: nombreVendedorFinal,
+        vendedorId: vendedorSeleccionadoId && !['tienda', 'otro'].includes(vendedorSeleccionadoId) ? vendedorSeleccionadoId : undefined,
         subtotal: totalBruto,
         descuento: 0,
         total: totalBruto,
@@ -326,6 +369,9 @@ export default function KioscoVentasPage() {
         ciudadCliente: ciudadCliente.trim().toUpperCase(),
         telefonoCliente: telefonoCliente.trim().toUpperCase(),
         codigoCliente: data.codigoCliente || 'CL-NUEVO',
+        sucursalId: sucursalSeleccionada,
+        sucursalNombre: sucursalActual?.nombre || 'SAN LUCAS 3ER CUARTEL',
+        vendedor: nombreVendedorFinal,
         total: totalBruto,
         enganche: tipoVenta === 'credito' ? planCredito.enganche : 0,
         saldoFinanciado: tipoVenta === 'credito' ? planCredito.saldoFinanciado : 0,
@@ -358,17 +404,37 @@ export default function KioscoVentasPage() {
     <DashboardLayout>
       <div className="space-y-6">
         {/* ENCABEZADO DEL KIOSCO */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gradient-to-r from-blue-900 to-indigo-900 p-6 rounded-2xl text-white shadow-lg">
-          <div>
+        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-gradient-to-r from-blue-900 to-indigo-900 p-6 rounded-2xl text-white shadow-lg">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 flex-wrap">
             <div className="flex items-center gap-3">
-              <Store className="h-8 w-8 text-blue-300" />
-              <h1 className="text-2xl md:text-3xl font-black tracking-tight">
-                Kiosco de Ventas y Crédito
-              </h1>
+              <Store className="h-8 w-8 text-blue-300 shrink-0" />
+              <div>
+                <h1 className="text-2xl md:text-3xl font-black tracking-tight">
+                  Kiosco de Ventas y Crédito
+                </h1>
+                <p className="text-blue-200 text-xs mt-0.5">
+                  Mueblería La Económica • Levantamiento de crédito, contado y contrato
+                </p>
+              </div>
             </div>
-            <p className="text-blue-200 text-sm mt-1">
-              Mueblería La Económica • Levantamiento de crédito, contado y emisión de contrato oficial
-            </p>
+
+            {/* Selector de Sucursal Activa */}
+            <div className="flex items-center gap-2 bg-white/10 backdrop-blur px-3 py-1.5 rounded-xl border border-white/20">
+              <MapPin className="h-4 w-4 text-emerald-300 shrink-0" />
+              <span className="text-xs text-blue-100 font-semibold">Sucursal:</span>
+              <Select value={sucursalSeleccionada} onValueChange={handleCambiarSucursal}>
+                <SelectTrigger className="h-7 text-xs bg-white text-blue-950 font-black border-none min-w-[200px] shadow">
+                  <SelectValue placeholder="Seleccione sucursal..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {sucursales.map(s => (
+                    <SelectItem key={s.id} value={s.id} className="text-xs font-bold">
+                      {s.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -477,9 +543,14 @@ export default function KioscoVentasPage() {
                         >
                           <div>
                             <div className="flex justify-between items-start gap-1 mb-1">
-                              <Badge variant="outline" className="text-[10px] font-bold text-blue-800 bg-blue-50 border-blue-200">
-                                {prod.categoria}
-                              </Badge>
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <Badge variant="outline" className="text-[10px] font-bold text-blue-800 bg-blue-50 border-blue-200">
+                                  {prod.categoria}
+                                </Badge>
+                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/80">
+                                  {sucursalActual?.nombre || 'SAN LUCAS'}
+                                </span>
+                              </div>
                               {prod.tamano && (
                                 <span className="text-[10px] text-gray-500 font-medium">
                                   {prod.tamano}
@@ -533,6 +604,26 @@ export default function KioscoVentasPage() {
                     <Badge variant="secondary" className="font-bold">
                       {carrito.reduce((s, i) => s + i.cantidad, 0)} artículos
                     </Badge>
+                  </div>
+
+                  {/* Sucursal Activa */}
+                  <div className="flex items-center justify-between mt-2 px-2.5 py-1.5 bg-blue-50 border border-blue-200/80 rounded-lg text-xs">
+                    <div className="flex items-center gap-1.5 text-blue-950 font-bold">
+                      <Store className="h-3.5 w-3.5 text-blue-700" />
+                      <span>Sucursal:</span>
+                    </div>
+                    <Select value={sucursalSeleccionada} onValueChange={handleCambiarSucursal}>
+                      <SelectTrigger className="h-6 text-xs bg-white border-blue-300 w-48 font-semibold px-2 py-0">
+                        <SelectValue placeholder="Seleccionar" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {sucursales.map(s => (
+                          <SelectItem key={s.id} value={s.id} className="text-xs font-medium">
+                            {s.nombre}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
                   {/* Selector Contado vs Crédito */}
@@ -637,6 +728,54 @@ export default function KioscoVentasPage() {
                     <span className="font-black text-xl text-blue-900">
                       {formatCurrency(totalBruto)}
                     </span>
+                  </div>
+
+                  {/* SELECCIÓN DE VENDEDOR DE MOSTRADOR */}
+                  <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg space-y-1.5">
+                    <div className="flex justify-between items-center">
+                      <Label className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                        <UserCheck className="h-3.5 w-3.5 text-blue-700" />
+                        Vendedor de Mostrador
+                      </Label>
+                      <span className="text-[10px] font-bold text-blue-800 bg-blue-100/70 px-2 py-0.5 rounded uppercase">
+                        {sucursalActual?.nombre || 'SUCURSAL'}
+                      </span>
+                    </div>
+
+                    <Select
+                      value={vendedorSeleccionadoId}
+                      onValueChange={(val) => {
+                        setVendedorSeleccionadoId(val);
+                        if (val !== 'otro' && val !== 'tienda') {
+                          const v = vendedores.find(x => x.id === val);
+                          setVendedorNombre(v?.name || val);
+                        } else if (val === 'tienda') {
+                          setVendedorNombre('VENTA MOSTRADOR');
+                        }
+                      }}
+                    >
+                      <SelectTrigger className="h-8 text-xs bg-white font-medium">
+                        <SelectValue placeholder="Seleccione vendedor..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="tienda">Venta Directa de Mostrador</SelectItem>
+                        {vendedores.map(v => (
+                          <SelectItem key={v.id} value={v.id}>
+                            {v.name} {v.sucursal?.nombre ? `(${v.sucursal.nombre})` : ''}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="otro">Captura manual / Otro vendedor...</SelectItem>
+                      </SelectContent>
+                    </Select>
+
+                    {vendedorSeleccionadoId === 'otro' && (
+                      <Input
+                        placeholder="Nombre completo del vendedor *"
+                        value={vendedorManual}
+                        onChange={e => setVendedorManual(e.target.value.toUpperCase())}
+                        className="h-8 text-xs bg-white uppercase mt-1"
+                      />
+                    )}
                   </div>
 
                   {/* DATOS DEL CLIENTE */}

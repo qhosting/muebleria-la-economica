@@ -1,6 +1,52 @@
 // Catálogo maestro extraído de las libretas de inventario de Mueblería La Económica
 // e utilidades de cálculo financiero y conversión de moneda a letras para Pagaré.
 
+export interface SucursalInfo {
+  id: string;
+  nombre: string;
+  direccion: string;
+  ciudad: string;
+  telefono: string;
+  esBodega: boolean;
+}
+
+export const SUCURSALES_SISTEMA: SucursalInfo[] = [
+  {
+    id: 'sucursal-san-lucas-3er-cuartel',
+    nombre: 'SAN LUCAS 3ER CUARTEL',
+    direccion: 'Carretera Aculco-Amealco San Lucas 3er. Cuartel',
+    ciudad: 'Aculco, Edo. de Méx.',
+    telefono: '427 273 2216',
+    esBodega: false
+  },
+  {
+    id: 'sucursal-amealco',
+    nombre: 'AMEALCO',
+    direccion: 'Calle Principal Centro',
+    ciudad: 'Amealco de Bonfil, Qro.',
+    telefono: '448 278 0000',
+    esBodega: false
+  },
+  {
+    id: 'sucursal-la-estancia-sjr',
+    nombre: 'LA ESTANCIA SJR',
+    direccion: 'Carretera Federal San Juan del Río - La Estancia',
+    ciudad: 'San Juan del Río, Qro.',
+    telefono: '427 273 2216',
+    esBodega: false
+  },
+  {
+    id: 'sucursal-san-ildefonso',
+    nombre: 'SAN ILDEFONSO',
+    direccion: 'Av. Hidalgo Centro, San Ildefonso Tultepec',
+    ciudad: 'Amealco / Aculco, Qro.',
+    telefono: '427 273 2216',
+    esBodega: false
+  }
+];
+
+export const SUCURSAL_SAN_LUCAS = SUCURSALES_SISTEMA[0];
+
 export interface CatalogoItem {
   id: string;
   codigo: string;
@@ -13,9 +59,11 @@ export interface CatalogoItem {
   precioVenta: number;
   precioContado: number;
   stockSugerido?: number;
+  sucursal?: string;
+  sucursalNombre?: string;
 }
 
-export const CATALOGO_PRODUCTOS_INICIAL: CatalogoItem[] = [
+const PRODUCTOS_LIBRETA_BASE: CatalogoItem[] = [
   // --- IMAGEN 1: ESTUFAS, LAVADORAS, LICUADORAS, PANTALLAS ---
   {
     id: 'est-whirlpool-wfr3000b',
@@ -852,6 +900,13 @@ export const CATALOGO_PRODUCTOS_INICIAL: CatalogoItem[] = [
     precioContado: 820,
   }
 ];
+
+// Catálogo enriquecido con asignación oficial a Sucursal SAN LUCAS 3ER CUARTEL
+export const CATALOGO_PRODUCTOS_INICIAL: CatalogoItem[] = PRODUCTOS_LIBRETA_BASE.map(item => ({
+  ...item,
+  sucursal: SUCURSAL_SAN_LUCAS.nombre,
+  sucursalNombre: SUCURSAL_SAN_LUCAS.nombre
+}));
 
 // Conversión de importes numéricos a texto formal mexicano (ej: "CUATRO MIL QUINIENTOS PESOS 00/100 M.N.")
 export function numeroALetras(monto: number): string {

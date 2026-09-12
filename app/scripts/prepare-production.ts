@@ -2,6 +2,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { seedSucursalesCatalogo } from './seed-sucursales-catalogo';
 
 const prisma = new PrismaClient();
 
@@ -171,9 +172,14 @@ Cobrador: {{cobrador}}
     console.log('🔄 Base de datos optimizada...');
     console.log('✅ Limpieza completada');
 
+    // 5. Configurar las 4 Sucursales, Vendedores de Mostrador e Inventario
+    await seedSucursalesCatalogo();
+
     console.log('\n🎉 ¡Sistema preparado para producción!');
     console.log('\n📊 Estado final:');
     console.log(`- ${await prisma.user.count()} usuarios`);
+    console.log(`- ${await prisma.sucursal.count()} sucursales`);
+    console.log(`- ${await prisma.producto.count()} productos`);
     console.log(`- ${await prisma.cliente.count()} clientes`);
     console.log(`- ${await prisma.pago.count()} pagos`);
     console.log(`- ${await prisma.plantillaTicket.count()} plantillas de ticket`);

@@ -1,6 +1,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
+import { seedSucursalesCatalogo } from './seed-sucursales-catalogo';
 
 const prisma = new PrismaClient();
 
@@ -312,9 +313,14 @@ Cobrador: {{cobrador}}
 
     console.log('✅ Rutas de cobranza creadas');
 
+    // Inicializar las 4 Sucursales, Vendedores de Mostrador e Inventario
+    await seedSucursalesCatalogo();
+
     console.log('\n🎉 ¡Seeders completados exitosamente!');
     console.log('\n📊 Resumen de datos creados:');
     console.log(`- ${await prisma.user.count()} usuarios`);
+    console.log(`- ${await prisma.sucursal.count()} sucursales`);
+    console.log(`- ${await prisma.producto.count()} productos`);
     console.log(`- ${await prisma.cliente.count()} clientes`);
     console.log(`- ${await prisma.pago.count()} pagos`);
     console.log(`- ${await prisma.plantillaTicket.count()} plantillas de ticket`);

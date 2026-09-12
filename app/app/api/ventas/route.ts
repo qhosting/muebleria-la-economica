@@ -92,6 +92,7 @@ export async function POST(request: NextRequest) {
       ciudadCliente = 'Aculco, Edo. de Méx.',
       telefonoCliente = '',
       sucursalId,
+      vendedorId,
       vendedor = session.user.name || 'TIENDA',
       subtotal,
       descuento = 0,
@@ -109,6 +110,15 @@ export async function POST(request: NextRequest) {
       clienteIdExistente,
       articulos = []
     } = body;
+
+    // Resolver sucursal activa: si no viene especificada, asignar por defecto SAN LUCAS 3ER CUARTEL
+    let activeSucursalId = sucursalId;
+    if (!activeSucursalId) {
+      const sucursalSanLucas = await prisma.sucursal.findFirst({
+        where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
+      });
+      activeSucursalId = sucursalSanLucas?.id || null;
+    }
 
     if (!nombreCliente || !articulos || articulos.length === 0) {
       return NextResponse.json(
@@ -147,7 +157,7 @@ export async function POST(request: NextRequest) {
             telefono: telefonoCliente || null,
             vendedor,
             cobradorAsignadoId: cobradorAsignadoId && cobradorAsignadoId !== 'sin-asignar' ? cobradorAsignadoId : null,
-            sucursalId: sucursalId || null,
+            sucursalId: activeSucursalId || null,
             statusCuenta: 'activo',
             direccionCompleta: `${direccionCliente}${ciudadCliente ? ', ' + ciudadCliente : ''}`.trim(),
             descripcionProducto: descripcionConceptos.substring(0, 250),
@@ -206,8 +216,9 @@ export async function POST(request: NextRequest) {
         direccionCliente: direccionCliente.trim(),
         ciudadCliente: (ciudadCliente || 'Aculco, Edo. de Méx.').trim(),
         telefonoCliente: telefonoCliente.trim(),
-        sucursalId: sucursalId || null,
-        vendedor,
+        sucursalId: activeSucursalId || null,
+        vendedorId: vendedorId || null,
+        vendedor: vendedor || 'TIENDA',
         subtotal: Number(subtotal),
         descuento: Number(descuento || 0),
         total: Number(total),
@@ -239,31 +250,50 @@ export async function POST(request: NextRequest) {
     });
 
     // 5. Descontar stock si los productos tienen sucursal y productoId real en DB
-    if (sucursalId) {
+    if (activeSucursalId) {
       for (const art of articulos) {
-        if (art.productoId && art.productoId.length > 20) { // CUID válido
+        let dbProductoId = art.productoId && art.productoId.length > 20 ? art.productoId : null;
+        
+        // Si no es un CUID, buscar por código o nombre en la tabla Producto
+        if (!dbProductoId && (art.codigo || art.concepto)) {
+          try {
+            const prodEncontrado = await prisma.producto.findFirst({
+              where: {
+                OR: [
+                  ...(art.codigo ? [{ codigo: art.codigo }] : []),
+                  ...(art.concepto ? [{ nombre: art.concepto }] : [])
+                ]
+              }
+            });
+            if (prodEncontrado) dbProductoId = prodEncontrado.id;
+          } catch (e) {
+            // Continuar si falla la búsqueda
+          }
+        }
+
+        if (dbProductoId) {
           try {
             await prisma.stock.upsert({
               where: {
                 productoId_sucursalId: {
-                  productoId: art.productoId,
-                  sucursalId
+                  productoId: dbProductoId,
+                  sucursalId: activeSucursalId
                 }
               },
               update: {
                 cantidad: { decrement: Number(art.cantidad || 1) }
               },
               create: {
-                productoId: art.productoId,
-                sucursalId,
+                productoId: dbProductoId,
+                sucursalId: activeSucursalId,
                 cantidad: -Number(art.cantidad || 1)
               }
             });
 
             await prisma.movimientoInventario.create({
               data: {
-                productoId: art.productoId,
-                sucursalOrigenId: sucursalId,
+                productoId: dbProductoId,
+                sucursalOrigenId: activeSucursalId,
                 tipoMovimiento: 'venta',
                 cantidad: Number(art.cantidad || 1),
                 motivo: `Venta en Kiosco Remisión Nº ${proximoFolio}`,

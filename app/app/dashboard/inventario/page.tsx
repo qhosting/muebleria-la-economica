@@ -32,6 +32,7 @@ export default function InventarioPage() {
     const [sucursales, setSucursales] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [sucursalFiltro, setSucursalFiltro] = useState<string>('todas');
     const [isMovimientoOpen, setIsMovimientoOpen] = useState(false);
     const [isProductoOpen, setIsProductoOpen] = useState(false);
     const [isSucursalOpen, setIsSucursalOpen] = useState(false);
@@ -63,10 +64,13 @@ export default function InventarioPage() {
         }
     };
 
-    const filteredProductos = productos.filter(p =>
-        p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.codigo.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredProductos = productos.filter(p => {
+        const matchSearch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                            p.codigo.toLowerCase().includes(searchTerm.toLowerCase());
+        if (!matchSearch) return false;
+        if (sucursalFiltro === 'todas') return true;
+        return p.stockPorSucursal?.some((s: any) => s.sucursalId === sucursalFiltro && s.cantidad > 0);
+    });
 
     const StockBadge = ({ cantidad, minimo }: { cantidad: number, minimo: number }) => {
         if (cantidad <= 0) return <Badge variant="destructive">Segotado</Badge>;
@@ -148,16 +152,35 @@ export default function InventarioPage() {
                     <TabsContent value="productos" className="mt-4">
                         <Card>
                             <CardHeader>
-                                <div className="flex justify-between items-center">
-                                    <CardTitle>Catálogo de Productos</CardTitle>
-                                    <div className="relative w-64">
-                                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
-                                        <Input
-                                            placeholder="Buscar producto..."
-                                            value={searchTerm}
-                                            onChange={(e) => setSearchTerm(e.target.value)}
-                                            className="pl-8"
-                                        />
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                                    <div>
+                                        <CardTitle>Catálogo de Productos</CardTitle>
+                                        <CardDescription>Inventario consolidado y por sucursal</CardDescription>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-2.5">
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-slate-50 border px-2.5 py-1 rounded-lg">
+                                            <Store className="h-3.5 w-3.5 text-blue-700" />
+                                            <span className="font-semibold">Sucursal:</span>
+                                            <select
+                                                value={sucursalFiltro}
+                                                onChange={(e) => setSucursalFiltro(e.target.value)}
+                                                className="bg-transparent font-bold text-blue-900 border-none focus:outline-none text-xs cursor-pointer"
+                                            >
+                                                <option value="todas">Todas las sucursales</option>
+                                                {sucursales.map(s => (
+                                                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="relative w-56">
+                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+                                            <Input
+                                                placeholder="Buscar por código, nombre..."
+                                                value={searchTerm}
+                                                onChange={(e) => setSearchTerm(e.target.value)}
+                                                className="pl-8 h-8 text-xs"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
                             </CardHeader>

@@ -203,6 +203,15 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Resolver sucursal activa: si no viene especificada, asignar por defecto SAN LUCAS 3ER CUARTEL
+    let activeSucursalId = sucursalId;
+    if (!activeSucursalId) {
+      const sucursalSanLucas = await prisma.sucursal.findFirst({
+        where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
+      });
+      activeSucursalId = sucursalSanLucas?.id || null;
+    }
+
     // Transacción para crear cliente y actualizar inventario
     const cliente = await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // 1. Crear Cliente
@@ -215,7 +224,7 @@ export async function POST(request: NextRequest) {
           vendedor,
           cobradorAsignadoId: cobradorId || null,
           productoId: productoId || null,
-          sucursalId: sucursalId || null,
+          sucursalId: activeSucursalId || null,
           direccionCompleta,
           descripcionProducto,
           diaPago: diaPago,
@@ -235,16 +244,30 @@ export async function POST(request: NextRequest) {
               email: true,
             },
           },
+          producto: {
+            select: {
+              id: true,
+              codigo: true,
+              nombre: true,
+              precioVenta: true,
+            },
+          },
+          sucursal: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
         },
       });
 
       // 2. Actualizar Inventario (si aplica)
-      if (productoId && sucursalId) {
+      if (productoId && activeSucursalId) {
         const stock = await tx.stock.findUnique({
           where: {
             productoId_sucursalId: {
               productoId,
-              sucursalId
+              sucursalId: activeSucursalId
             }
           }
         });
@@ -265,7 +288,7 @@ export async function POST(request: NextRequest) {
             productoId,
             tipoMovimiento: 'venta',
             cantidad: 1,
-            sucursalOrigenId: sucursalId,
+            sucursalOrigenId: activeSucursalId,
             motivo: `Venta a cliente ${nuevoCliente.codigoCliente}`,
             referencia: nuevoCliente.id,
             usuarioId: (session.user as any).id

@@ -4,7 +4,7 @@ import React, { useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Printer, Download, X, CheckCircle, FileText } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
-import { numeroALetras, formatearFechaLegal } from '@/lib/catalogo-kiosco';
+import { numeroALetras, formatearFechaLegal, SUCURSALES_SISTEMA } from '@/lib/catalogo-kiosco';
 
 interface ItemVenta {
   cantidad: number;
@@ -32,6 +32,9 @@ interface RemisionPagarePrintProps {
     interesMoratorioMensual?: number;
     firmaCliente?: string;
     codigoCliente?: string;
+    sucursalId?: string | number;
+    sucursalNombre?: string;
+    sucursal?: { nombre?: string };
     detalles: ItemVenta[];
   };
   onClose?: () => void;
@@ -49,6 +52,12 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
     : Number(venta.total);
 
   const importeEnLetras = numeroALetras(montoPagare);
+
+  // Resolver datos de la sucursal de emisión
+  const sucursalActiva = SUCURSALES_SISTEMA.find(s =>
+    s.id === venta.sucursalId ||
+    s.nombre.toUpperCase() === (venta.sucursalNombre || venta.sucursal?.nombre || '').toUpperCase()
+  ) || SUCURSALES_SISTEMA[0];
 
   const handlePrint = () => {
     window.print();
@@ -71,7 +80,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
               Remisión y Pagaré Oficial Nº {folioFormateado}
             </h2>
             <p className="text-xs text-gray-500">
-              Mueblería La Económica • Documento Mercantil
+              Mueblería La Económica • Documento Mercantil • Sucursal {sucursalActiva.nombre}
             </p>
           </div>
         </div>
@@ -104,11 +113,14 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             <h1 className="text-2xl md:text-3xl font-extrabold tracking-wider text-blue-900 uppercase font-serif">
               MUEBLERÍA LA ECONÓMICA
             </h1>
-            <p className="text-xs md:text-sm font-semibold text-gray-700 mt-1 uppercase tracking-tight">
-              Carretera Aculco-Amealco San Lucas 3er. Cuartel • Tel. 427 273 2216
+            <p className="text-xs font-bold text-blue-800 uppercase tracking-wide mt-0.5">
+              SUCURSAL {sucursalActiva.nombre}
+            </p>
+            <p className="text-xs md:text-sm font-semibold text-gray-700 mt-0.5 uppercase tracking-tight">
+              {sucursalActiva.direccion} • Tel. {sucursalActiva.telefono}
             </p>
             <p className="text-[11px] text-gray-500 font-medium">
-              Aculco, Estado de México
+              {sucursalActiva.ciudad}
             </p>
           </div>
 
@@ -267,7 +279,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
               <strong className="border-b border-gray-800 px-2">
                 {venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}
               </strong>{' '}
-              EN EL DOMICILIO SEÑALADO O EN LA MATRIZ DE ACULCO, EDO. DE MÉX.
+              EN EL DOMICILIO SEÑALADO O EN LA SUCURSAL / MATRIZ ({sucursalActiva.nombre} - {sucursalActiva.ciudad}).
             </p>
             <p className="tracking-tight">
               VALOR DE LA MERCANCÍA RECIBIDA A MI (NUESTRA) ENTERA SATISFACCIÓN. ESTE DOCUMENTO CAUSARÁ

@@ -9,6 +9,8 @@ export interface User {
   name: string;
   role: UserRole;
   codigoGestor?: string;
+  sucursalId?: string;
+  sucursal?: any;
   isActive: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -166,6 +168,8 @@ export interface Venta {
   ciudadCliente?: string;
   telefonoCliente?: string;
   sucursalId?: string;
+  sucursal?: any;
+  vendedorId?: string;
   vendedor?: string;
   subtotal: number;
   descuento: number;
