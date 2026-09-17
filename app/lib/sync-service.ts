@@ -4,6 +4,8 @@ import { db, OfflineCliente, OfflinePago, OfflineMotarorio, SyncQueue, generateL
 import { toast } from 'sonner';
 import { apiFetch } from './api-config';
 
+import { networkMonitor } from './network-quality';
+
 export class SyncService {
   private static instance: SyncService;
   private syncInProgress = false;
@@ -21,7 +23,7 @@ export class SyncService {
   // Inicializar sincronización automática
   public async initAutoSync(cobradorId: string) {
     const settings = await db.settings.get(cobradorId);
-    if (settings?.autoSync && navigator.onLine) {
+    if (settings?.autoSync !== false) {
       this.startAutoSync(cobradorId);
     }
   }
@@ -31,21 +33,27 @@ export class SyncService {
       clearInterval(this.autoSyncInterval);
     }
 
-    // 🚀 OPTIMIZACIÓN MÓVIL: Sincronizar cada 15 minutos en lugar de 5 (menos agresivo)
-    // También verificar si realmente hay datos pendientes antes de sincronizar
+    // 🚀 OPTIMIZACIÓN MÓVIL: Verificar cada 2 minutos
     this.autoSyncInterval = setInterval(async () => {
-      if (navigator.onLine && !this.syncInProgress) {
+      if (!this.syncInProgress) {
         try {
-          // Solo sincronizar si hay datos pendientes
-          const pendingCount = await db.syncQueue.where('status').equals('pending').count();
-          if (pendingCount > 0) {
-            await this.syncAll(cobradorId, false); // silent sync
+          const pendingPagos = await db.pagos.where('syncStatus').equals('pending').count();
+          const pendingMotararios = await db.motararios.where('syncStatus').equals('pending').count();
+
+          if (pendingPagos > 0 || pendingMotararios > 0) {
+            const quality = networkMonitor.getState();
+            if (quality.isStable) {
+              console.log(`[Auto-Sync] Datos pendientes (${pendingPagos} pagos, ${pendingMotararios} motararios). Red estable, sincronizando...`);
+              await this.syncAll(cobradorId, false); // silent sync
+            } else {
+              console.log(`[Auto-Sync] Datos pendientes pero red inestable o desconectada (${quality.status}). Se pospone.`);
+            }
           }
         } catch (error) {
           console.error('Error en auto-sync:', error);
         }
       }
-    }, 15 * 60 * 1000); // 15 minutos en lugar de 5
+    }, 2 * 60 * 1000);
   }
 
   public stopAutoSync() {
@@ -62,8 +70,15 @@ export class SyncService {
       return false;
     }
 
-    if (!navigator.onLine) {
+    // Validar calidad de conexión real antes de proceder
+    const quality = await networkMonitor.checkQuality();
+    if (!quality.isOnline) {
       if (showToast) toast.error('Sin conexión a internet');
+      return false;
+    }
+
+    if (!quality.isStable && !showToast) {
+      console.log(`Sincronización silenciosa pospuesta: red celular inestable (${quality.latencyMs}ms)`);
       return false;
     }
 
@@ -78,13 +93,13 @@ export class SyncService {
       // 2. Subir pagos pendientes
       await this.uploadPagos(cobradorId);
 
-      // 3. Subir motararios pendientes (si existen)
+      // 3. Subir motararios pendientes
       await this.uploadMotararios(cobradorId);
 
       // 4. Actualizar timestamp de sincronización
       await this.updateLastSync(cobradorId);
 
-      if (showToast) toast.success('Sincronización completada');
+      if (showToast) toast.success('Sincronización completada con éxito');
       return true;
 
     } catch (error) {
@@ -132,16 +147,13 @@ export class SyncService {
       .toArray();
 
     console.log(`Pagos pendientes para sincronizar: ${pagosPendientes.length}`);
-    pagosPendientes.forEach(pago => {
-      console.log(`Pago: ${pago.localId}, tipo: ${pago.tipoPago}, monto: ${pago.monto}`);
-    });
 
     for (const pago of pagosPendientes) {
       try {
         console.log(`Sincronizando pago ${pago.localId} (${pago.tipoPago})`);
 
-        // Marcar como sincronizando
-        await db.pagos.update(pago.localId, { syncStatus: 'syncing' });
+        // 🚀 CORRECCIÓN DEXIE: Usar .where('localId').equals().modify()
+        await db.pagos.where('localId').equals(pago.localId).modify({ syncStatus: 'syncing' });
 
         const payloadPago = {
           clienteId: pago.clienteId,
@@ -154,8 +166,6 @@ export class SyncService {
           localId: pago.localId
         };
 
-        console.log('Enviando pago al servidor:', payloadPago);
-
         const response = await apiFetch('/api/pagos', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -166,50 +176,47 @@ export class SyncService {
           const pagoServidor = await response.json();
           console.log(`Pago ${pago.localId} sincronizado exitosamente con ID: ${pagoServidor.id}`);
 
-          // Actualizar con ID del servidor
-          await db.pagos.update(pago.localId, {
+          // 🚀 CORRECCIÓN DEXIE: Actualizar por localId
+          await db.pagos.where('localId').equals(pago.localId).modify({
             id: pagoServidor.id,
             syncStatus: 'synced',
             lastSync: Date.now()
           });
+
+          // Actualizar cola de sincronización
+          await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'completed' });
         } else {
           const errorText = await response.text();
           console.error(`Error en respuesta del servidor para pago ${pago.localId}:`, response.status, errorText);
 
-          // Marcar como fallido
-          await db.pagos.update(pago.localId, { syncStatus: 'failed' });
+          // Revertir a pending para reintento posterior
+          await db.pagos.where('localId').equals(pago.localId).modify({ syncStatus: 'pending' });
+          await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'failed', error: errorText });
         }
 
       } catch (error) {
         console.error(`Error subiendo pago ${pago.localId}:`, error);
-        await db.pagos.update(pago.localId, { syncStatus: 'failed' });
+        await db.pagos.where('localId').equals(pago.localId).modify({ syncStatus: 'pending' });
+        await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'failed' });
       }
     }
   }
 
   // Subir motararios pendientes al servidor
   private async uploadMotararios(cobradorId: string) {
-    // Verificar si hay motararios pendientes
     const motarariosPendientes = await db.motararios
       .where('syncStatus').equals('pending')
       .and(motarario => motarario.cobradorId === cobradorId)
       .toArray();
 
+    if (motarariosPendientes.length === 0) return;
     console.log(`Motararios pendientes para sincronizar: ${motarariosPendientes.length}`);
 
-    // Si no hay endpoint de motararios, simplemente marcar como omitidos por ahora
-    if (motarariosPendientes.length === 0) {
-      return;
-    }
-
-    // Por ahora, comentamos la sincronización de motararios hasta que el endpoint esté disponible
-    console.log('Sincronización de motararios pendiente - endpoint no disponible');
-    // TODO: Implementar endpoint /api/motararios si se necesita
-
-    /*
     for (const motarario of motarariosPendientes) {
       try {
-        const response = await fetch('/api/motararios', {
+        await db.motararios.where('localId').equals(motarario.localId).modify({ syncStatus: 'syncing' });
+
+        const response = await apiFetch('/api/motararios', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -224,21 +231,21 @@ export class SyncService {
 
         if (response.ok) {
           const motararioServidor = await response.json();
-          await db.motararios.update(motarario.localId, {
+          await db.motararios.where('localId').equals(motarario.localId).modify({
             id: motararioServidor.id,
             syncStatus: 'synced',
             lastSync: Date.now()
           });
+          await db.syncQueue.where('localId').equals(motarario.localId).modify({ status: 'completed' });
         } else {
-          await db.motararios.update(motarario.localId, { syncStatus: 'failed' });
+          await db.motararios.where('localId').equals(motarario.localId).modify({ syncStatus: 'pending' });
         }
 
       } catch (error) {
         console.error('Error subiendo motarario:', error);
-        await db.motararios.update(motarario.localId, { syncStatus: 'failed' });
+        await db.motararios.where('localId').equals(motarario.localId).modify({ syncStatus: 'pending' });
       }
     }
-    */
   }
 
   // Actualizar timestamp de última sincronización

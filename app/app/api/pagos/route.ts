@@ -188,6 +188,31 @@ export async function POST(request: NextRequest) {
       saldoNuevo = round2(saldoAnterior + montoNumerico);
     }
 
+    // 🚀 IDEMPOTENCIA: Si se envía localId, verificar si ya fue procesado para evitar duplicados
+    if (localId) {
+      const pagoExistente = await prisma.pago.findFirst({
+        where: { localId },
+        include: {
+          cliente: {
+            select: {
+              codigoCliente: true,
+              nombreCompleto: true,
+            },
+          },
+          cobrador: {
+            select: {
+              name: true,
+            },
+          },
+        },
+      });
+
+      if (pagoExistente) {
+        console.log(`Pago con localId ${localId} ya registrado previamente, devolviendo existente.`);
+        return NextResponse.json(pagoExistente, { status: 200 });
+      }
+    }
+
     // Crear el pago en una transacción
     const resultado = await prisma.$transaction(async (prisma: any) => {
       const pago = await prisma.pago.create({
@@ -200,6 +225,7 @@ export async function POST(request: NextRequest) {
           fechaPago: fechaPago ? new Date(fechaPago) : new Date(),
           metodoPago: metodoPago || 'efectivo',
           numeroRecibo: numeroRecibo || null,
+          localId: localId || null,
           saldoAnterior,
           saldoNuevo,
           sincronizado: true,

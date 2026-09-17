@@ -56,6 +56,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cliente sin cobrador asignado' }, { status: 400 });
     }
 
+    // 🚀 IDEMPOTENCIA: Verificar si ya existe motarario con este localId
+    if (localId) {
+      const motararioExistente = await prisma.motarario.findFirst({
+        where: { localId }
+      });
+      if (motararioExistente) {
+        console.log(`Motarario con localId ${localId} ya existía en BD, devolviendo existente.`);
+        return NextResponse.json(motararioExistente, { status: 200 });
+      }
+    }
+
     // Crear el motarario
     const motarario = await prisma.motarario.create({
       data: {

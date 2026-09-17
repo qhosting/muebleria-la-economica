@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { PrinterConfigModal } from '@/components/mobile/printer-config-modal';
 import { syncService } from '@/lib/sync-service';
 import { toast } from 'sonner';
+import { VERSION_INFO } from '@/lib/version';
 
 export default function MobilePerfilPage() {
     const { data: session } = useSession();
@@ -101,8 +102,8 @@ export default function MobilePerfilPage() {
                     Cerrar Sesión
                 </Button>
 
-                <div className="text-center text-xs text-slate-600 pt-4">
-                    Version 1.0.0 (Build 100)
+                <div className="text-center text-xs text-slate-500 pt-4 font-mono">
+                    {VERSION_INFO.displayName}
                 </div>
             </div>
 

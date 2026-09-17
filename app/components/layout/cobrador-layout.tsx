@@ -10,6 +10,10 @@ import { Badge } from '@/components/ui/badge';
 // import { SyncIndicator } from '@/components/sync-indicator'; // TODO: Crear este componente después
 // import { NetworkStatus } from '@/components/network-status'; // TODO: o este
 
+import { useNetworkQuality } from '@/lib/network-quality';
+import { VersionCheckModal } from '@/components/mobile/version-check-modal';
+import { Activity } from 'lucide-react';
+
 interface CobradorLayoutProps {
     children: ReactNode;
 }
@@ -17,12 +21,12 @@ interface CobradorLayoutProps {
 export function CobradorLayout({ children }: CobradorLayoutProps) {
     const { isNative } = usePlatform();
     const pathname = usePathname();
-
-    // Simulación de estado de red (luego conectaremos el hook real)
-    const isOnline = true;
+    const network = useNetworkQuality();
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
+            <VersionCheckModal />
+
             {/* Header simplificado */}
             <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50 shadow-md">
                 <div className="px-4 py-3 flex items-center justify-between">
@@ -34,10 +38,24 @@ export function CobradorLayout({ children }: CobradorLayoutProps) {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <Badge variant={isOnline ? undefined : 'destructive'} className="h-6 px-1.5 text-[10px] uppercase gap-1">
-                            {isOnline ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
-                            {isOnline ? "Online" : "Offline"}
-                        </Badge>
+                        {network.status === 'online' && (
+                            <Badge className="h-6 px-2 text-[10px] uppercase gap-1 bg-emerald-950 text-emerald-400 border-emerald-800">
+                                <Wifi className="w-3 h-3" />
+                                Online {network.latencyMs ? `(${network.latencyMs}ms)` : ''}
+                            </Badge>
+                        )}
+                        {network.status === 'unstable' && (
+                            <Badge className="h-6 px-2 text-[10px] uppercase gap-1 bg-amber-950 text-amber-400 border-amber-800">
+                                <Activity className="w-3 h-3 animate-pulse" />
+                                Inestable {network.latencyMs ? `(${network.latencyMs}ms)` : ''}
+                            </Badge>
+                        )}
+                        {network.status === 'offline' && (
+                            <Badge variant="destructive" className="h-6 px-2 text-[10px] uppercase gap-1">
+                                <WifiOff className="w-3 h-3" />
+                                Offline
+                            </Badge>
+                        )}
                     </div>
                 </div>
             </header>

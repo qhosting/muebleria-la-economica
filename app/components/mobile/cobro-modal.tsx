@@ -34,6 +34,7 @@ import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
 import { TicketData } from '@/lib/bluetooth-printer';
 import { PrinterConfigModal } from './printer-config-modal';
 import { Switch } from '@/components/ui/switch';
+import { networkMonitor } from '@/lib/network-quality';
 
 interface CobroModalProps {
   cliente: OfflineCliente;
@@ -248,94 +249,55 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         saldoNuevo: calculatedValues.saldoAnterior
       } : null;
 
-      if (isOnline) {
-        // Registrar pago regular si existe
-        if (pagoRegular) {
-          const responsePrincipal = await fetch('/api/pagos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(pagoRegular)
-          });
+      // 🚀 OFFLINE POR DEFAULT: Guardar siempre localmente primero (sin riesgo de pérdida por señal caída)
+      if (pagoRegular) {
+        await syncService.addPagoOffline(pagoRegular);
+      }
 
-          if (!responsePrincipal.ok) {
-            throw new Error('Error al procesar el pago regular');
-          }
-        }
+      if (pagoMoratorio) {
+        await syncService.addPagoOffline(pagoMoratorio);
+      }
 
-        // Registrar pago moratorio si existe
-        if (pagoMoratorio) {
-          const responseMoratorio = await fetch('/api/pagos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(pagoMoratorio)
-          });
+      const mensaje = pagoMoratorio
+        ? `Cobro guardado: Regular (${formatCurrency(calculatedValues.montoParaSaldo)}) + Moratorio (${formatCurrency(calculatedValues.montoMoratorio)})`
+        : 'Cobro registrado exitosamente';
 
-          if (!responseMoratorio.ok) {
-            console.error('Error al registrar moratorio, pero pago regular fue exitoso');
-          }
-        }
+      toast.success(mensaje, {
+        description: 'Guardado en el dispositivo. Se sincroniza automáticamente.'
+      });
 
-        const mensaje = pagoMoratorio
-          ? `Pago registrado exitosamente: ${formatCurrency(calculatedValues.montoParaSaldo)} al saldo + ${formatCurrency(calculatedValues.montoMoratorio)} moratorio`
-          : 'Pago registrado exitosamente';
-
-        toast.success(mensaje);
-
-        // Imprimir ticket si está habilitado y la impresora está conectada
-        if (imprimirTicket && isPrinterConnected) {
-          try {
-            const fechaTicket = pagoRegular ? pagoRegular.fechaPago : (pagoMoratorio ? pagoMoratorio.fechaPago : new Date().toISOString());
-            const reciboTicket = (pagoRegular ? pagoRegular.numeroRecibo : (pagoMoratorio ? pagoMoratorio.numeroRecibo : '')) || '';
-            const ticketData = createTicketData(fechaTicket, reciboTicket);
-            await printTicket(ticketData);
-          } catch (error) {
-            console.error('Error imprimiendo ticket:', error);
-            toast.error('El pago se registró correctamente, pero hubo un error al imprimir el ticket');
-          }
-        }
-
-      } else {
-        // Si está offline, guardar localmente
-        if (pagoRegular) {
-          console.log('Guardando pago regular offline:', pagoRegular);
-          await syncService.addPagoOffline(pagoRegular);
-        }
-
-        if (pagoMoratorio) {
-          console.log('Guardando pago moratorio offline:', pagoMoratorio);
-          await syncService.addPagoOffline(pagoMoratorio);
-        }
-
-        const mensaje = pagoMoratorio
-          ? `Pagos guardados offline: Regular (${formatCurrency(calculatedValues.montoParaSaldo)}) + Moratorio (${formatCurrency(calculatedValues.montoMoratorio)})`
-          : 'Pago guardado offline';
-
-        toast.success(mensaje, {
-          description: 'Se sincronizará cuando tengas conexión'
-        });
-
-        console.log(`Pagos offline guardados - Regular: ${!!pagoRegular}, Moratorio: ${!!pagoMoratorio}`);
-
-        // Imprimir ticket si está habilitado y la impresora está conectada (también offline)
-        if (imprimirTicket && isPrinterConnected) {
-          try {
-            const fechaTicket = pagoRegular ? pagoRegular.fechaPago : (pagoMoratorio ? pagoMoratorio.fechaPago : new Date().toISOString());
-            const reciboTicket = (pagoRegular ? pagoRegular.numeroRecibo : (pagoMoratorio ? pagoMoratorio.numeroRecibo : '')) || '';
-            const ticketData = createTicketData(fechaTicket, reciboTicket);
-            await printTicket(ticketData);
-          } catch (error) {
-            console.error('Error imprimiendo ticket:', error);
-            toast.error('El pago se guardó offline correctamente, pero hubo un error al imprimir el ticket');
-          }
+      // Imprimir ticket inmediatamente en la impresora Bluetooth
+      if (imprimirTicket && isPrinterConnected) {
+        try {
+          const fechaTicket = pagoRegular ? pagoRegular.fechaPago : (pagoMoratorio ? pagoMoratorio.fechaPago : new Date().toISOString());
+          const reciboTicket = (pagoRegular ? pagoRegular.numeroRecibo : (pagoMoratorio ? pagoMoratorio.numeroRecibo : '')) || '';
+          const ticketData = createTicketData(fechaTicket, reciboTicket);
+          await printTicket(ticketData);
+        } catch (error) {
+          console.error('Error imprimiendo ticket:', error);
+          toast.error('El cobro se guardó correctamente, pero hubo un error al imprimir el ticket');
         }
       }
 
+      // Notificar al padre y cerrar modal de inmediato sin esperar la red
       onSuccess();
       onClose();
 
+      // En segundo plano (no bloqueante), si la conexión es estable, iniciar sincronización silenciosa
+      setTimeout(async () => {
+        try {
+          const quality = networkMonitor.getState();
+          if (quality.isStable) {
+            await syncService.syncAll(userId, false);
+          }
+        } catch (bgError) {
+          console.log('Sync en background pospuesto para el siguiente ciclo:', bgError);
+        }
+      }, 500);
+
     } catch (error) {
-      console.error('Error processing payment:', error);
-      toast.error('Error al procesar el pago');
+      console.error('Error guardando pago localmente:', error);
+      toast.error('Error al guardar el pago en el dispositivo');
     } finally {
       setLoading(false);
     }

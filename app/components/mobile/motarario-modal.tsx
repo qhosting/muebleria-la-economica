@@ -26,6 +26,7 @@ import {
 import { OfflineCliente } from '@/lib/offline-db';
 import { syncService } from '@/lib/sync-service';
 import { toast } from 'sonner';
+import { networkMonitor } from '@/lib/network-quality';
 
 interface MotararioModalProps {
   cliente: OfflineCliente;
@@ -95,35 +96,31 @@ export function MotararioModal({ cliente, isOpen, onClose, onSuccess, isOnline }
         proximaVisita: proximaVisita ? new Date(proximaVisita).toISOString() : undefined
       };
 
-      if (isOnline) {
-        // Si está online, enviar directamente al servidor
-        const response = await fetch('/api/motararios', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(motararioData)
-        });
+      // 🚀 OFFLINE POR DEFAULT: Guardar siempre localmente primero
+      await syncService.addMotararioOffline(motararioData);
 
-        if (!response.ok) {
-          throw new Error('Error al registrar motarario');
-        }
-
-        toast.success('Motarario registrado exitosamente');
-        
-      } else {
-        // Si está offline, guardar localmente
-        await syncService.addMotararioOffline(motararioData);
-        
-        toast.success('Motarario guardado offline', {
-          description: 'Se sincronizará cuando tengas conexión'
-        });
-      }
+      toast.success('Motarario registrado', {
+        description: 'Guardado localmente. Se sincroniza automáticamente.'
+      });
 
       onSuccess();
       onClose();
 
+      // Sincronización en background si la conexión es estable
+      setTimeout(async () => {
+        try {
+          const quality = networkMonitor.getState();
+          if (quality.isStable) {
+            await syncService.syncAll(userId, false);
+          }
+        } catch (e) {
+          console.log('Sync de motarario en background pospuesto:', e);
+        }
+      }, 500);
+
     } catch (error) {
       console.error('Error registering motarario:', error);
-      toast.error('Error al registrar motarario');
+      toast.error('Error al registrar motarario en el dispositivo');
     } finally {
       setLoading(false);
     }
