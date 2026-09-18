@@ -153,8 +153,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Verificar permisos del cobrador
-    if (userRole === 'cobrador' && cliente.cobradorAsignadoId !== userId) {
-      return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
+    if (userRole === 'cobrador') {
+      // Si el cliente ya tiene cobrador asignado explícito y no es este cobrador, restringir
+      if (cliente.cobradorAsignadoId && cliente.cobradorAsignadoId !== userId) {
+        return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
+      }
     }
 
     const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;
@@ -245,11 +248,19 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Actualizar saldo del cliente si el tipo de pago afecta el saldo
+      // Actualizar saldo del cliente y asignar cobrador si estaba sin asignar
+      const clienteUpdateData: any = {};
       if (afectaSaldo) {
+        clienteUpdateData.saldoActual = saldoNuevo;
+      }
+      if (userRole === 'cobrador' && !cliente.cobradorAsignadoId) {
+        clienteUpdateData.cobradorAsignadoId = userId;
+      }
+
+      if (Object.keys(clienteUpdateData).length > 0) {
         await prisma.cliente.update({
           where: { id: clienteId },
-          data: { saldoActual: saldoNuevo },
+          data: clienteUpdateData,
         });
       }
 

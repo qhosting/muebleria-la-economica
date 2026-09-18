@@ -33,27 +33,22 @@ export class SyncService {
       clearInterval(this.autoSyncInterval);
     }
 
-    // 🚀 OPTIMIZACIÓN MÓVIL: Verificar cada 2 minutos
+    // 🚀 OPTIMIZACIÓN MÓVIL: Verificar cada 1 minuto si hay conexión
     this.autoSyncInterval = setInterval(async () => {
-      if (!this.syncInProgress) {
+      if (!this.syncInProgress && typeof window !== 'undefined' && navigator.onLine) {
         try {
           const pendingPagos = await db.pagos.where('syncStatus').equals('pending').count();
           const pendingMotararios = await db.motararios.where('syncStatus').equals('pending').count();
 
           if (pendingPagos > 0 || pendingMotararios > 0) {
-            const quality = networkMonitor.getState();
-            if (quality.isStable) {
-              console.log(`[Auto-Sync] Datos pendientes (${pendingPagos} pagos, ${pendingMotararios} motararios). Red estable, sincronizando...`);
-              await this.syncAll(cobradorId, false); // silent sync
-            } else {
-              console.log(`[Auto-Sync] Datos pendientes pero red inestable o desconectada (${quality.status}). Se pospone.`);
-            }
+            console.log(`[Auto-Sync] Datos pendientes (${pendingPagos} pagos, ${pendingMotararios} motararios). Sincronizando...`);
+            await this.syncAll(cobradorId, false); // silent sync
           }
         } catch (error) {
           console.error('Error en auto-sync:', error);
         }
       }
-    }, 2 * 60 * 1000);
+    }, 60 * 1000);
   }
 
   public stopAutoSync() {
@@ -70,15 +65,9 @@ export class SyncService {
       return false;
     }
 
-    // Validar calidad de conexión real antes de proceder
-    const quality = await networkMonitor.checkQuality();
-    if (!quality.isOnline) {
+    // Validar si el navegador reporta estar offline
+    if (typeof window !== 'undefined' && !navigator.onLine) {
       if (showToast) toast.error('Sin conexión a internet');
-      return false;
-    }
-
-    if (!quality.isStable && !showToast) {
-      console.log(`Sincronización silenciosa pospuesta: red celular inestable (${quality.latencyMs}ms)`);
       return false;
     }
 
@@ -87,20 +76,26 @@ export class SyncService {
     try {
       if (showToast) toast.info('Sincronizando datos...');
 
-      // 1. Descargar clientes actualizados del servidor
+      // 1. PRIMERO: Subir pagos pendientes (prioridad para resguardar cobros en el servidor)
+      const pagosOk = await this.uploadPagos(cobradorId);
+
+      // 2. SEGUNDO: Subir motararios pendientes
+      const motarariosOk = await this.uploadMotararios(cobradorId);
+
+      // 3. TERCERO: Descargar clientes actualizados del servidor (traerá saldos recién actualizados)
       await this.downloadClientes(cobradorId);
-
-      // 2. Subir pagos pendientes
-      await this.uploadPagos(cobradorId);
-
-      // 3. Subir motararios pendientes
-      await this.uploadMotararios(cobradorId);
 
       // 4. Actualizar timestamp de sincronización
       await this.updateLastSync(cobradorId);
 
-      if (showToast) toast.success('Sincronización completada con éxito');
-      return true;
+      if (showToast) {
+        if (pagosOk && motarariosOk) {
+          toast.success('Sincronización completada con éxito');
+        } else {
+          toast.warning('Sincronización parcial: algunos registros no se pudieron subir');
+        }
+      }
+      return pagosOk && motarariosOk;
 
     } catch (error) {
       console.error('Error en sincronización:', error);
@@ -115,16 +110,18 @@ export class SyncService {
   private async downloadClientes(cobradorId: string) {
     try {
       const response = await apiFetch(`/api/sync/clientes/${cobradorId}?full=true`);
-      if (!response.ok) throw new Error('Error al descargar clientes');
+      if (!response.ok) {
+        console.warn(`No se pudieron descargar clientes para cobrador ${cobradorId}: ${response.status}`);
+        return;
+      }
 
       const clientesServidor = await response.json();
+      if (!Array.isArray(clientesServidor)) return;
 
-      // Limpiar clientes locales y agregar los del servidor
+      // Actualizar clientes locales usando put (upsert seguro sin errores de clave)
       await db.transaction('rw', db.clientes, async () => {
-        await db.clientes.where('cobradorAsignadoId').equals(cobradorId).delete();
-
         for (const cliente of clientesServidor) {
-          await db.clientes.add({
+          await db.clientes.put({
             ...cliente,
             lastSync: Date.now(),
             syncStatus: 'synced' as const
@@ -135,116 +132,141 @@ export class SyncService {
       console.log(`${clientesServidor.length} clientes sincronizados`);
     } catch (error) {
       console.error('Error descargando clientes:', error);
-      throw error;
     }
   }
 
   // Subir pagos pendientes al servidor
-  private async uploadPagos(cobradorId: string) {
-    const pagosPendientes = await db.pagos
-      .where('syncStatus').equals('pending')
-      .and(pago => pago.cobradorId === cobradorId)
-      .toArray();
+  public async uploadPagos(cobradorId: string, specificLocalIds?: string[]): Promise<boolean> {
+    try {
+      let query = db.pagos.where('syncStatus').equals('pending');
+      let pagosPendientes = await query.toArray();
 
-    console.log(`Pagos pendientes para sincronizar: ${pagosPendientes.length}`);
+      if (specificLocalIds && specificLocalIds.length > 0) {
+        pagosPendientes = pagosPendientes.filter(p => specificLocalIds.includes(p.localId));
+      } else if (cobradorId) {
+        pagosPendientes = pagosPendientes.filter(p => p.cobradorId === cobradorId || !p.cobradorId);
+      }
 
-    for (const pago of pagosPendientes) {
-      try {
-        console.log(`Sincronizando pago ${pago.localId} (${pago.tipoPago})`);
+      if (pagosPendientes.length === 0) return true;
 
-        // 🚀 CORRECCIÓN DEXIE: Usar .where('localId').equals().modify()
-        await db.pagos.where('localId').equals(pago.localId).modify({ syncStatus: 'syncing' });
+      console.log(`Pagos pendientes para sincronizar: ${pagosPendientes.length}`);
+      let allOk = true;
 
-        const payloadPago = {
-          clienteId: pago.clienteId,
-          monto: pago.monto,
-          tipoPago: pago.tipoPago,
-          concepto: pago.concepto,
-          fechaPago: pago.fechaPago,
-          metodoPago: pago.metodoPago,
-          numeroRecibo: pago.numeroRecibo,
-          localId: pago.localId
-        };
+      for (const pago of pagosPendientes) {
+        try {
+          console.log(`Sincronizando pago ${pago.localId} (${pago.tipoPago})`);
 
-        const response = await apiFetch('/api/pagos', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payloadPago)
-        });
+          await db.pagos.where('localId').equals(pago.localId).modify({ syncStatus: 'syncing' });
 
-        if (response.ok) {
-          const pagoServidor = await response.json();
-          console.log(`Pago ${pago.localId} sincronizado exitosamente con ID: ${pagoServidor.id}`);
+          const payloadPago = {
+            clienteId: pago.clienteId,
+            cobradorId: pago.cobradorId || cobradorId,
+            monto: pago.monto,
+            tipoPago: pago.tipoPago,
+            concepto: pago.concepto,
+            fechaPago: pago.fechaPago,
+            metodoPago: pago.metodoPago,
+            numeroRecibo: pago.numeroRecibo,
+            localId: pago.localId
+          };
 
-          // 🚀 CORRECCIÓN DEXIE: Actualizar por localId
-          await db.pagos.where('localId').equals(pago.localId).modify({
-            id: pagoServidor.id,
-            syncStatus: 'synced',
-            lastSync: Date.now()
+          const response = await apiFetch('/api/pagos', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payloadPago)
           });
 
-          // Actualizar cola de sincronización
-          await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'completed' });
-        } else {
-          const errorText = await response.text();
-          console.error(`Error en respuesta del servidor para pago ${pago.localId}:`, response.status, errorText);
+          if (response.ok) {
+            const pagoServidor = await response.json();
+            console.log(`Pago ${pago.localId} sincronizado exitosamente con ID: ${pagoServidor.id}`);
 
-          // Revertir a pending para reintento posterior
+            await db.pagos.where('localId').equals(pago.localId).modify({
+              id: pagoServidor.id,
+              syncStatus: 'synced',
+              lastSync: Date.now()
+            });
+
+            // Actualizar cola de sincronización
+            await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'completed' });
+          } else {
+            allOk = false;
+            const errorText = await response.text();
+            console.error(`Error en respuesta del servidor para pago ${pago.localId}:`, response.status, errorText);
+
+            // Revertir a pending para reintento posterior
+            await db.pagos.where('localId').equals(pago.localId).modify({ syncStatus: 'pending' });
+            await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'failed', error: errorText });
+          }
+
+        } catch (error) {
+          allOk = false;
+          console.error(`Error subiendo pago ${pago.localId}:`, error);
           await db.pagos.where('localId').equals(pago.localId).modify({ syncStatus: 'pending' });
-          await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'failed', error: errorText });
+          await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'failed' });
         }
-
-      } catch (error) {
-        console.error(`Error subiendo pago ${pago.localId}:`, error);
-        await db.pagos.where('localId').equals(pago.localId).modify({ syncStatus: 'pending' });
-        await db.syncQueue.where('localId').equals(pago.localId).modify({ status: 'failed' });
       }
+
+      return allOk;
+    } catch (err) {
+      console.error('Error general en uploadPagos:', err);
+      return false;
     }
   }
 
   // Subir motararios pendientes al servidor
-  private async uploadMotararios(cobradorId: string) {
-    const motarariosPendientes = await db.motararios
-      .where('syncStatus').equals('pending')
-      .and(motarario => motarario.cobradorId === cobradorId)
-      .toArray();
+  public async uploadMotararios(cobradorId: string): Promise<boolean> {
+    try {
+      const motarariosPendientes = await db.motararios
+        .where('syncStatus').equals('pending')
+        .and(motarario => !cobradorId || motarario.cobradorId === cobradorId || !motarario.cobradorId)
+        .toArray();
 
-    if (motarariosPendientes.length === 0) return;
-    console.log(`Motararios pendientes para sincronizar: ${motarariosPendientes.length}`);
+      if (motarariosPendientes.length === 0) return true;
+      console.log(`Motararios pendientes para sincronizar: ${motarariosPendientes.length}`);
+      let allOk = true;
 
-    for (const motarario of motarariosPendientes) {
-      try {
-        await db.motararios.where('localId').equals(motarario.localId).modify({ syncStatus: 'syncing' });
+      for (const motarario of motarariosPendientes) {
+        try {
+          await db.motararios.where('localId').equals(motarario.localId).modify({ syncStatus: 'syncing' });
 
-        const response = await apiFetch('/api/motararios', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            clienteId: motarario.clienteId,
-            motivo: motarario.motivo,
-            descripcion: motarario.descripcion,
-            fecha: motarario.fecha,
-            proximaVisita: motarario.proximaVisita,
-            localId: motarario.localId
-          })
-        });
-
-        if (response.ok) {
-          const motararioServidor = await response.json();
-          await db.motararios.where('localId').equals(motarario.localId).modify({
-            id: motararioServidor.id,
-            syncStatus: 'synced',
-            lastSync: Date.now()
+          const response = await apiFetch('/api/motararios', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              clienteId: motarario.clienteId,
+              cobradorId: motarario.cobradorId || cobradorId,
+              motivo: motarario.motivo,
+              descripcion: motarario.descripcion,
+              fecha: motarario.fecha,
+              proximaVisita: motarario.proximaVisita,
+              localId: motarario.localId
+            })
           });
-          await db.syncQueue.where('localId').equals(motarario.localId).modify({ status: 'completed' });
-        } else {
+
+          if (response.ok) {
+            const motararioServidor = await response.json();
+            await db.motararios.where('localId').equals(motarario.localId).modify({
+              id: motararioServidor.id,
+              syncStatus: 'synced',
+              lastSync: Date.now()
+            });
+            await db.syncQueue.where('localId').equals(motarario.localId).modify({ status: 'completed' });
+          } else {
+            allOk = false;
+            await db.motararios.where('localId').equals(motarario.localId).modify({ syncStatus: 'pending' });
+          }
+
+        } catch (error) {
+          allOk = false;
+          console.error('Error subiendo motarario:', error);
           await db.motararios.where('localId').equals(motarario.localId).modify({ syncStatus: 'pending' });
         }
-
-      } catch (error) {
-        console.error('Error subiendo motarario:', error);
-        await db.motararios.where('localId').equals(motarario.localId).modify({ syncStatus: 'pending' });
       }
+
+      return allOk;
+    } catch (err) {
+      console.error('Error general en uploadMotararios:', err);
+      return false;
     }
   }
 
@@ -272,8 +294,12 @@ export class SyncService {
       printStatus: 'pending'
     };
 
+    if (!pago.id) {
+      delete pago.id;
+    }
+
     console.log('Agregando pago offline:', pago);
-    await db.pagos.add(pago);
+    await db.pagos.put(pago);
 
     // Actualizar cliente localmente
     const cliente = await db.clientes.get(pago.clienteId);
@@ -310,7 +336,11 @@ export class SyncService {
       createdOffline: true
     };
 
-    await db.motararios.add(motarario);
+    if (!motarario.id) {
+      delete motarario.id;
+    }
+
+    await db.motararios.put(motarario);
 
     // Agregar a cola de sincronización
     await db.syncQueue.add({
@@ -363,9 +393,17 @@ export const syncService = SyncService.getInstance();
 
 // Event listeners para manejo de conectividad (solo en el cliente)
 if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
+  window.addEventListener('online', async () => {
     console.log('Conexión restaurada - intentando sincronizar');
     toast.success('Conexión restaurada');
+    try {
+      const setting = await db.settings.toCollection().first();
+      if (setting?.cobradorId) {
+        await syncService.syncAll(setting.cobradorId, false);
+      }
+    } catch (e) {
+      console.warn('Error auto-sincronizando al volver online:', e);
+    }
   });
 
   window.addEventListener('offline', () => {

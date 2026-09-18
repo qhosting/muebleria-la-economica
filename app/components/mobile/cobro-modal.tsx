@@ -219,10 +219,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
     setLoading(true);
 
     try {
-      const crearPagoRegular = calculatedValues.montoParaSaldo > 0 || calculatedValues.montoMoratorio === 0;
+      const crearPagoRegular = calculatedValues.montoParaSaldo > 0 || (calculatedValues.montoMoratorio === 0 && tipoPago !== 'mora');
 
       const pagoRegular = crearPagoRegular ? {
-        id: '', // Se generará en el servidor
         clienteId: cliente.id,
         cobradorId: userId,
         monto: calculatedValues.montoParaSaldo, // Solo el monto que va al saldo
@@ -236,7 +235,6 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
       } : null;
 
       const pagoMoratorio = calculatedValues.montoMoratorio > 0 ? {
-        id: '', // Se generará en el servidor
         clienteId: cliente.id,
         cobradorId: userId,
         monto: calculatedValues.montoMoratorio,
@@ -249,22 +247,41 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         saldoNuevo: calculatedValues.saldoAnterior
       } : null;
 
-      // 🚀 OFFLINE POR DEFAULT: Guardar siempre localmente primero (sin riesgo de pérdida por señal caída)
+      // 🚀 OFFLINE POR DEFAULT: Guardar siempre localmente primero (resiliencia ante señal caída)
+      const localIds: string[] = [];
       if (pagoRegular) {
-        await syncService.addPagoOffline(pagoRegular);
+        const lid = await syncService.addPagoOffline(pagoRegular);
+        if (lid) localIds.push(lid);
       }
 
       if (pagoMoratorio) {
-        await syncService.addPagoOffline(pagoMoratorio);
+        const lid = await syncService.addPagoOffline(pagoMoratorio);
+        if (lid) localIds.push(lid);
+      }
+
+      // 🚀 MODO ONLINE: Si hay conexión, sincronizar de inmediato directamente con el servidor
+      let syncedOnline = false;
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        try {
+          syncedOnline = await syncService.uploadPagos(userId, localIds);
+        } catch (syncErr) {
+          console.warn('Sync inmediato no completado, quedará para auto-sync:', syncErr);
+        }
       }
 
       const mensaje = pagoMoratorio
         ? `Cobro guardado: Regular (${formatCurrency(calculatedValues.montoParaSaldo)}) + Moratorio (${formatCurrency(calculatedValues.montoMoratorio)})`
         : 'Cobro registrado exitosamente';
 
-      toast.success(mensaje, {
-        description: 'Guardado en el dispositivo. Se sincroniza automáticamente.'
-      });
+      if (syncedOnline) {
+        toast.success(mensaje, {
+          description: 'Guardado y sincronizado con la base de datos.'
+        });
+      } else {
+        toast.success(mensaje, {
+          description: 'Pago guardado offline. Se sincronizará automáticamente cuando haya conexión.'
+        });
+      }
 
       // Imprimir ticket inmediatamente en la impresora Bluetooth
       if (imprimirTicket && isPrinterConnected) {
@@ -279,15 +296,14 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         }
       }
 
-      // Notificar al padre y cerrar modal de inmediato sin esperar la red
+      // Notificar al padre y cerrar modal de inmediato
       onSuccess();
       onClose();
 
-      // En segundo plano (no bloqueante), si la conexión es estable, iniciar sincronización silenciosa
+      // En segundo plano (no bloqueante), si hay conexión, intentar sincronizar pendientes restantes
       setTimeout(async () => {
         try {
-          const quality = networkMonitor.getState();
-          if (quality.isStable) {
+          if (typeof window !== 'undefined' && navigator.onLine) {
             await syncService.syncAll(userId, false);
           }
         } catch (bgError) {

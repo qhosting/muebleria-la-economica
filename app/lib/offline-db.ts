@@ -21,7 +21,7 @@ export interface OfflineCliente {
 }
 
 export interface OfflinePago {
-  id: string;
+  id?: string;
   clienteId: string;
   monto: number;
   tipoPago: 'regular' | 'abono' | 'liquidacion' | 'mora' | 'cobro_mora';
@@ -41,7 +41,7 @@ export interface OfflinePago {
 }
 
 export interface OfflineMotarorio {
-  id: string;
+  id?: string;
   clienteId: string;
   cobradorId: string;
   motivo: 'no_estaba' | 'sin_dinero' | 'viajo' | 'enfermo' | 'otro';
@@ -91,6 +91,14 @@ export class OfflineDatabase extends Dexie {
       clientes: 'id, nombreCompleto, cobradorAsignadoId, diaPago, statusCuenta, lastSync, syncStatus',
       pagos: '++id, localId, clienteId, cobradorId, fechaPago, syncStatus, createdOffline, printStatus',
       motararios: '++id, localId, clienteId, cobradorId, fecha, syncStatus, createdOffline',
+      syncQueue: '++id, type, localId, status, attempts, lastAttempt',
+      settings: 'cobradorId'
+    });
+
+    this.version(2).stores({
+      clientes: 'id, nombreCompleto, cobradorAsignadoId, diaPago, statusCuenta, lastSync, syncStatus',
+      pagos: 'localId, id, clienteId, cobradorId, fechaPago, syncStatus, createdOffline, printStatus',
+      motararios: 'localId, id, clienteId, cobradorId, fecha, syncStatus, createdOffline',
       syncQueue: '++id, type, localId, status, attempts, lastAttempt',
       settings: 'cobradorId'
     });

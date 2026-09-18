@@ -44,9 +44,19 @@ export async function GET(
     const lastSync = searchParams.get('lastSync');
 
     let whereClause: any = {
-      cobradorAsignadoId: params.cobradorId,
       statusCuenta: 'activo'
     };
+
+    if (userRole === 'cobrador') {
+      whereClause.cobradorAsignadoId = params.cobradorId;
+    } else if (userRole === 'admin' || userRole === 'gestor_cobranza') {
+      // Si es admin/gestor y especificó un cobrador asignado concreto
+      if (params.cobradorId && params.cobradorId !== userId && params.cobradorId !== 'all') {
+        whereClause.cobradorAsignadoId = params.cobradorId;
+      }
+    } else {
+      whereClause.cobradorAsignadoId = params.cobradorId;
+    }
 
     // Si no es sincronización completa, solo traer cambios desde lastSync
     if (!full && lastSync) {

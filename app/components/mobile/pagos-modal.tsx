@@ -110,15 +110,25 @@ export function PagosModal({ cliente, isOpen, onClose, isOnline }: PagosModalPro
         const pagosACachear = pagosSerializados.slice(0, 10);
         
         await db.transaction('rw', db.pagos, async () => {
-          // 1. Eliminar pagos locales antiguos de ESTE cliente para no saturar memoria
-          // Solo mantenemos los más recientes que acabamos de bajar
-          await db.pagos.where('clienteId').equals(cliente.id).delete();
+          // 1. Eliminar únicamente pagos YA SINCRONIZADOS de este cliente para actualizar caché
+          // NUNCA eliminar pagos con syncStatus === 'pending' que estén pendientes de subir
+          const pagosSincronizados = await db.pagos
+            .where('clienteId')
+            .equals(cliente.id)
+            .and(p => p.syncStatus === 'synced')
+            .toArray();
 
-          // 2. Guardar los nuevos pagos (limitado a los últimos 10 para ahorrar memoria)
+          for (const p of pagosSincronizados) {
+            if (p.localId) {
+              await db.pagos.where('localId').equals(p.localId).delete();
+            }
+          }
+
+          // 2. Guardar los pagos descargados del servidor usando put
           for (const pago of pagosACachear) {
-            await db.pagos.add({
+            await db.pagos.put({
               ...pago,
-              localId: pago.id, // Usamos el ID real como localId para el cache
+              localId: (pago as any).localId || pago.id, // Usamos el ID real o localId como clave
               syncStatus: 'synced',
               createdOffline: false,
               printStatus: pago.ticketImpreso ? 'printed' : 'pending',

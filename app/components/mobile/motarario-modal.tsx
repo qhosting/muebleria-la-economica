@@ -87,7 +87,6 @@ export function MotararioModal({ cliente, isOpen, onClose, onSuccess, isOnline }
 
     try {
       const motararioData = {
-        id: '', // Se generará en el servidor
         clienteId: cliente.id,
         cobradorId: userId,
         motivo,
@@ -99,18 +98,33 @@ export function MotararioModal({ cliente, isOpen, onClose, onSuccess, isOnline }
       // 🚀 OFFLINE POR DEFAULT: Guardar siempre localmente primero
       await syncService.addMotararioOffline(motararioData);
 
-      toast.success('Motarario registrado', {
-        description: 'Guardado localmente. Se sincroniza automáticamente.'
-      });
+      // Si hay conexión, subir de inmediato al servidor
+      let syncedOnline = false;
+      if (typeof window !== 'undefined' && navigator.onLine) {
+        try {
+          syncedOnline = await syncService.uploadMotararios(userId);
+        } catch (syncErr) {
+          console.warn('Sync inmediato de motarario no completado:', syncErr);
+        }
+      }
+
+      if (syncedOnline) {
+        toast.success('Motarario registrado', {
+          description: 'Guardado y sincronizado con el servidor.'
+        });
+      } else {
+        toast.success('Motarario registrado', {
+          description: 'Guardado localmente. Se sincronizará automáticamente.'
+        });
+      }
 
       onSuccess();
       onClose();
 
-      // Sincronización en background si la conexión es estable
+      // Sincronización en background de datos pendientes restantes
       setTimeout(async () => {
         try {
-          const quality = networkMonitor.getState();
-          if (quality.isStable) {
+          if (typeof window !== 'undefined' && navigator.onLine) {
             await syncService.syncAll(userId, false);
           }
         } catch (e) {
