@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { apiFetch } from './api-config';
+import { Capacitor } from '@capacitor/core';
+import { Network } from '@capacitor/network';
 
 export type NetworkStatusType = 'online' | 'unstable' | 'offline';
 
@@ -41,6 +43,27 @@ class NetworkQualityMonitor {
   }
 
   private init() {
+    // Listener nativo de Capacitor para Android APK
+    if (Capacitor.isNativePlatform()) {
+      try {
+        Network.addListener('networkStatusChange', (status: any) => {
+          if (status.connected) {
+            this.checkQuality();
+          } else {
+            this.updateState({
+              status: 'offline',
+              isOnline: false,
+              isStable: false,
+              latencyMs: null,
+              lastChecked: Date.now()
+            });
+          }
+        });
+      } catch (e) {
+        console.warn('Error inicializando listener nativo de red:', e);
+      }
+    }
+
     window.addEventListener('online', () => {
       this.checkQuality();
     });

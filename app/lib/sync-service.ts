@@ -10,6 +10,9 @@ export class SyncService {
   private static instance: SyncService;
   private syncInProgress = false;
   private autoSyncInterval?: NodeJS.Timeout;
+  private currentCobradorId?: string;
+  private networkSubscribed = false;
+  private lastAutoSyncAttempt = 0;
 
   private constructor() { }
 
@@ -20,12 +23,86 @@ export class SyncService {
     return SyncService.instance;
   }
 
+  public getCurrentCobradorId(): string | undefined {
+    return this.currentCobradorId;
+  }
+
+  public setCurrentCobradorId(id: string) {
+    this.currentCobradorId = id;
+  }
+
+  // Desbloquear cualquier pago o motarario que haya quedado en 'syncing' por crash o recarga previa
+  public async resetStuckSyncing() {
+    try {
+      await db.pagos.where('syncStatus').equals('syncing').modify({ syncStatus: 'pending' });
+      await db.motararios.where('syncStatus').equals('syncing').modify({ syncStatus: 'pending' });
+    } catch (err) {
+      console.warn('Error reseteando registros colgados en syncing:', err);
+    }
+  }
+
   // Inicializar sincronización automática
   public async initAutoSync(cobradorId: string) {
+    if (!cobradorId) return;
+    this.currentCobradorId = cobradorId;
+
+    // Asegurar que exista configuración local con el cobradorId para reconexiones automáticas
+    try {
+      const existing = await db.settings.get(cobradorId);
+      if (!existing) {
+        await db.settings.put({
+          cobradorId,
+          syncEnabled: true,
+          autoSync: true,
+          printFormat: 'thermal',
+          offlineMode: false,
+          lastFullSync: Date.now()
+        });
+      }
+    } catch (e) {
+      console.warn('Error inicializando settings en IndexedDB:', e);
+    }
+
+    // Limpiar posibles elementos congelados
+    await this.resetStuckSyncing();
+
+    // Suscribir auto-sync al monitor de red para sincronizar apenas detecte conexión ESTABLE
+    this.setupNetworkMonitorSync(cobradorId);
+
     const settings = await db.settings.get(cobradorId);
     if (settings?.autoSync !== false) {
       this.startAutoSync(cobradorId);
     }
+  }
+
+  private setupNetworkMonitorSync(cobradorId: string) {
+    if (this.networkSubscribed) return;
+    this.networkSubscribed = true;
+
+    networkMonitor.subscribe(async (netState) => {
+      // Sincronizar automáticamente sólo cuando la conexión es 'online' Y realmente estable (ping < 2000ms)
+      if (netState.status === 'online' && netState.isStable && !this.syncInProgress) {
+        const now = Date.now();
+        // Control de frecuencia para evitar múltiples ráfagas seguidas
+        if (now - this.lastAutoSyncAttempt < 15000) return;
+        this.lastAutoSyncAttempt = now;
+
+        try {
+          const activeCobradorId = cobradorId || this.currentCobradorId;
+          if (!activeCobradorId) return;
+
+          const pendingPagos = await db.pagos.where('syncStatus').equals('pending').count();
+          const pendingMotararios = await db.motararios.where('syncStatus').equals('pending').count();
+
+          if (pendingPagos > 0 || pendingMotararios > 0) {
+            console.log(`[Auto-Sync Red Estable] Conexión estable confirmada (${netState.latencyMs}ms). Sincronizando ${pendingPagos} pagos y ${pendingMotararios} motararios...`);
+            await this.syncAll(activeCobradorId, false);
+          }
+        } catch (err) {
+          console.warn('Error en auto-sync disparado por red estable:', err);
+        }
+      }
+    });
   }
 
   private startAutoSync(cobradorId: string) {
@@ -33,20 +110,24 @@ export class SyncService {
       clearInterval(this.autoSyncInterval);
     }
 
-    // 🚀 OPTIMIZACIÓN MÓVIL: Verificar cada 1 minuto si hay conexión
+    // 🚀 OPTIMIZACIÓN MÓVIL: Verificar cada 1 minuto
     this.autoSyncInterval = setInterval(async () => {
-      if (!this.syncInProgress && typeof window !== 'undefined' && navigator.onLine) {
-        try {
-          const pendingPagos = await db.pagos.where('syncStatus').equals('pending').count();
-          const pendingMotararios = await db.motararios.where('syncStatus').equals('pending').count();
+      const activeCobradorId = cobradorId || this.currentCobradorId;
+      if (!activeCobradorId || this.syncInProgress) return;
 
-          if (pendingPagos > 0 || pendingMotararios > 0) {
-            console.log(`[Auto-Sync] Datos pendientes (${pendingPagos} pagos, ${pendingMotararios} motararios). Sincronizando...`);
-            await this.syncAll(cobradorId, false); // silent sync
-          }
-        } catch (error) {
-          console.error('Error en auto-sync:', error);
+      const netState = networkMonitor.getState();
+      if (!netState.isOnline) return;
+
+      try {
+        const pendingPagos = await db.pagos.where('syncStatus').equals('pending').count();
+        const pendingMotararios = await db.motararios.where('syncStatus').equals('pending').count();
+
+        if (pendingPagos > 0 || pendingMotararios > 0) {
+          console.log(`[Auto-Sync Intervalo] Datos pendientes (${pendingPagos} pagos, ${pendingMotararios} motararios). Sincronizando...`);
+          await this.syncAll(activeCobradorId, false); // silent sync
         }
+      } catch (error) {
+        console.error('Error en auto-sync periódico:', error);
       }
     }, 60 * 1000);
   }
@@ -65,8 +146,15 @@ export class SyncService {
       return false;
     }
 
-    // Validar si el navegador reporta estar offline
-    if (typeof window !== 'undefined' && !navigator.onLine) {
+    const targetCobradorId = cobradorId || this.currentCobradorId;
+    if (!targetCobradorId) {
+      if (showToast) toast.error('No se especificó cobrador');
+      return false;
+    }
+
+    // Validar estado de red con networkMonitor
+    const netState = networkMonitor.getState();
+    if (!netState.isOnline) {
       if (showToast) toast.error('Sin conexión a internet');
       return false;
     }
@@ -74,19 +162,22 @@ export class SyncService {
     this.syncInProgress = true;
 
     try {
+      // Liberar registros previamente colgados antes de subir
+      await this.resetStuckSyncing();
+
       if (showToast) toast.info('Sincronizando datos...');
 
       // 1. PRIMERO: Subir pagos pendientes (prioridad para resguardar cobros en el servidor)
-      const pagosOk = await this.uploadPagos(cobradorId);
+      const pagosOk = await this.uploadPagos(targetCobradorId);
 
       // 2. SEGUNDO: Subir motararios pendientes
-      const motarariosOk = await this.uploadMotararios(cobradorId);
+      const motarariosOk = await this.uploadMotararios(targetCobradorId);
 
       // 3. TERCERO: Descargar clientes actualizados del servidor (traerá saldos recién actualizados)
-      await this.downloadClientes(cobradorId);
+      await this.downloadClientes(targetCobradorId);
 
       // 4. Actualizar timestamp de sincronización
-      await this.updateLastSync(cobradorId);
+      await this.updateLastSync(targetCobradorId);
 
       if (showToast) {
         if (pagosOk && motarariosOk) {
@@ -394,12 +485,23 @@ export const syncService = SyncService.getInstance();
 // Event listeners para manejo de conectividad (solo en el cliente)
 if (typeof window !== 'undefined') {
   window.addEventListener('online', async () => {
-    console.log('Conexión restaurada - intentando sincronizar');
-    toast.success('Conexión restaurada');
+    console.log('Conexión restaurada - verificando calidad para sincronizar');
+    toast.success('Conexión restaurada', {
+      description: 'Verificando estabilidad de red...'
+    });
     try {
-      const setting = await db.settings.toCollection().first();
-      if (setting?.cobradorId) {
-        await syncService.syncAll(setting.cobradorId, false);
+      // Probar calidad real de conexión (ping al servidor)
+      const netState = await networkMonitor.checkQuality();
+
+      let cobradorId = syncService.getCurrentCobradorId();
+      if (!cobradorId) {
+        const setting = await db.settings.toCollection().first();
+        cobradorId = setting?.cobradorId;
+      }
+
+      if (cobradorId && netState.isOnline) {
+        console.log(`[Online Event] Disparando sincronización para cobrador ${cobradorId}`);
+        await syncService.syncAll(cobradorId, false);
       }
     } catch (e) {
       console.warn('Error auto-sincronizando al volver online:', e);
@@ -408,6 +510,8 @@ if (typeof window !== 'undefined') {
 
   window.addEventListener('offline', () => {
     console.log('Conexión perdida - modo offline');
-    toast.info('Sin conexión - trabajando offline');
+    toast.info('Sin conexión - trabajando offline', {
+      description: 'Los cobros y notas se guardan de forma segura en tu dispositivo'
+    });
   });
 }

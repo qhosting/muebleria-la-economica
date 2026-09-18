@@ -66,13 +66,9 @@ export function SyncStatus() {
     if (userId && userRole === 'cobrador') {
       loadSyncData();
       
-      // Inicializar sync automático
+      // Asegurar que el sincronizador esté activo
       syncService.initAutoSync(userId);
     }
-
-    return () => {
-      syncService.stopAutoSync();
-    };
   }, [userId, userRole]);
 
   const loadSyncData = async () => {

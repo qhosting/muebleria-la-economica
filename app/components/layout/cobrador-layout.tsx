@@ -1,8 +1,9 @@
 'use client';
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { usePlatform } from '@/hooks/usePlatform';
 import { Home, Users, DollarSign, User, Wifi, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -13,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { useNetworkQuality } from '@/lib/network-quality';
 import { VersionCheckModal } from '@/components/mobile/version-check-modal';
 import { Activity } from 'lucide-react';
+import { syncService } from '@/lib/sync-service';
 
 interface CobradorLayoutProps {
     children: ReactNode;
@@ -22,6 +24,17 @@ export function CobradorLayout({ children }: CobradorLayoutProps) {
     const { isNative } = usePlatform();
     const pathname = usePathname();
     const network = useNetworkQuality();
+    const { data: session } = useSession();
+
+    const userId = (session?.user as any)?.id;
+    const userRole = (session?.user as any)?.role;
+
+    // Inicializar sincronizador global en todo el layout móvil
+    useEffect(() => {
+        if (userId && (userRole === 'cobrador' || userRole === 'admin')) {
+            syncService.initAutoSync(userId);
+        }
+    }, [userId, userRole]);
 
     return (
         <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col">
