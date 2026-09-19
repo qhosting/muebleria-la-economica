@@ -162,31 +162,38 @@ export class SyncService {
     this.syncInProgress = true;
 
     try {
-      // Liberar registros previamente colgados antes de subir
+      // Liberar registros previamente colgados antes de sincronizar
       await this.resetStuckSyncing();
 
       if (showToast) toast.info('Sincronizando datos...');
 
-      // 1. PRIMERO: Subir pagos pendientes (prioridad para resguardar cobros en el servidor)
+      // 1. PRIMERO: Descargar clientes asignados del servidor
+      const clientesOk = await this.downloadClientes(targetCobradorId);
+
+      // 2. SEGUNDO: Subir pagos pendientes al servidor
       const pagosOk = await this.uploadPagos(targetCobradorId);
 
-      // 2. SEGUNDO: Subir motararios pendientes
+      // 3. TERCERO: Subir motararios pendientes
       const motarariosOk = await this.uploadMotararios(targetCobradorId);
 
-      // 3. TERCERO: Descargar clientes actualizados del servidor (traerá saldos recién actualizados)
-      await this.downloadClientes(targetCobradorId);
+      // 4. CUARTO: Si se procesaron pagos nuevos, refrescar clientes para reflejar saldos confirmados del servidor
+      if (pagosOk) {
+        await this.downloadClientes(targetCobradorId);
+      }
 
-      // 4. Actualizar timestamp de sincronización
+      // 5. Actualizar timestamp de sincronización
       await this.updateLastSync(targetCobradorId);
 
       if (showToast) {
-        if (pagosOk && motarariosOk) {
+        if (clientesOk && pagosOk && motarariosOk) {
           toast.success('Sincronización completada con éxito');
+        } else if (!clientesOk) {
+          toast.warning('Sincronización parcial: error descargando clientes');
         } else {
           toast.warning('Sincronización parcial: algunos registros no se pudieron subir');
         }
       }
-      return pagosOk && motarariosOk;
+      return clientesOk && pagosOk && motarariosOk;
 
     } catch (error) {
       console.error('Error en sincronización:', error);
@@ -198,31 +205,52 @@ export class SyncService {
   }
 
   // Descargar clientes asignados al cobrador
-  private async downloadClientes(cobradorId: string) {
+  public async downloadClientes(cobradorId: string): Promise<boolean> {
     try {
       const response = await apiFetch(`/api/sync/clientes/${cobradorId}?full=true`);
       if (!response.ok) {
-        console.warn(`No se pudieron descargar clientes para cobrador ${cobradorId}: ${response.status}`);
-        return;
+        const errorText = await response.text();
+        console.warn(`No se pudieron descargar clientes para cobrador ${cobradorId} (${response.status}):`, errorText);
+        return false;
       }
 
       const clientesServidor = await response.json();
-      if (!Array.isArray(clientesServidor)) return;
+      if (!Array.isArray(clientesServidor)) return false;
+
+      // Consultar si existen cobros pendientes de subir para no sobreescribir su saldo provisional
+      const pagosPendientes = await db.pagos.where('syncStatus').equals('pending').toArray();
+      const pendientesPorCliente = new Map<string, number>();
+      for (const p of pagosPendientes) {
+        const monto = Number(p.monto) || 0;
+        if (['regular', 'abono', 'liquidacion'].includes(p.tipoPago)) {
+          pendientesPorCliente.set(p.clienteId, (pendientesPorCliente.get(p.clienteId) || 0) + monto);
+        } else if (p.tipoPago === 'cobro_mora') {
+          pendientesPorCliente.set(p.clienteId, (pendientesPorCliente.get(p.clienteId) || 0) - monto);
+        }
+      }
 
       // Actualizar clientes locales usando put (upsert seguro sin errores de clave)
       await db.transaction('rw', db.clientes, async () => {
         for (const cliente of clientesServidor) {
+          const saldoServidor = Number(cliente.saldoPendiente) || 0;
+          const pendiente = pendientesPorCliente.get(cliente.id) || 0;
+          const saldoFinal = Math.max(0, Math.round((saldoServidor - pendiente + Number.EPSILON) * 100) / 100);
+
           await db.clientes.put({
             ...cliente,
+            saldoPendiente: saldoFinal,
+            montoAcordado: Number(cliente.montoAcordado) || 0,
             lastSync: Date.now(),
-            syncStatus: 'synced' as const
+            syncStatus: pendiente > 0 ? 'pending' : 'synced'
           });
         }
       });
 
       console.log(`${clientesServidor.length} clientes sincronizados`);
+      return true;
     } catch (error) {
       console.error('Error descargando clientes:', error);
+      return false;
     }
   }
 

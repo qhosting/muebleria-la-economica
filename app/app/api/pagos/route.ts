@@ -152,12 +152,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
     }
 
-    // Verificar permisos del cobrador
-    if (userRole === 'cobrador') {
-      // Si el cliente ya tiene cobrador asignado explícito y no es este cobrador, restringir
-      if (cliente.cobradorAsignadoId && cliente.cobradorAsignadoId !== userId) {
-        return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
-      }
+    // Si es cobrador y el cliente tenía otro cobrador asignado, se registra el pago respetando la autoría del cobro
+    if (userRole === 'cobrador' && cliente.cobradorAsignadoId && cliente.cobradorAsignadoId !== userId) {
+      console.warn(`Cobrador ${userId} cobrando a cliente ${clienteId} (asignado a ${cliente.cobradorAsignadoId}). Se acepta el pago para resguardar la recaudación en campo.`);
     }
 
     const round2 = (num: number) => Math.round((num + Number.EPSILON) * 100) / 100;

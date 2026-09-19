@@ -46,15 +46,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Cliente no encontrado' }, { status: 404 });
     }
 
-    // Si es cobrador, verificar que le pertenece el cliente
-    if (userRole === 'cobrador' && cliente.cobradorAsignadoId !== userId) {
-      return NextResponse.json({ error: 'No tienes acceso a este cliente' }, { status: 403 });
-    }
-
-    // Verificar que el cliente tenga cobrador asignado
-    if (!cliente.cobradorAsignadoId) {
-      return NextResponse.json({ error: 'Cliente sin cobrador asignado' }, { status: 400 });
-    }
+    // Si es cobrador, usar su propio ID como autor de la visita
+    const cobradorResponsableId = userRole === 'cobrador' ? userId : (cliente.cobradorAsignadoId || userId);
 
     // 🚀 IDEMPOTENCIA: Verificar si ya existe motarario con este localId
     if (localId) {
@@ -71,7 +64,7 @@ export async function POST(request: NextRequest) {
     const motarario = await prisma.motarario.create({
       data: {
         clienteId,
-        cobradorId: cliente.cobradorAsignadoId,
+        cobradorId: cobradorResponsableId,
         motivo,
         descripcion,
         fecha: new Date(fecha),

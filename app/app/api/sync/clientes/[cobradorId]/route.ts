@@ -21,10 +21,8 @@ export async function GET(
     const userRole = (session.user as any).role;
     const userId = (session.user as any).id;
 
-    // Verificar permisos - el cobrador solo puede ver sus clientes
-    if (userRole === 'cobrador' && userId !== params.cobradorId) {
-      return NextResponse.json({ error: 'No puedes sincronizar clientes de otros cobradores' }, { status: 403 });
-    }
+    // Si es cobrador, siempre sincronizar sus propios clientes asignados sin errores por discrepancia de ruta
+    const targetCobradorId = userRole === 'cobrador' ? userId : params.cobradorId;
 
     // Managers pueden ver clientes de sus cobradores asignados
     if (userRole === 'manager') {
@@ -33,7 +31,7 @@ export async function GET(
         include: { clientesAsignados: true }
       });
 
-      const hasAccess = manager?.clientesAsignados.some((c: any) => c.cobradorAsignadoId === params.cobradorId);
+      const hasAccess = manager?.clientesAsignados.some((c: any) => c.cobradorAsignadoId === targetCobradorId);
       if (!hasAccess) {
         return NextResponse.json({ error: 'No puedes sincronizar clientes de este cobrador' }, { status: 403 });
       }
@@ -48,14 +46,14 @@ export async function GET(
     };
 
     if (userRole === 'cobrador') {
-      whereClause.cobradorAsignadoId = params.cobradorId;
+      whereClause.cobradorAsignadoId = userId;
     } else if (userRole === 'admin' || userRole === 'gestor_cobranza') {
       // Si es admin/gestor y especificó un cobrador asignado concreto
-      if (params.cobradorId && params.cobradorId !== userId && params.cobradorId !== 'all') {
-        whereClause.cobradorAsignadoId = params.cobradorId;
+      if (targetCobradorId && targetCobradorId !== userId && targetCobradorId !== 'all') {
+        whereClause.cobradorAsignadoId = targetCobradorId;
       }
     } else {
-      whereClause.cobradorAsignadoId = params.cobradorId;
+      whereClause.cobradorAsignadoId = targetCobradorId;
     }
 
     // Si no es sincronización completa, solo traer cambios desde lastSync
@@ -93,16 +91,16 @@ export async function GET(
       ]
     });
 
-    // Transformar datos para formato offline
+    // Transformar datos para formato offline asegurando tipos numéricos válidos
     const clientesOffline = clientes.map((cliente: any) => ({
       id: cliente.id,
       nombreCompleto: cliente.nombreCompleto,
-      telefono: cliente.telefono,
+      telefono: cliente.telefono || '',
       direccion: cliente.direccionCompleta,
       diaPago: cliente.diaPago,
-      montoAcordado: cliente.montoPago,
-      saldoPendiente: cliente.saldoActual,
-      fechaUltimoPago: cliente.pagos[0]?.fechaPago?.toISOString(),
+      montoAcordado: cliente.montoPago ? parseFloat(cliente.montoPago.toString()) : 0,
+      saldoPendiente: cliente.saldoActual ? parseFloat(cliente.saldoActual.toString()) : 0,
+      fechaUltimoPago: cliente.pagos[0]?.fechaPago ? new Date(cliente.pagos[0].fechaPago).toISOString() : undefined,
       statusCuenta: cliente.statusCuenta,
       cobradorAsignadoId: cliente.cobradorAsignadoId,
       notas: null // Este campo no existe en el modelo actual
