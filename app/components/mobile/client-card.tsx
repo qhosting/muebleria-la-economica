@@ -105,12 +105,24 @@ export function ClientCard({
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
-            <h3 className="font-medium text-sm leading-tight truncate">
-              {cliente.nombreCompleto}
-            </h3>
+            <div className="flex items-center gap-1.5">
+              <h3 className="font-medium text-sm leading-tight truncate">
+                {cliente.nombreCompleto}
+              </h3>
+              {cliente.codigoCliente && (
+                <span className="text-[10px] font-mono bg-muted text-muted-foreground px-1.5 py-0.5 rounded flex-shrink-0">
+                  {cliente.codigoCliente}
+                </span>
+              )}
+            </div>
             <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
               <Calendar className="w-3 h-3" />
               {getDayName(cliente.diaPago)} - {formatCurrency(cliente.montoAcordado)}
+              {cliente.descripcionProducto && (
+                <span className="truncate max-w-[140px] text-slate-400">
+                  • {cliente.descripcionProducto}
+                </span>
+              )}
             </p>
           </div>
           

@@ -68,6 +68,8 @@ export interface TicketData {
   numeroRecibo?: string;
   cliente: {
     nombreCompleto: string;
+    codigoCliente?: string;
+    descripcionProducto?: string;
     telefono?: string;
     direccion: string;
     diaPago: string;

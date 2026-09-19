@@ -6,11 +6,15 @@ import Dexie, { Table } from 'dexie';
 export interface OfflineCliente {
   id: string;
   nombreCompleto: string;
+  codigoCliente?: string;
   telefono: string;
   direccion: string;
   diaPago: string;
   montoAcordado: number;
   saldoPendiente: number;
+  saldoConsolidado?: number;
+  descripcionProducto?: string;
+  vendedor?: string;
   fechaUltimoPago?: string;
   statusCuenta: 'activo' | 'suspendido' | 'cancelado';
   cobradorAsignadoId: string;
@@ -71,6 +75,7 @@ export interface AppSettings {
   lastFullSync?: number;
   syncEnabled: boolean;
   autoSync: boolean;
+  preferOffline?: boolean;
   bluetoothPrinter?: string;
   printFormat: 'thermal' | 'standard';
   offlineMode: boolean;
@@ -128,3 +133,14 @@ export const getSyncStats = async (cobradorId: string) => {
     pendingSync: pendingSyncCount
   };
 };
+
+// Función para limpiar datos de otros gestores en IndexedDB
+export const clearPreviousGestorData = async (currentCobradorId: string) => {
+  if (!currentCobradorId) return;
+  try {
+    await db.clientes.filter(c => !c.cobradorAsignadoId || c.cobradorAsignadoId !== currentCobradorId).delete();
+  } catch (error) {
+    console.error('Error al limpiar datos de otros gestores:', error);
+  }
+};
+

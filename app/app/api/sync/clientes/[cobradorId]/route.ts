@@ -67,9 +67,12 @@ export async function GET(
       where: whereClause,
       select: {
         id: true,
+        codigoCliente: true,
         nombreCompleto: true,
         telefono: true,
         direccionCompleta: true,
+        descripcionProducto: true,
+        vendedor: true,
         diaPago: true,
         montoPago: true,
         saldoActual: true,
@@ -91,20 +94,42 @@ export async function GET(
       ]
     });
 
+    // Obtener sumas consolidadas por teléfono para estos clientes
+    const phones = clientes.map((c: any) => c.telefono).filter(Boolean);
+    const consolidadoSums = phones.length > 0 ? await prisma.cliente.groupBy({
+      by: ['telefono'],
+      where: {
+        telefono: { in: phones },
+        statusCuenta: 'activo'
+      },
+      _sum: {
+        saldoActual: true
+      }
+    }) : [];
+
+    const sumMap = new Map(consolidadoSums.map((s: any) => [s.telefono, parseFloat(s._sum.saldoActual?.toString() || '0')]));
+
     // Transformar datos para formato offline asegurando tipos numéricos válidos
-    const clientesOffline = clientes.map((cliente: any) => ({
-      id: cliente.id,
-      nombreCompleto: cliente.nombreCompleto,
-      telefono: cliente.telefono || '',
-      direccion: cliente.direccionCompleta,
-      diaPago: cliente.diaPago,
-      montoAcordado: cliente.montoPago ? parseFloat(cliente.montoPago.toString()) : 0,
-      saldoPendiente: cliente.saldoActual ? parseFloat(cliente.saldoActual.toString()) : 0,
-      fechaUltimoPago: cliente.pagos[0]?.fechaPago ? new Date(cliente.pagos[0].fechaPago).toISOString() : undefined,
-      statusCuenta: cliente.statusCuenta,
-      cobradorAsignadoId: cliente.cobradorAsignadoId,
-      notas: null // Este campo no existe en el modelo actual
-    }));
+    const clientesOffline = clientes.map((cliente: any) => {
+      const saldoActual = cliente.saldoActual ? parseFloat(cliente.saldoActual.toString()) : 0;
+      return {
+        id: cliente.id,
+        codigoCliente: cliente.codigoCliente || '',
+        nombreCompleto: cliente.nombreCompleto,
+        telefono: cliente.telefono || '',
+        direccion: cliente.direccionCompleta,
+        descripcionProducto: cliente.descripcionProducto || '',
+        vendedor: cliente.vendedor || '',
+        diaPago: cliente.diaPago,
+        montoAcordado: cliente.montoPago ? parseFloat(cliente.montoPago.toString()) : 0,
+        saldoPendiente: saldoActual,
+        saldoConsolidado: (cliente.telefono ? sumMap.get(cliente.telefono) : null) || saldoActual,
+        fechaUltimoPago: cliente.pagos[0]?.fechaPago ? new Date(cliente.pagos[0].fechaPago).toISOString() : undefined,
+        statusCuenta: cliente.statusCuenta,
+        cobradorAsignadoId: cliente.cobradorAsignadoId,
+        notas: null
+      };
+    });
 
     return NextResponse.json(clientesOffline);
 

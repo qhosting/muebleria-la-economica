@@ -1,6 +1,6 @@
 
 // Servicio de sincronización para PWA de cobranza móvil
-import { db, OfflineCliente, OfflinePago, OfflineMotarorio, SyncQueue, generateLocalId } from './offline-db';
+import { db, OfflineCliente, OfflinePago, OfflineMotarorio, SyncQueue, generateLocalId, clearPreviousGestorData } from './offline-db';
 import { toast } from 'sonner';
 import { apiFetch } from './api-config';
 
@@ -46,18 +46,23 @@ export class SyncService {
     if (!cobradorId) return;
     this.currentCobradorId = cobradorId;
 
+    // 🧹 Limpieza automática de clientes pertenecientes a otros gestores
+    await clearPreviousGestorData(cobradorId);
+
     // Asegurar que exista configuración local con el cobradorId para reconexiones automáticas
     try {
-      const existing = await db.settings.get(cobradorId);
+      let existing = await db.settings.get(cobradorId);
       if (!existing) {
-        await db.settings.put({
+        existing = {
           cobradorId,
           syncEnabled: true,
           autoSync: true,
+          preferOffline: true, // 🚀 MODO OFFLINE PREFERIDO POR DEFECTO PARA FLUIDEZ EN CAMPO
           printFormat: 'thermal',
           offlineMode: false,
           lastFullSync: Date.now()
-        });
+        };
+        await db.settings.put(existing);
       }
     } catch (e) {
       console.warn('Error inicializando settings en IndexedDB:', e);
@@ -229,8 +234,13 @@ export class SyncService {
         }
       }
 
-      // Actualizar clientes locales usando put (upsert seguro sin errores de clave)
+      // Limpiar clientes de otros gestores y actualizar los locales usando put
+      await clearPreviousGestorData(cobradorId);
+
       await db.transaction('rw', db.clientes, async () => {
+        // Eliminar clientes que no pertenezcan al cobrador
+        await db.clientes.filter(c => !c.cobradorAsignadoId || c.cobradorAsignadoId !== cobradorId).delete();
+
         for (const cliente of clientesServidor) {
           const saldoServidor = Number(cliente.saldoPendiente) || 0;
           const pendiente = pendientesPorCliente.get(cliente.id) || 0;
@@ -238,6 +248,7 @@ export class SyncService {
 
           await db.clientes.put({
             ...cliente,
+            cobradorAsignadoId: cliente.cobradorAsignadoId || cobradorId,
             saldoPendiente: saldoFinal,
             montoAcordado: Number(cliente.montoAcordado) || 0,
             lastSync: Date.now(),
@@ -391,13 +402,16 @@ export class SyncService {
 
   // Actualizar timestamp de última sincronización
   private async updateLastSync(cobradorId: string) {
+    const existing = await db.settings.get(cobradorId);
     await db.settings.put({
+      ...existing,
       cobradorId,
       lastFullSync: Date.now(),
       syncEnabled: true,
       autoSync: true,
       printFormat: 'thermal',
-      offlineMode: false
+      offlineMode: false,
+      preferOffline: existing?.preferOffline !== undefined ? existing.preferOffline : true
     });
   }
 
@@ -488,7 +502,8 @@ export class SyncService {
       pendingMotararios,
       failedItems,
       isOnline: navigator.onLine,
-      syncInProgress: this.syncInProgress
+      syncInProgress: this.syncInProgress,
+      preferOffline: settings?.preferOffline || false
     };
   }
 

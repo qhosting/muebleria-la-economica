@@ -1,7 +1,12 @@
 
-const CACHE_NAME = 'vertexerp-v1.4.0';
+const CACHE_NAME = 'vertexerp-v1.4.1';
 const urlsToCache = [
   '/login',
+  '/cobrador-app',
+  '/mobile/home',
+  '/mobile/clientes',
+  '/mobile/caja',
+  '/mobile/perfil',
   '/dashboard',
   '/dashboard/cobranza',
   '/dashboard/cobranza-mobile',
@@ -96,8 +101,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Para páginas de dashboard, usar estrategia Network First con timeout
-  if (url.pathname.startsWith('/dashboard') || url.pathname === '/login') {
+  // Para páginas de dashboard, mobile y login, usar estrategia Network First con timeout
+  if (url.pathname.startsWith('/dashboard') || url.pathname.startsWith('/mobile') || url.pathname === '/cobrador-app' || url.pathname === '/login') {
     event.respondWith(
       // Intentar fetch con timeout
       Promise.race([
@@ -127,6 +132,11 @@ self.addEventListener('fetch', (event) => {
               return cachedResponse;
             }
             
+            // Si es ruta móvil, intentar devolver /mobile/home o /cobrador-app
+            if (url.pathname.startsWith('/mobile')) {
+              return caches.match('/mobile/home').then(res => res || caches.match('/cobrador-app'));
+            }
+
             // Si no hay cache y es una página de navegación, devolver el dashboard principal
             if (url.pathname.startsWith('/dashboard') && url.pathname !== '/dashboard') {
               return caches.match('/dashboard');
