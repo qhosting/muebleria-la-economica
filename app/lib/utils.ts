@@ -7,11 +7,38 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(
+  amount: number | null | undefined,
+  decimalsOrOptions: number | boolean | {
+    minimumFractionDigits?: number;
+    maximumFractionDigits?: number;
+  } = 2
+): string {
+  const num = typeof amount === 'number' && !isNaN(amount) ? amount : Number(amount) || 0;
+  let minDecimals = 2;
+  let maxDecimals = 2;
+
+  if (typeof decimalsOrOptions === 'number') {
+    minDecimals = decimalsOrOptions;
+    maxDecimals = decimalsOrOptions;
+  } else if (typeof decimalsOrOptions === 'boolean') {
+    minDecimals = decimalsOrOptions ? 2 : 0;
+    maxDecimals = decimalsOrOptions ? 2 : 0;
+  } else if (decimalsOrOptions && typeof decimalsOrOptions === 'object') {
+    if (decimalsOrOptions.minimumFractionDigits !== undefined) {
+      minDecimals = decimalsOrOptions.minimumFractionDigits;
+    }
+    if (decimalsOrOptions.maximumFractionDigits !== undefined) {
+      maxDecimals = decimalsOrOptions.maximumFractionDigits;
+    }
+  }
+
   return new Intl.NumberFormat('es-MX', {
     style: 'currency',
     currency: 'MXN',
-  }).format(amount);
+    minimumFractionDigits: minDecimals,
+    maximumFractionDigits: maxDecimals,
+  }).format(num);
 }
 
 export function formatDate(date: Date | string | null | undefined): string {

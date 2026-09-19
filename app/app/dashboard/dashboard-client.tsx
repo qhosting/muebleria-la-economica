@@ -100,7 +100,9 @@ export function DashboardClient({ session: initialSession }: DashboardClientProp
         <Icon className={`h-4 w-4 text-${color}-600`} />
       </CardHeader>
       <CardContent>
-        <div className="text-2xl font-bold">{value}</div>
+        <div className="text-2xl font-bold">
+          {typeof value === 'number' ? Math.round(value).toLocaleString('es-MX') : value}
+        </div>
         {description && (
           <p className="text-xs text-muted-foreground">{description}</p>
         )}
@@ -193,7 +195,7 @@ export function DashboardClient({ session: initialSession }: DashboardClientProp
 
             <StatCard
               title="Cobranza Hoy"
-              value={formatCurrency(stats.cobranzaHoy)}
+              value={formatCurrency(stats.cobranzaHoy, 0)}
               description="Pagos del día"
               icon={DollarSign}
               color="green"
@@ -201,7 +203,7 @@ export function DashboardClient({ session: initialSession }: DashboardClientProp
 
             <StatCard
               title="Cobranza del Mes"
-              value={formatCurrency(stats.cobranzaMes)}
+              value={formatCurrency(stats.cobranzaMes, 0)}
               description="Pagos mensuales"
               icon={TrendingUp}
               color="blue"
@@ -217,7 +219,7 @@ export function DashboardClient({ session: initialSession }: DashboardClientProp
 
             <StatCard
               title="Saldos Totales"
-              value={formatCurrency(stats.saldosTotales)}
+              value={formatCurrency(stats.saldosTotales, 0)}
               description="Por cobrar"
               icon={CreditCard}
               color="orange"
