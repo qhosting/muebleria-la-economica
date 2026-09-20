@@ -7,6 +7,8 @@ export interface OfflineCliente {
   id: string;
   nombreCompleto: string;
   codigoCliente?: string;
+  curp?: string;
+  numContrato?: string;
   telefono: string;
   direccion: string;
   diaPago: string;

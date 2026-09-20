@@ -1,7 +1,7 @@
 'use client';
 import { Card, CardContent, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
-import { Users, DollarSign } from 'lucide-react';
+import { Users, DollarSign, ShieldCheck, Store } from 'lucide-react';
 
 export default function MobileHomePage() {
     return (
@@ -18,15 +18,35 @@ export default function MobileHomePage() {
                             <div className="p-3 bg-emerald-500/10 rounded-full">
                                 <Users className="w-6 h-6 text-emerald-500" />
                             </div>
-                            <span className="font-semibold text-white text-sm">Ver Clientes</span>
+                            <span className="font-semibold text-white text-sm">Cobranza / Clientes</span>
+                        </CardContent>
+                    </Card>
+                </Link>
+                <Link href="/dashboard/kiosco" className="block">
+                    <Card className="bg-slate-900 border-slate-800 hover:bg-slate-800 active:scale-95 transition-all cursor-pointer">
+                        <CardContent className="flex flex-col items-center justify-center p-6 gap-3 text-center h-32">
+                            <div className="p-3 bg-amber-500/10 rounded-full">
+                                <Store className="w-6 h-6 text-amber-500" />
+                            </div>
+                            <span className="font-semibold text-white text-sm">Kiosco de Ventas</span>
+                        </CardContent>
+                    </Card>
+                </Link>
+                <Link href="/mobile/boveda" className="block">
+                    <Card className="bg-slate-900 border-slate-800 hover:bg-slate-800 active:scale-95 transition-all cursor-pointer">
+                        <CardContent className="flex flex-col items-center justify-center p-6 gap-3 text-center h-32">
+                            <div className="p-3 bg-blue-500/10 rounded-full">
+                                <ShieldCheck className="w-6 h-6 text-blue-400" />
+                            </div>
+                            <span className="font-semibold text-white text-sm">Bóveda Digital</span>
                         </CardContent>
                     </Card>
                 </Link>
                 <Link href="/mobile/caja" className="block">
                     <Card className="bg-slate-900 border-slate-800 hover:bg-slate-800 active:scale-95 transition-all cursor-pointer">
                         <CardContent className="flex flex-col items-center justify-center p-6 gap-3 text-center h-32">
-                            <div className="p-3 bg-amber-500/10 rounded-full">
-                                <DollarSign className="w-6 h-6 text-amber-500" />
+                            <div className="p-3 bg-purple-500/10 rounded-full">
+                                <DollarSign className="w-6 h-6 text-purple-400" />
                             </div>
                             <span className="font-semibold text-white text-sm">Caja Diaria</span>
                         </CardContent>

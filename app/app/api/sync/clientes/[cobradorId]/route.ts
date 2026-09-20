@@ -20,9 +20,10 @@ export async function GET(
 
     const userRole = (session.user as any).role;
     const userId = (session.user as any).id;
+    const isFieldWorker = userRole === 'cobrador' || userRole === 'vendedor';
 
-    // Si es cobrador, siempre sincronizar sus propios clientes asignados sin errores por discrepancia de ruta
-    const targetCobradorId = userRole === 'cobrador' ? userId : params.cobradorId;
+    // Si es cobrador o vendedor, sincronizar sus propios clientes asignados
+    const targetCobradorId = isFieldWorker ? userId : params.cobradorId;
 
     // Managers pueden ver clientes de sus cobradores asignados
     if (userRole === 'manager') {
@@ -47,6 +48,11 @@ export async function GET(
 
     if (userRole === 'cobrador') {
       whereClause.cobradorAsignadoId = userId;
+    } else if (userRole === 'vendedor') {
+      whereClause.OR = [
+        { cobradorAsignadoId: userId },
+        { vendedor: (session.user as any).name || (session.user as any).email }
+      ];
     } else if (userRole === 'admin' || userRole === 'gestor_cobranza') {
       // Si es admin/gestor y especificó un cobrador asignado concreto
       if (targetCobradorId && targetCobradorId !== userId && targetCobradorId !== 'all') {
@@ -68,6 +74,8 @@ export async function GET(
       select: {
         id: true,
         codigoCliente: true,
+        curp: true,
+        numContrato: true,
         nombreCompleto: true,
         telefono: true,
         direccionCompleta: true,
@@ -115,6 +123,8 @@ export async function GET(
       return {
         id: cliente.id,
         codigoCliente: cliente.codigoCliente || '',
+        curp: cliente.curp || '',
+        numContrato: cliente.numContrato || '',
         nombreCompleto: cliente.nombreCompleto,
         telefono: cliente.telefono || '',
         direccion: cliente.direccionCompleta,

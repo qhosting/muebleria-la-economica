@@ -79,6 +79,8 @@ model User {
   motararios            Motarario[]
   rutasCobranza         RutaCobranza[]
   ventasComoVendedor    Venta[]        @relation("VendedorVenta")
+  documentosCreados     DocumentoBoveda[] @relation("VendedorBoveda")
+  validacionesDocumentos DocumentoBoveda[] @relation("ValidadorDocumento")
 
   @@map("users")
 }
@@ -86,6 +88,8 @@ model User {
 model Cliente {
   id                  String        @id @default(cuid())
   codigoCliente       String        @unique
+  curp                String?
+  numContrato         String?
   fechaVenta          DateTime
   nombreCompleto      String
   telefono            String?
@@ -114,6 +118,8 @@ model Cliente {
   motararios          Motarario[]
   ventas              Venta[]
 
+  @@index([curp])
+  @@index([numContrato])
   @@map("clientes")
 }
 
@@ -385,4 +391,33 @@ model DetalleVenta {
   importe         Decimal   @db.Decimal(10,2)
 
   @@map("detalles_venta")
+}
+
+model DocumentoBoveda {
+  id              String   @id @default(cuid())
+  clienteCurp     String?  // Identificador único del cliente (CURP)
+  codigoCliente   String?  // Código de cliente vinculado
+  folioContrato   String?  // Folio de contrato vinculado
+  nombreCliente   String?
+  telefono        String?  // Teléfono del cliente
+  tipoDocumento   String   // INE_FRONT, INE_BACK, DOMICILIO, INGRESOS, PROPIEDAD, CONTRATO_FRONT, CONTRATO_BACK, FACHADA, GPS, OTRO, etc.
+  url             String
+  status          String   @default("PENDIENTE") // PENDIENTE, VALIDADO, RECHAZADO
+  motivoRechazo   String?
+  vendedorId      String?
+  validadoPorId   String?
+  fechaValidacion DateTime?
+  driveFileId     String?  // ID de archivo en Google Drive
+  driveUrl        String?  // Enlace web de Google Drive
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  vendedor        User?    @relation("VendedorBoveda", fields: [vendedorId], references: [id])
+  validadoPor     User?    @relation("ValidadorDocumento", fields: [validadoPorId], references: [id])
+
+  @@index([clienteCurp])
+  @@index([codigoCliente])
+  @@index([folioContrato])
+  @@index([vendedorId])
+  @@map("documentos_boveda")
 }

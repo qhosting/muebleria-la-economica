@@ -18,7 +18,8 @@ import {
   CheckCircle,
   Wifi,
   WifiOff,
-  AlertTriangle
+  AlertTriangle,
+  ShieldCheck
 } from 'lucide-react';
 import { OfflineCliente } from '@/lib/offline-db';
 import { formatCurrency, getDayName } from '@/lib/utils';
@@ -30,6 +31,7 @@ interface ClientCardProps {
   isOnline: boolean;
   onCobrar: (cliente: OfflineCliente) => void;
   onVerPagos: (cliente: OfflineCliente) => void;
+  onVerBoveda?: (cliente: OfflineCliente) => void;
   onCall?: (telefono: string) => void;
   showSyncStatus?: boolean;
 }
@@ -39,6 +41,7 @@ export function ClientCard({
   isOnline, 
   onCobrar, 
   onVerPagos,
+  onVerBoveda,
   onCall,
   showSyncStatus = true
 }: ClientCardProps) {
@@ -219,8 +222,20 @@ export function ClientCard({
             className="flex-1 h-9 text-xs"
           >
             <Receipt className="w-4 h-4 mr-1" />
-            Ver Pagos
+            Pagos
           </Button>
+
+          {onVerBoveda && (
+            <Button
+              onClick={() => onVerBoveda(cliente)}
+              variant="outline"
+              className="h-9 px-3 text-xs text-blue-600 border-blue-200 hover:bg-blue-50 dark:border-slate-800 dark:hover:bg-slate-800"
+              title="Abrir Bóveda Digital"
+            >
+              <ShieldCheck className="w-4 h-4 mr-1" />
+              Bóveda
+            </Button>
+          )}
         </div>
 
         {/* Indicador de conectividad */}

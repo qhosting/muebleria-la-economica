@@ -51,7 +51,7 @@ export function LoginForm() {
           const savedProfile = await obtenerDatoCobrador<any>('user_profile');
           if (savedProfile) {
             toast.info('Sin conexión. Entrando en modo offline automáticamente...');
-            const url = savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard';
+            const url = ['cobrador', 'vendedor'].includes(savedProfile.role) ? '/mobile/home' : '/dashboard';
             router.replace(url);
           }
         }
@@ -157,17 +157,17 @@ export function LoginForm() {
             }
 
             // Redireccionar según el rol del usuario
-            let redirectUrl = '/mobile/home'; // Default para cobradores
+            let redirectUrl = '/mobile/home'; // Default para cobradores y vendedores
 
             if (userRole === 'admin') redirectUrl = '/dashboard';
             else if (userRole === 'gestor_cobranza') redirectUrl = '/dashboard/clientes';
             else if (userRole === 'reporte_cobranza') redirectUrl = '/dashboard/reportes';
-            else if (userRole === 'cobrador') redirectUrl = '/mobile/home';
+            else if (userRole === 'cobrador' || userRole === 'vendedor') redirectUrl = '/mobile/home';
 
             console.log(`🚀 Redirigiendo a ${redirectUrl} para rol ${userRole}`);
 
             // En nativo siempre usar el router de Next.js para mantener el contexto de la app
-            if (isNative || userRole === 'cobrador') {
+            if (isNative || userRole === 'cobrador' || userRole === 'vendedor') {
               router.replace(redirectUrl);
             } else {
               // En web admin, permitimos refresh completo para asegurar estado limpio
@@ -185,7 +185,7 @@ export function LoginForm() {
 
             if (savedProfile && savedProfile.email === email) {
               if (confirm('No se pudo establecer conexión con el servidor. ¿Desea entrar en MODO OFFLINE con los datos guardados de la última sesión?')) {
-                router.replace(savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard');
+                router.replace(['cobrador', 'vendedor'].includes(savedProfile.role) ? '/mobile/home' : '/dashboard');
                 return;
               }
             }
@@ -206,7 +206,7 @@ export function LoginForm() {
         const savedProfile = await obtenerDatoCobrador<any>('user_profile');
         if (savedProfile && savedProfile.email === email) {
           toast.info('Sin conexión. Entrando en modo offline...');
-          router.replace(savedProfile.role === 'cobrador' ? '/mobile/home' : '/dashboard');
+          router.replace(['cobrador', 'vendedor'].includes(savedProfile.role) ? '/mobile/home' : '/dashboard');
           return;
         }
       }

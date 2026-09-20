@@ -27,6 +27,7 @@ import {
   Printer,
   Package,
   Store,
+  ShieldCheck,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -41,19 +42,25 @@ const navigation = [
     name: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
-    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza', 'cobrador'],
+    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza', 'cobrador', 'vendedor'],
+  },
+  {
+    name: 'Bóveda Digital',
+    href: '/dashboard/boveda',
+    icon: ShieldCheck,
+    roles: ['admin', 'gestor_cobranza', 'vendedor', 'cobrador'],
   },
   {
     name: 'Kiosco de Ventas',
     href: '/dashboard/kiosco',
     icon: Store,
-    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza', 'vendedor', 'cobrador'],
   },
   {
     name: 'Clientes',
     href: '/dashboard/clientes',
     icon: Users,
-    roles: ['admin', 'gestor_cobranza'],
+    roles: ['admin', 'gestor_cobranza', 'vendedor', 'cobrador'],
   },
   {
     name: 'Usuarios',
@@ -71,13 +78,13 @@ const navigation = [
     name: 'Cobranza Móvil',
     href: '/dashboard/cobranza',
     icon: CreditCard,
-    roles: ['cobrador'],
+    roles: ['cobrador', 'vendedor'],
   },
   {
     name: 'Mi Impresora',
     href: '/dashboard/mi-impresora',
     icon: Printer,
-    roles: ['cobrador'],
+    roles: ['cobrador', 'vendedor'],
   },
   {
     name: 'Pagos',

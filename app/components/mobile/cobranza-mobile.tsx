@@ -34,13 +34,14 @@ import { SyncStatus } from './sync-status';
 import { ClientCard } from './client-card';
 import { CobroModal } from './cobro-modal';
 import { PagosModal } from './pagos-modal';
+import { DigitalizadorModal } from '@/components/boveda/digitalizador-modal';
 import { formatCurrency, getDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FooterVersion } from '@/components/version-info';
 import { PWAInstallButton } from '@/components/pwa/pwa-install-button';
 import { CorteModal } from './corte-modal';
 import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
-import { Printer, Calculator, Receipt } from 'lucide-react';
+import { Printer, Calculator, Receipt, ShieldCheck } from 'lucide-react';
 import { TicketData } from '@/lib/bluetooth-printer';
 
 interface CobranzaMobileProps {
@@ -61,8 +62,10 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
   const [sortBy, setSortBy] = useState<'nombre' | 'saldo' | 'dia'>('nombre');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
   const [selectedCliente, setSelectedCliente] = useState<OfflineCliente | null>(null);
+  const [selectedBovedaCliente, setSelectedBovedaCliente] = useState<any>(null);
   const [showCobroModal, setShowCobroModal] = useState(false);
   const [showPagosModal, setShowPagosModal] = useState(false);
+  const [showBovedaModal, setShowBovedaModal] = useState(false);
   const [showCorteModal, setShowCorteModal] = useState(false);
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true);
   const [stats, setStats] = useState<any>(null);
@@ -73,6 +76,18 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
   const userRole = (session?.user as any)?.role;
   const userId = (session?.user as any)?.id;
   const { isConnected: isPrinterConnected, printTicket } = useBluetoothPrinter();
+
+  const handleVerBoveda = useCallback((cliente: OfflineCliente) => {
+    setSelectedBovedaCliente({
+      id: cliente.id,
+      nombreCompleto: cliente.nombreCompleto,
+      codigoCliente: cliente.codigoCliente,
+      curp: cliente.curp,
+      numContrato: cliente.numContrato || cliente.codigoCliente,
+      telefono: cliente.telefono
+    });
+    setShowBovedaModal(true);
+  }, []);
 
   const diasSemana = [
     { value: '1', label: 'LUNES' },
@@ -582,6 +597,7 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
                 isOnline={isOnline}
                 onCobrar={handleCobrar}
                 onVerPagos={handleVerPagos}
+                onVerBoveda={handleVerBoveda}
                 showSyncStatus={true}
               />
             ))}
@@ -606,6 +622,16 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
               isOnline={isOnline}
             />
           </>
+        )}
+
+        {selectedBovedaCliente && (
+          <DigitalizadorModal
+            open={showBovedaModal}
+            onOpenChange={setShowBovedaModal}
+            cliente={selectedBovedaCliente}
+            isAdmin={['admin', 'gestor_cobranza'].includes((session?.user as any)?.role?.toLowerCase())}
+            userRole={(session?.user as any)?.role}
+          />
         )}
 
         <CorteModal 

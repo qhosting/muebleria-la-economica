@@ -36,8 +36,8 @@ export default function CobradorAppPage() {
             if (currentUser) {
                 const userRole = (currentUser as any).role;
 
-                if (userRole !== 'cobrador' && userRole !== 'admin') {
-                    setMessage('Acceso denegado. Esta app es solo para cobradores.');
+                if (userRole !== 'cobrador' && userRole !== 'vendedor' && userRole !== 'admin' && userRole !== 'gestor_cobranza') {
+                    setMessage('Acceso denegado. Esta app es para cobradores y vendedores.');
                     setTimeout(() => router.push('/dashboard'), 3000);
                     return;
                 }

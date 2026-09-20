@@ -31,13 +31,15 @@ import {
   Package,
   History,
   FileText,
-  UserCheck
+  UserCheck,
+  ShieldCheck
 } from 'lucide-react';
 import { formatCurrency, getDayName, cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, SUCURSALES_SISTEMA, SUCURSAL_SAN_LUCAS, calcularPlanCredito } from '@/lib/catalogo-kiosco';
 import { RemisionPagarePrint } from '@/components/ventas/RemisionPagarePrint';
 import { SignaturePadModal } from '@/components/ventas/SignaturePadModal';
+import { DigitalizadorModal } from '@/components/boveda/digitalizador-modal';
 import { CartItem, Cliente, User as UserType } from '@/lib/types';
 
 export default function KioscoVentasPage() {
@@ -81,6 +83,14 @@ export default function KioscoVentasPage() {
   const [isCustomProductOpen, setIsCustomProductOpen] = useState(false);
   const [customProduct, setCustomProduct] = useState({ concepto: '', precio: '' });
   const [ventaParaImprimir, setVentaParaImprimir] = useState<any>(null);
+  const [bovedaModalOpen, setBovedaModalOpen] = useState(false);
+  const [bovedaCliente, setBovedaCliente] = useState<{
+    codigoCliente?: string;
+    folioContrato?: string;
+    nombreCliente?: string;
+    telefono?: string;
+    direccion?: string;
+  } | null>(null);
 
   // Historial de ventas recientes
   const [historialVentas, setHistorialVentas] = useState<any[]>([]);
@@ -1181,20 +1191,41 @@ export default function KioscoVentasPage() {
                             {formatCurrency(Number(v.saldoFinanciado || 0))}
                           </td>
                           <td className="py-2.5 px-3 text-center">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setVentaParaImprimir({
-                                  ...v,
-                                  detalles: v.detalles || []
-                                });
-                              }}
-                              className="gap-1 text-xs h-7 text-blue-700 hover:bg-blue-50"
-                            >
-                              <Printer className="h-3 w-3" />
-                              Reimprimir
-                            </Button>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setVentaParaImprimir({
+                                    ...v,
+                                    detalles: v.detalles || []
+                                  });
+                                }}
+                                className="gap-1 text-xs h-7 text-blue-700 hover:bg-blue-50"
+                              >
+                                <Printer className="h-3 w-3" />
+                                Reimprimir
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setBovedaCliente({
+                                    codigoCliente: v.codigoCliente,
+                                    folioContrato: v.folio,
+                                    nombreCliente: v.nombreCliente,
+                                    telefono: v.telefonoCliente,
+                                    direccion: v.direccionCliente,
+                                  });
+                                  setBovedaModalOpen(true);
+                                }}
+                                className="gap-1 text-xs h-7 text-blue-600 hover:bg-blue-50 border-blue-200"
+                                title="Digitalizar documentos y GPS en Bóveda"
+                              >
+                                <ShieldCheck className="h-3 w-3" />
+                                Bóveda
+                              </Button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -1261,6 +1292,23 @@ export default function KioscoVentasPage() {
           <RemisionPagarePrint
             venta={ventaParaImprimir}
             onClose={() => setVentaParaImprimir(null)}
+          />
+        )}
+
+        {/* MODAL DE BÓVEDA DIGITAL */}
+        {bovedaModalOpen && bovedaCliente && (
+          <DigitalizadorModal
+            open={bovedaModalOpen}
+            onOpenChange={setBovedaModalOpen}
+            cliente={{
+              nombreCompleto: bovedaCliente.nombreCliente || '',
+              codigoCliente: bovedaCliente.codigoCliente,
+              numContrato: bovedaCliente.folioContrato,
+              telefono: bovedaCliente.telefono,
+              direccion: bovedaCliente.direccion,
+            }}
+            isAdmin={['admin', 'gestor_cobranza'].includes((session?.user as any)?.role?.toLowerCase())}
+            userRole={(session?.user as any)?.role}
           />
         )}
       </div>

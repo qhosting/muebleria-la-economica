@@ -21,3 +21,5 @@ out
 app/.env.bak
 .env.bak
 **/test-results
+app/public/uploads/boveda/*
+!app/public/uploads/boveda/.gitkeep

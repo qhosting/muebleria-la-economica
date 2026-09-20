@@ -31,7 +31,7 @@ export default function MobileClientesPage() {
             return;
         }
 
-        if (userRole !== 'cobrador' && userRole !== 'admin') { // Permitir admin para pruebas
+        if (userRole !== 'cobrador' && userRole !== 'vendedor' && userRole !== 'admin' && userRole !== 'gestor_cobranza') {
             router.replace('/dashboard');
             return;
         }
@@ -48,7 +48,7 @@ export default function MobileClientesPage() {
     const loadInitialData = async () => {
         try {
             // Intentar cargar clientes solo si hay conexión
-            if (typeof window !== 'undefined' && navigator.onLine && userId && userRole === 'cobrador') {
+            if (typeof window !== 'undefined' && navigator.onLine && userId && (userRole === 'cobrador' || userRole === 'vendedor' || userRole === 'admin' || userRole === 'gestor_cobranza')) {
                 const response = await apiFetch(`/api/sync/clientes/${userId}?full=true`, {
                     headers: {
                         'Cache-Control': 'no-cache'

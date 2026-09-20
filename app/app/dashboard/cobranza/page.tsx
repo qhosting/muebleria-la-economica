@@ -68,8 +68,8 @@ export default function CobranzaPage() {
                       window.innerWidth < 768;
       setIsMobileDevice(isMobile);
       
-      // Si es cobrador en dispositivo móvil, redirigir a versión móvil
-      if (isMobile && userRole === 'cobrador') {
+      // Si es cobrador o vendedor en dispositivo móvil, redirigir a versión móvil
+      if (isMobile && (userRole === 'cobrador' || userRole === 'vendedor')) {
         router.push('/dashboard/cobranza-mobile');
         return;
       }
@@ -163,8 +163,8 @@ export default function CobranzaPage() {
     setSelectedCliente(null);
   };
 
-  // Si es cobrador, mostrar opción para versión móvil
-  if (userRole === 'cobrador') {
+  // Si es cobrador, vendedor o gestor, mostrar interfaz de cobranza
+  if (userRole === 'cobrador' || userRole === 'vendedor' || userRole === 'admin' || userRole === 'gestor_cobranza') {
     return (
       <DashboardLayout>
         <div className="container mx-auto p-6">

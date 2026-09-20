@@ -20,17 +20,25 @@ export async function GET(
     const userRole = (session.user as any).role;
     const userId = (session.user as any).id;
 
-    // Verificar permisos
-    if (userRole === 'cobrador' && userId !== params.cobradorId) {
-      return NextResponse.json({ error: 'No puedes ver clientes de otros cobradores' }, { status: 403 });
+    // Verificar permisos: cobrador o vendedor solo pueden ver sus propios clientes asignados/vendidos
+    if ((userRole === 'cobrador' || userRole === 'vendedor') && userId !== params.cobradorId) {
+      return NextResponse.json({ error: 'No puedes ver clientes de otros cobradores o vendedores' }, { status: 403 });
     }
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: params.cobradorId },
+      select: { name: true, role: true }
+    });
 
     const { searchParams } = new URL(request.url);
     const diaPago = searchParams.get('diaPago');
     const statusCuenta = searchParams.get('statusCuenta') || 'activo';
 
     const where: any = {
-      cobradorAsignadoId: params.cobradorId,
+      OR: [
+        { cobradorAsignadoId: params.cobradorId },
+        ...(targetUser?.name ? [{ vendedor: targetUser.name }] : [])
+      ],
       statusCuenta,
     };
 
