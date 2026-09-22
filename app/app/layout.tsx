@@ -54,7 +54,7 @@ export default function RootLayout({
         {/* PWA - Icons for other platforms */}
         <meta name="msapplication-TileImage" content="/icon-192x192.png" />
         
-        {/* PWA - Service Worker Registration */}
+        {/* PWA - Service Worker Registration & Auto-Update */}
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -63,15 +63,53 @@ export default function RootLayout({
                   navigator.serviceWorker.register('/sw.js')
                     .then(function(registration) {
                       console.log('✅ Service Worker registrado:', registration.scope);
-                      
-                      // Detectar cuando se instala
-                      window.addEventListener('appinstalled', () => {
+
+                      // Forzar verificación de nueva versión de inmediato
+                      registration.update().catch(function() {});
+
+                      // Verificar periódicamente cada 30 minutos
+                      setInterval(function() {
+                        registration.update().catch(function() {});
+                      }, 30 * 60 * 1000);
+
+                      // Verificar cada vez que la app vuelve a primer plano
+                      document.addEventListener('visibilitychange', function() {
+                        if (document.visibilityState === 'visible') {
+                          registration.update().catch(function() {});
+                        }
+                      });
+
+                      // Detectar cuando hay un nuevo Service Worker instalándose
+                      registration.addEventListener('updatefound', function() {
+                        var newWorker = registration.installing;
+                        if (newWorker) {
+                          newWorker.addEventListener('statechange', function() {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                              console.log('🔄 Nueva versión detectada, forzando activación...');
+                              newWorker.postMessage({ type: 'SKIP_WAITING' });
+                            }
+                          });
+                        }
+                      });
+
+                      // Detectar cuando se instala por primera vez
+                      window.addEventListener('appinstalled', function() {
                         console.log('✅ PWA instalada exitosamente');
                       });
                     })
                     .catch(function(err) {
                       console.error('❌ Error al registrar Service Worker:', err);
                     });
+
+                  // Cuando el nuevo Service Worker toma el control, recargar para limpiar caché y servir nueva versión
+                  var isRefreshing = false;
+                  navigator.serviceWorker.addEventListener('controllerchange', function() {
+                    if (!isRefreshing) {
+                      isRefreshing = true;
+                      console.log('✨ Nuevo Service Worker activo. Recargando página...');
+                      window.location.reload();
+                    }
+                  });
                 });
               }
             `,
