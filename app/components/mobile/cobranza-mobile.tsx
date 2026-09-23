@@ -30,7 +30,6 @@ import {
 } from 'lucide-react';
 import { OfflineCliente, db, getSyncStats } from '@/lib/offline-db';
 import { syncService } from '@/lib/sync-service';
-import { SyncStatus } from './sync-status';
 import { ClientCard } from './client-card';
 import { CobroModal } from './cobro-modal';
 import { PagosModal } from './pagos-modal';
@@ -38,7 +37,6 @@ import { DigitalizadorModal } from '@/components/boveda/digitalizador-modal';
 import { formatCurrency, getDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FooterVersion } from '@/components/version-info';
-import { PWAInstallButton } from '@/components/pwa/pwa-install-button';
 import { CorteModal } from './corte-modal';
 import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
 import { Printer, Calculator, Receipt, ShieldCheck } from 'lucide-react';
@@ -485,14 +483,6 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
               )}
             </Badge>
           </div>
-        </div>
-
-        {/* Estado de sincronización */}
-        <SyncStatus />
-
-        {/* Botón de instalación PWA */}
-        <div className="mb-4">
-          <PWAInstallButton />
         </div>
 
         {/* Estadísticas rápidas */}

@@ -133,10 +133,10 @@ export function PWAInstallButton() {
       onClick={handleInstallClick}
       variant="default"
       size="sm"
-      className="bg-green-600 hover:bg-green-700 text-white shadow-lg w-full"
+      className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg w-full h-11 text-sm font-medium"
     >
       <Download className="mr-2 h-4 w-4" />
-      Instalar Aplicación
+      Instalar Web App (PWA)
     </Button>
   );
 }

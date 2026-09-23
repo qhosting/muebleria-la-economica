@@ -1,19 +1,15 @@
 'use client';
 
-import { ReactNode, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import { usePlatform } from '@/hooks/usePlatform';
-import { Home, Users, DollarSign, User, Wifi, WifiOff } from 'lucide-react';
+import { Home, Users, DollarSign, User, Wifi, WifiOff, Sun, Activity } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '@/components/ui/badge';
-// import { SyncIndicator } from '@/components/sync-indicator'; // TODO: Crear este componente después
-// import { NetworkStatus } from '@/components/network-status'; // TODO: o este
-
 import { useNetworkQuality } from '@/lib/network-quality';
 import { VersionCheckModal } from '@/components/mobile/version-check-modal';
-import { Activity } from 'lucide-react';
 import { syncService } from '@/lib/sync-service';
 
 interface CobradorLayoutProps {
@@ -25,9 +21,37 @@ export function CobradorLayout({ children }: CobradorLayoutProps) {
     const pathname = usePathname();
     const network = useNetworkQuality();
     const { data: session } = useSession();
+    const [modoSol, setModoSol] = useState(false);
 
     const userId = (session?.user as any)?.id;
     const userRole = (session?.user as any)?.role;
+
+    // Cargar y sincronizar preferencia de Modo Sol
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const active = localStorage.getItem('modo_sol') === 'true';
+            setModoSol(active);
+            if (active) {
+                document.body.classList.add('modo-sol');
+            } else {
+                document.body.classList.remove('modo-sol');
+            }
+        }
+    }, []);
+
+    const toggleModoSol = () => {
+        const next = !modoSol;
+        setModoSol(next);
+        if (typeof window !== 'undefined') {
+            if (next) {
+                document.body.classList.add('modo-sol');
+                localStorage.setItem('modo_sol', 'true');
+            } else {
+                document.body.classList.remove('modo-sol');
+                localStorage.setItem('modo_sol', 'false');
+            }
+        }
+    };
 
     // Inicializar sincronizador global en todo el layout móvil
     useEffect(() => {
@@ -51,6 +75,19 @@ export function CobradorLayout({ children }: CobradorLayoutProps) {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        {/* Botón de Modo Sol (Alto Contraste para luz solar) */}
+                        <button
+                            onClick={toggleModoSol}
+                            className={`p-1.5 rounded-lg border transition-all ${
+                                modoSol 
+                                ? 'bg-amber-100 text-amber-700 border-amber-300 shadow-sm' 
+                                : 'bg-slate-800 text-amber-400 border-slate-700 hover:bg-slate-700'
+                            }`}
+                            title={modoSol ? "Modo Sol activado (Tocar para modo oscuro)" : "Activar Modo Sol (Alto contraste para luz solar)"}
+                        >
+                            <Sun className="w-4 h-4" />
+                        </button>
+
                         {network.status === 'online' && (
                             <Badge className="h-6 px-2 text-[10px] uppercase gap-1 bg-emerald-950 text-emerald-400 border-emerald-800">
                                 <Wifi className="w-3 h-3" />
