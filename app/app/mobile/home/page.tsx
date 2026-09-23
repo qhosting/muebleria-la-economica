@@ -22,7 +22,7 @@ export default function MobileHomePage() {
                         </CardContent>
                     </Card>
                 </Link>
-                <Link href="/dashboard/kiosco" className="block">
+                <Link href="/mobile/kiosco" className="block">
                     <Card className="bg-slate-900 border-slate-800 hover:bg-slate-800 active:scale-95 transition-all cursor-pointer">
                         <CardContent className="flex flex-col items-center justify-center p-6 gap-3 text-center h-32">
                             <div className="p-3 bg-amber-500/10 rounded-full">

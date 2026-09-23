@@ -177,6 +177,23 @@ export function useBluetoothPrinter() {
     }
   };
 
+  const printVentaTicket = async (ventaData: any): Promise<boolean> => {
+    if (!isConnected) {
+      toast.error('Impresora no conectada');
+      return false;
+    }
+
+    try {
+      await bluetoothPrinter.printVentaTicket(ventaData);
+      toast.success('Ticket de venta impreso exitosamente');
+      return true;
+    } catch (error: any) {
+      const message = error.message || 'Error imprimiendo ticket de venta';
+      toast.error(message);
+      return false;
+    }
+  };
+
   return {
     isConnected,
     isConnecting,
@@ -189,6 +206,7 @@ export function useBluetoothPrinter() {
     reconnectToPrinter,
     disconnectFromPrinter,
     printTicket,
+    printVentaTicket,
     printCorte,
     printTestPage,
     updateConnectionStatus

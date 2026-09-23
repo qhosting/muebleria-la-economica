@@ -7,6 +7,7 @@ const urlsToCache = [
   '/mobile/clientes',
   '/mobile/caja',
   '/mobile/perfil',
+  '/mobile/kiosco',
   '/dashboard',
   '/dashboard/cobranza',
   '/dashboard/cobranza-mobile',

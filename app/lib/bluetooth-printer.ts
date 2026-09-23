@@ -98,6 +98,37 @@ export interface TicketData {
   };
 }
 
+export interface VentaTicketData {
+  folio: string | number;
+  fecha: string;
+  cliente: {
+    nombre: string;
+    telefono?: string;
+    direccion: string;
+  };
+  vendedor: {
+    nombre: string;
+  };
+  tipoVenta: 'contado' | 'credito';
+  articulos: Array<{
+    concepto: string;
+    cantidad: number;
+    precioUnitario: number;
+    subtotal: number;
+  }>;
+  total: number;
+  enganche: number;
+  saldoFinanciado: number;
+  plazoSemanas?: number;
+  montoCuota?: number;
+  diaPago?: string;
+  empresa?: {
+    nombre: string;
+    direccion?: string;
+    telefono?: string;
+  };
+}
+
 class BluetoothPrinterService {
   private connection: PrinterConnection = {
     device: null,
@@ -649,6 +680,89 @@ class BluetoothPrinterService {
 
     } catch (error) {
       console.error('Error imprimiendo corte:', error);
+      throw error;
+    }
+  }
+
+  async printVentaTicket(data: VentaTicketData): Promise<void> {
+    if (!this.connection.isConnected) {
+      throw new Error('Impresora no conectada');
+    }
+
+    try {
+      let ticket = '';
+      ticket += this.COMMANDS.INIT;
+
+      // Encabezado
+      ticket += this.COMMANDS.CENTER;
+      ticket += this.COMMANDS.BOLD_ON;
+      ticket += (data.empresa?.nombre || 'MUEBLERIA LA ECONOMICA').toUpperCase() + this.LF;
+      ticket += this.COMMANDS.BOLD_OFF;
+
+      if (data.empresa?.direccion) {
+        ticket += data.empresa.direccion + this.LF;
+      }
+      if (data.empresa?.telefono) {
+        ticket += 'Tel: ' + data.empresa.telefono + this.LF;
+      }
+
+      ticket += this.createDivider() + this.LF;
+      ticket += this.COMMANDS.CENTER;
+      ticket += this.COMMANDS.BOLD_ON;
+      ticket += (data.tipoVenta === 'credito' ? 'NOTA DE VENTA A CREDITO' : 'NOTA DE VENTA DE CONTADO') + this.LF;
+      ticket += 'FOLIO: #' + data.folio + this.LF;
+      ticket += this.COMMANDS.BOLD_OFF;
+      ticket += this.createDivider() + this.LF;
+
+      ticket += this.COMMANDS.LEFT;
+      ticket += 'Fecha: ' + this.formatDate(data.fecha) + this.LF;
+      ticket += 'Asesor: ' + data.vendedor.nombre + this.LF;
+      ticket += 'Cliente: ' + data.cliente.nombre + this.LF;
+      if (data.cliente.telefono) ticket += 'Tel: ' + data.cliente.telefono + this.LF;
+      if (data.cliente.direccion) ticket += 'Dir: ' + data.cliente.direccion + this.LF;
+      ticket += this.createDivider() + this.LF;
+
+      // Artículos
+      ticket += this.COMMANDS.BOLD_ON;
+      ticket += 'ARTICULOS:' + this.LF;
+      ticket += this.COMMANDS.BOLD_OFF;
+      data.articulos.forEach(art => {
+        ticket += `${art.cantidad}x ${art.concepto}` + this.LF;
+        ticket += this.rightAlignText(this.formatCurrency(art.subtotal)) + this.LF;
+      });
+      ticket += this.createDivider('-') + this.LF;
+
+      // Totales
+      ticket += this.COMMANDS.BOLD_ON;
+      ticket += 'TOTAL:' + this.rightAlignText(this.formatCurrency(data.total)) + this.LF;
+      if (data.tipoVenta === 'credito') {
+        ticket += 'ENGANCHE:' + this.rightAlignText(this.formatCurrency(data.enganche)) + this.LF;
+        ticket += 'SALDO A CREDITO:' + this.rightAlignText(this.formatCurrency(data.saldoFinanciado)) + this.LF;
+        if (data.plazoSemanas && data.montoCuota) {
+          ticket += `PLAZO: ${data.plazoSemanas} SEMANAS` + this.LF;
+          ticket += `PAGO SEMANAL:` + this.rightAlignText(this.formatCurrency(data.montoCuota)) + this.LF;
+        }
+        if (data.diaPago) {
+          ticket += 'DIA DE COBRO: ' + this.getDayName(data.diaPago) + this.LF;
+        }
+      }
+      ticket += this.COMMANDS.BOLD_OFF;
+
+      ticket += this.createDivider('=') + this.LF;
+      ticket += this.LF;
+      ticket += this.COMMANDS.CENTER;
+      ticket += 'FIRMA DE CONFORMIDAD' + this.LF;
+      ticket += this.LF + this.LF;
+      ticket += this.createDivider('_', 22) + this.LF;
+      ticket += 'Gracias por su preferencia' + this.LF;
+
+      ticket += this.COMMANDS.FEED;
+      ticket += this.COMMANDS.CUT;
+
+      await this.sendData(ticket);
+      console.log('Ticket de venta impreso exitosamente');
+    } catch (error) {
+      console.error('Error imprimiendo ticket de venta:', error);
       throw error;
     }
   }
