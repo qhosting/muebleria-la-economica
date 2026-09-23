@@ -1,5 +1,5 @@
 
-const CACHE_NAME = 'vertexerp-v2.1.0';
+const CACHE_NAME = 'vertexerp-v2.2.0';
 const urlsToCache = [
   '/login',
   '/cobrador-app',
@@ -45,11 +45,11 @@ self.addEventListener('message', (event) => {
 
 // Instalar Service Worker con manejo de errores mejorado
 self.addEventListener('install', (event) => {
-  console.log('[SW] Instalando Service Worker v2.1.0');
+  console.log('[SW] Instalando Service Worker v2.2.0');
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
-        console.log('[SW] Cache VertexERP v2.1.0 abierto');
+        console.log('[SW] Cache VertexERP v2.2.0 abierto');
         // Intentar agregar todas las URLs, pero continuar si alguna falla
         return Promise.allSettled(
           urlsToCache.map(url => 
@@ -70,7 +70,7 @@ self.addEventListener('install', (event) => {
 
 // Activar Service Worker y limpiar cachés antiguas
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Activando Service Worker v2.1.0');
+  console.log('[SW] Activando Service Worker v2.2.0');
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -84,7 +84,7 @@ self.addEventListener('activate', (event) => {
       );
     })
     .then(() => {
-      console.log('[SW] Service Worker v2.1.0 activado y reclamando clientes');
+      console.log('[SW] Service Worker v2.2.0 activado y reclamando clientes');
       // Tomar control de todas las páginas inmediatamente
       return self.clients.claim();
     })
