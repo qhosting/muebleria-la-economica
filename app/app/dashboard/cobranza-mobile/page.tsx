@@ -8,6 +8,7 @@ import { useRouter } from 'next/navigation';
 import CobranzaMobile from '@/components/mobile/cobranza-mobile';
 import { OfflineCliente } from '@/lib/offline-db';
 import { getFullPath } from '@/lib/api-config';
+import { VersionCheckModal } from '@/components/mobile/version-check-modal';
 
 export default function CobranzaMobilePage() {
   const { data: session, status } = useSession();
@@ -106,5 +107,10 @@ export default function CobranzaMobilePage() {
     );
   }
 
-  return <CobranzaMobile initialClientes={initialClientes} />;
+  return (
+    <>
+      <VersionCheckModal />
+      <CobranzaMobile initialClientes={initialClientes} />
+    </>
+  );
 }
