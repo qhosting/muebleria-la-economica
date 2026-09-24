@@ -23,6 +23,17 @@ export const authOptions: NextAuthOptions = {
             email: credentials.email,
             isActive: true
           },
+          include: {
+            sucursal: {
+              select: {
+                id: true,
+                nombre: true,
+                direccion: true,
+                telefono: true,
+                esBodega: true,
+              }
+            }
+          }
         });
 
         if (!user?.password) {
@@ -43,6 +54,8 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           role: user.role,
+          sucursalId: user.sucursalId,
+          sucursal: user.sucursal,
         };
       },
     }),
@@ -86,6 +99,32 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.role = (user as any).role;
         token.id = user.id;
+        token.sucursalId = (user as any).sucursalId;
+        token.sucursal = (user as any).sucursal;
+      } else if (token.id && !token.sucursal) {
+        try {
+          const dbUser = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: {
+              sucursalId: true,
+              sucursal: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  direccion: true,
+                  telefono: true,
+                  esBodega: true
+                }
+              }
+            }
+          });
+          if (dbUser) {
+            token.sucursalId = dbUser.sucursalId;
+            token.sucursal = dbUser.sucursal;
+          }
+        } catch {
+          // Ignorar error si base de datos no está disponible
+        }
       }
       return token;
     },
@@ -93,6 +132,8 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         (session.user as any).id = token.id || token.sub;
         (session.user as any).role = token.role;
+        (session.user as any).sucursalId = token.sucursalId;
+        (session.user as any).sucursal = token.sucursal;
       }
       return session;
     },

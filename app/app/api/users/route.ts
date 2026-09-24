@@ -27,6 +27,13 @@ export async function GET() {
         name: true,
         role: true,
         codigoGestor: true,
+        sucursalId: true,
+        sucursal: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
         isActive: true,
         createdAt: true,
         updatedAt: true,
@@ -69,9 +76,9 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { email, password, name, role, codigoGestor, isActive = true } = body;
+    const { email, password, name, role, codigoGestor, sucursalId, isActive = true } = body;
     
-    console.log('📝 [POST /api/users] Datos recibidos:', { email, name, role, codigoGestor, isActive, hasPassword: !!password });
+    console.log('📝 [POST /api/users] Datos recibidos:', { email, name, role, codigoGestor, sucursalId, isActive, hasPassword: !!password });
 
     if (!email || !password || !name || !role) {
       console.error('❌ [POST /api/users] Campos requeridos faltantes');
@@ -105,6 +112,7 @@ export async function POST(request: NextRequest) {
         password: hashedPassword,
         role,
         codigoGestor: codigoGestor?.trim() || null,
+        sucursalId: sucursalId?.trim() || null,
         isActive,
       },
       select: {
@@ -113,6 +121,10 @@ export async function POST(request: NextRequest) {
         name: true,
         role: true,
         codigoGestor: true,
+        sucursalId: true,
+        sucursal: {
+          select: { id: true, nombre: true }
+        },
         isActive: true,
         createdAt: true,
       },

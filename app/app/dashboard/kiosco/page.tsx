@@ -32,7 +32,8 @@ import {
   History,
   FileText,
   UserCheck,
-  ShieldCheck
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
 import { formatCurrency, getDayName, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -44,6 +45,10 @@ import { CartItem, Cliente, User as UserType } from '@/lib/types';
 
 export default function KioscoVentasPage() {
   const { data: session } = useSession();
+  const userRole = (session?.user as any)?.role;
+  const userSucursalId = (session?.user as any)?.sucursalId || (session?.user as any)?.sucursal?.id;
+  const userSucursalNombre = (session?.user as any)?.sucursal?.nombre;
+  const esAdmin = userRole === 'admin';
 
   // Estados de catálogo y productos
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('Todos');
@@ -100,6 +105,31 @@ export default function KioscoVentasPage() {
     cargarDatosIniciales();
   }, []);
 
+  // Si la sesión de usuario carga después de las sucursales, auto-asumir la sucursal del usuario
+  useEffect(() => {
+    if (sucursales.length > 0 && (userSucursalId || userSucursalNombre)) {
+      const userSuc = sucursales.find((s: any) => 
+        (userSucursalId && s.id === userSucursalId) ||
+        (userSucursalNombre && s.nombre?.toUpperCase().trim() === userSucursalNombre?.toUpperCase().trim())
+      );
+      if (userSuc && sucursalSeleccionada !== userSuc.id) {
+        setSucursalSeleccionada(userSuc.id);
+      }
+    }
+  }, [userSucursalId, userSucursalNombre, sucursales]);
+
+  // Si el usuario logueado es vendedor o usuario de sucursal, auto-asignarlo como vendedor
+  useEffect(() => {
+    if (session?.user) {
+      const currentUserId = (session.user as any)?.id;
+      const currentUserName = session.user.name;
+      if (currentUserId && currentUserName) {
+        setVendedorSeleccionadoId(currentUserId);
+        setVendedorNombre(currentUserName);
+      }
+    }
+  }, [session]);
+
   const cargarDatosIniciales = async () => {
     try {
       setLoading(true);
@@ -123,12 +153,23 @@ export default function KioscoVentasPage() {
       if (resSucursales.ok) {
         const data = await resSucursales.json();
         setSucursales(data || []);
-        // Priorizar por defecto la sucursal SAN LUCAS 3ER CUARTEL
-        const sanLucas = data?.find((s: any) => 
-          s.nombre?.toUpperCase().includes('SAN LUCAS')
+
+        // Si el usuario tiene una sucursal asignada en su perfil/sesión, asume esa sucursal
+        const userSuc = data?.find((s: any) => 
+          (userSucursalId && s.id === userSucursalId) ||
+          (userSucursalNombre && s.nombre?.toUpperCase().trim() === userSucursalNombre?.toUpperCase().trim())
         );
-        const inicialId = sanLucas ? sanLucas.id : (data.length > 0 ? data[0].id : '');
-        setSucursalSeleccionada(inicialId);
+
+        if (userSuc) {
+          setSucursalSeleccionada(userSuc.id);
+        } else {
+          // Si no tiene sucursal asignada (ej. admin general), priorizar San Lucas o la primera
+          const sanLucas = data?.find((s: any) => 
+            s.nombre?.toUpperCase().includes('SAN LUCAS')
+          );
+          const inicialId = sanLucas ? sanLucas.id : (data.length > 0 ? data[0].id : '');
+          setSucursalSeleccionada(inicialId);
+        }
       }
 
       if (resProductos.ok) {
@@ -219,14 +260,15 @@ export default function KioscoVentasPage() {
     }
 
     // 2. Si no hay registro explícito en BD para esta sucursal:
-    // Los productos cargados primero del catálogo físico pertenecen exclusivamente a SAN LUCAS 3ER CUARTEL
+    // Los productos cargados primero del catálogo físico pertenecen principalmente a SAN LUCAS 3ER CUARTEL
     const esSanLucas = sucursalActual?.nombre?.toUpperCase().includes('SAN LUCAS');
     if (esSanLucas) {
       return item.stockSugerido || item.stockTotal || 5;
     }
 
-    // Para cualquier otra sucursal (AMEALCO, LA ESTANCIA SJR, SAN ILDEFONSO), si no tiene stock asignado en la BD, la existencia es 0
-    return 0;
+    // Para cualquier otra sucursal (AMEALCO, LA ESTANCIA SJR, SAN ILDEFONSO),
+    // si aún no se han sincronizado registros en BD, mostrar stock inicial para que el catálogo opere
+    return item.stockSugerido ? Math.min(3, item.stockSugerido) : 2;
   };
 
   // Agregar producto del catálogo al carrito
@@ -357,13 +399,11 @@ export default function KioscoVentasPage() {
         return {
           ...item,
           stockTotal: item.stockSugerido || 5,
-          stockPorSucursal: [
-            {
-              sucursalId: 'sucursal-san-lucas-3er-cuartel',
-              sucursalNombre: 'SAN LUCAS 3ER CUARTEL',
-              cantidad: item.stockSugerido || 5
-            }
-          ]
+          stockPorSucursal: SUCURSALES_SISTEMA.map(s => ({
+            sucursalId: s.id,
+            sucursalNombre: s.nombre,
+            cantidad: s.nombre.includes('SAN LUCAS') ? (item.stockSugerido || 5) : 3
+          }))
         };
       });
 
@@ -384,17 +424,15 @@ export default function KioscoVentasPage() {
       return [...catalogoActualizado, ...nuevosDeBD];
     }
     
-    // Si aún no carga productosDB, asumir catálogo inicial con existencia en SAN LUCAS 3ER CUARTEL
+    // Si aún no carga productosDB, asumir catálogo inicial con existencia en todas las sucursales
     return CATALOGO_PRODUCTOS_INICIAL.map(item => ({
       ...item,
       stockTotal: item.stockSugerido || 5,
-      stockPorSucursal: [
-        {
-          sucursalId: 'sucursal-san-lucas-3er-cuartel',
-          sucursalNombre: 'SAN LUCAS 3ER CUARTEL',
-          cantidad: item.stockSugerido || 5
-        }
-      ]
+      stockPorSucursal: SUCURSALES_SISTEMA.map(s => ({
+        sucursalId: s.id,
+        sucursalNombre: s.nombre,
+        cantidad: s.nombre.includes('SAN LUCAS') ? (item.stockSugerido || 5) : 3
+      }))
     }));
   }, [productosDB]);
 
@@ -538,22 +576,43 @@ export default function KioscoVentasPage() {
             </div>
 
             {/* Selector de Sucursal Activa */}
-            <div className="flex items-center gap-2 bg-white/10 backdrop-blur px-3 py-1.5 rounded-xl border border-white/20">
-              <MapPin className="h-4 w-4 text-emerald-300 shrink-0" />
-              <span className="text-xs text-blue-100 font-semibold">Sucursal:</span>
-              <Select value={sucursalSeleccionada} onValueChange={handleCambiarSucursal}>
-                <SelectTrigger className="h-7 text-xs bg-white text-blue-950 font-black border-none min-w-[200px] shadow">
-                  <SelectValue placeholder="Seleccione sucursal..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {sucursales.map(s => (
-                    <SelectItem key={s.id} value={s.id} className="text-xs font-bold">
-                      {s.nombre}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {(!esAdmin && (userSucursalId || userSucursalNombre)) ? (
+              <div className="flex items-center gap-2 bg-emerald-500/20 backdrop-blur px-3.5 py-1.5 rounded-xl border border-emerald-400/40 text-white shadow-sm">
+                <MapPin className="h-4 w-4 text-emerald-300 shrink-0" />
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-blue-200 font-semibold">Sucursal:</span>
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    {sucursalActual?.nombre || userSucursalNombre}
+                  </span>
+                </div>
+                <Badge variant="outline" className="text-[10px] bg-emerald-950/60 text-emerald-200 border-emerald-400/30 font-bold px-1.5 py-0 flex items-center gap-1 ml-1">
+                  <Lock className="h-2.5 w-2.5" />
+                  Asignada
+                </Badge>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur px-3 py-1.5 rounded-xl border border-white/20">
+                <MapPin className="h-4 w-4 text-emerald-300 shrink-0" />
+                <span className="text-xs text-blue-100 font-semibold">Sucursal:</span>
+                <Select value={sucursalSeleccionada} onValueChange={handleCambiarSucursal}>
+                  <SelectTrigger className="h-7 text-xs bg-white text-blue-950 font-black border-none min-w-[200px] shadow">
+                    <SelectValue placeholder="Seleccione sucursal..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {sucursales.map(s => (
+                      <SelectItem key={s.id} value={s.id} className="text-xs font-bold">
+                        {s.nombre}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {esAdmin && (
+                  <span className="text-[10px] text-blue-200 font-bold hidden sm:inline bg-blue-950/50 px-2 py-0.5 rounded">
+                    Admin
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">

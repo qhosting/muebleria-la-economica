@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -23,7 +23,6 @@ import {
   Route,
   Receipt,
   AlertTriangle,
-  Upload,
   Printer,
   Package,
   Store,
@@ -37,96 +36,127 @@ interface SidebarProps {
   onToggleCollapse?: () => void;
 }
 
-const navigation = [
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: any;
+  roles: string[];
+  section: string;
+}
+
+const navigation: NavigationItem[] = [
+  // ==========================================
+  // OPERACIÓN PRINCIPAL
+  // ==========================================
   {
     name: 'Dashboard',
     href: '/dashboard',
     icon: LayoutDashboard,
     roles: ['admin', 'gestor_cobranza', 'reporte_cobranza', 'cobrador', 'vendedor'],
-  },
-  {
-    name: 'Bóveda Digital',
-    href: '/dashboard/boveda',
-    icon: ShieldCheck,
-    roles: ['admin', 'gestor_cobranza', 'vendedor', 'cobrador'],
+    section: 'Principal',
   },
   {
     name: 'Kiosco de Ventas',
     href: '/dashboard/kiosco',
     icon: Store,
     roles: ['admin', 'gestor_cobranza', 'reporte_cobranza', 'vendedor', 'cobrador'],
+    section: 'Principal',
   },
+  {
+    name: 'Bóveda Digital',
+    href: '/dashboard/boveda',
+    icon: ShieldCheck,
+    roles: ['admin', 'gestor_cobranza', 'vendedor', 'cobrador'],
+    section: 'Principal',
+  },
+
+  // ==========================================
+  // CARTERA Y COBRANZA
+  // ==========================================
   {
     name: 'Clientes',
     href: '/dashboard/clientes',
     icon: Users,
     roles: ['admin', 'gestor_cobranza', 'vendedor', 'cobrador'],
+    section: 'Crédito y Cartera',
   },
   {
-    name: 'Usuarios',
-    href: '/dashboard/usuarios',
-    icon: UserCheck,
-    roles: ['admin'],
-  },
-  {
-    name: 'Importar Saldos',
-    href: '/dashboard/saldos',
-    icon: Upload,
-    roles: ['admin'], // Solo admin
+    name: 'Pagos y Recibos',
+    href: '/dashboard/pagos',
+    icon: Receipt,
+    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+    section: 'Crédito y Cartera',
   },
   {
     name: 'Cobranza Móvil',
     href: '/dashboard/cobranza',
     icon: CreditCard,
     roles: ['cobrador', 'vendedor'],
+    section: 'Crédito y Cartera',
   },
   {
-    name: 'Mi Impresora',
-    href: '/dashboard/mi-impresora',
-    icon: Printer,
-    roles: ['cobrador', 'vendedor'],
-  },
-  {
-    name: 'Pagos',
-    href: '/dashboard/pagos',
-    icon: Receipt,
-    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
-  },
-  {
-    name: 'Inventario',
-    href: '/dashboard/inventario',
-    icon: Package,
-    roles: ['admin', 'gestor_cobranza'],
-  },
-  {
-    name: 'Reportes',
-    href: '/dashboard/reportes',
-    icon: BarChart3,
-    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+    name: 'Rutas de Cobranza',
+    href: '/dashboard/rutas',
+    icon: Route,
+    roles: ['admin', 'gestor_cobranza', 'cobrador'],
+    section: 'Crédito y Cartera',
   },
   {
     name: 'Morosidad',
     href: '/dashboard/morosidad',
     icon: AlertTriangle,
     roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+    section: 'Crédito y Cartera',
+  },
+
+  // ==========================================
+  // INVENTARIO Y FINANZAS
+  // ==========================================
+  {
+    name: 'Inventario',
+    href: '/dashboard/inventario',
+    icon: Package,
+    roles: ['admin', 'gestor_cobranza'],
+    section: 'Inventario y Finanzas',
   },
   {
-    name: 'Rutas',
-    href: '/dashboard/rutas',
-    icon: Route,
-    roles: ['admin', 'gestor_cobranza', 'cobrador'],
+    name: 'Reportes',
+    href: '/dashboard/reportes',
+    icon: BarChart3,
+    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+    section: 'Inventario y Finanzas',
+  },
+
+  // ==========================================
+  // HERRAMIENTAS Y ADMINISTRACIÓN
+  // ==========================================
+  {
+    name: 'Mi Impresora',
+    href: '/dashboard/mi-impresora',
+    icon: Printer,
+    roles: ['admin', 'cobrador', 'vendedor'],
+    section: 'Sistema y Ajustes',
   },
   {
     name: 'Plantillas',
     href: '/dashboard/plantillas',
     icon: FileText,
     roles: ['admin', 'gestor_cobranza'],
+    section: 'Sistema y Ajustes',
+  },
+  {
+    name: 'Usuarios',
+    href: '/dashboard/usuarios',
+    icon: UserCheck,
+    roles: ['admin'],
+    section: 'Sistema y Ajustes',
   },
   {
     name: 'Configuración',
     href: '/dashboard/configuracion',
     icon: Settings,
     roles: ['admin'],
+    section: 'Sistema y Ajustes',
   },
 ];
 
@@ -233,26 +263,47 @@ export function Sidebar({
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-          {filteredNavigation.map((item) => {
+        <nav className="flex-1 py-3 px-2 space-y-1 overflow-y-auto">
+          {filteredNavigation.map((item, index) => {
             const isActive = pathname === item.href;
+            const prevItem = filteredNavigation[index - 1];
+            const isNewSection = !prevItem || prevItem.section !== item.section;
+
             return (
-              <Link
-                key={item.name}
-                href={item.href}
-                title={isCollapsed ? item.name : undefined}
-                onClick={() => setIsMobileOpen(false)}
-                className={cn(
-                  "flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors",
-                  isActive
-                    ? "bg-blue-50 text-blue-700 border-r-2 border-blue-600"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50",
-                  isCollapsed && "justify-center px-0 py-2.5"
+              <React.Fragment key={item.name}>
+                {!isCollapsed && isNewSection && (
+                  <div className={cn(
+                    "px-3 pb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 select-none",
+                    index > 0 ? "pt-3.5" : "pt-1"
+                  )}>
+                    {item.section}
+                  </div>
                 )}
-              >
-                <item.icon className={cn("h-5 w-5 flex-shrink-0", !isCollapsed && "mr-3")} />
-                {!isCollapsed && <span className="truncate">{item.name}</span>}
-              </Link>
+                {isCollapsed && isNewSection && index > 0 && (
+                  <div className="my-1.5 border-t border-slate-100" />
+                )}
+                <Link
+                  href={item.href}
+                  title={isCollapsed ? `${item.section}: ${item.name}` : undefined}
+                  onClick={() => setIsMobileOpen(false)}
+                  className={cn(
+                    "flex items-center px-3 py-2 rounded-lg text-sm font-medium transition-all group",
+                    isActive
+                      ? "bg-blue-600 text-white font-semibold shadow-sm"
+                      : "text-slate-600 hover:text-slate-900 hover:bg-slate-100",
+                    isCollapsed && "justify-center px-0 py-2.5"
+                  )}
+                >
+                  <item.icon className={cn(
+                    "h-5 w-5 flex-shrink-0 transition-colors",
+                    !isCollapsed && "mr-3",
+                    isActive ? "text-white" : "text-slate-400 group-hover:text-slate-600"
+                  )} />
+                  {!isCollapsed && (
+                    <span className="truncate">{item.name}</span>
+                  )}
+                </Link>
+              </React.Fragment>
             );
           })}
         </nav>
@@ -264,12 +315,18 @@ export function Sidebar({
               <p className="text-sm font-medium text-gray-900 truncate">
                 {session?.user?.name}
               </p>
-              <p className="text-xs text-gray-500 mb-2 truncate">
+              <p className="text-xs text-gray-500 mb-1 truncate">
                 {userRole === 'admin' && 'Administrador'}
                 {userRole === 'gestor_cobranza' && 'Gestor de Cobranza'}
                 {userRole === 'reporte_cobranza' && 'Reportes'}
                 {userRole === 'cobrador' && 'Cobrador'}
+                {userRole === 'vendedor' && 'Vendedor de Sucursal'}
               </p>
+              {(session?.user as any)?.sucursal?.nombre && (
+                <p className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200 mb-2 truncate text-center">
+                  📍 {(session?.user as any).sucursal.nombre}
+                </p>
+              )}
               {/* Version Info */}
               <div className="flex justify-center">
                 <VersionInfo showButton={true} />

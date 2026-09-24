@@ -19,22 +19,29 @@ import {
   Trash2, 
   Shield, 
   Users,
-  Mail
+  Mail,
+  MapPin,
+  RefreshCw,
+  Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { User } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 const ROLES = {
   admin: 'Administrador',
   gestor_cobranza: 'Gestor de Cobranza',
   reporte_cobranza: 'Reportes',
-  cobrador: 'Cobrador'
+  cobrador: 'Cobrador',
+  vendedor: 'Vendedor de Sucursal'
 };
 
 export default function UsuariosPage() {
   const { data: session } = useSession();
   const [usuarios, setUsuarios] = useState<User[]>([]);
+  const [sucursales, setSucursales] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRole, setSelectedRole] = useState('all');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -44,14 +51,47 @@ export default function UsuariosPage() {
     name: '',
     email: '',
     password: '',
-    role: 'cobrador',
+    role: 'vendedor',
+    sucursalId: '',
     codigoGestor: '',
     isActive: true
   });
 
   useEffect(() => {
     fetchUsuarios();
+    fetchSucursales();
   }, []);
+
+  const fetchSucursales = async () => {
+    try {
+      const response = await fetch('/api/inventario/sucursales');
+      if (response.ok) {
+        const data = await response.json();
+        setSucursales(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error('Error al cargar sucursales:', e);
+    }
+  };
+
+  const handleSyncVendedores = async () => {
+    try {
+      setSyncing(true);
+      const res = await fetch('/api/admin/setup-sucursales', { method: 'POST' });
+      if (res.ok) {
+        toast.success('4 Sucursales y sus Vendedores oficiales sincronizados con éxito');
+        await fetchUsuarios();
+        await fetchSucursales();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Error al sincronizar vendedores');
+      }
+    } catch (e) {
+      toast.error('Error conectando con el servidor');
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   const fetchUsuarios = async () => {
     try {
@@ -100,7 +140,7 @@ export default function UsuariosPage() {
         toast.success(editingUser ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente');
         setIsDialogOpen(false);
         setEditingUser(null);
-        setFormData({ name: '', email: '', password: '', role: 'cobrador', codigoGestor: '', isActive: true });
+        setFormData({ name: '', email: '', password: '', role: 'vendedor', sucursalId: '', codigoGestor: '', isActive: true });
         fetchUsuarios();
       } else {
         // Obtener el mensaje de error del servidor
@@ -121,7 +161,8 @@ export default function UsuariosPage() {
       name: user.name || '',
       email: user.email || '',
       password: '',
-      role: user.role || 'cobrador',
+      role: user.role || 'vendedor',
+      sucursalId: user.sucursalId || '',
       codigoGestor: (user as any).codigoGestor || '',
       isActive: user.isActive ?? true
     });
@@ -179,101 +220,132 @@ export default function UsuariosPage() {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
             <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
-            <p className="text-gray-600">Gestión de usuarios del sistema</p>
+            <p className="text-gray-600">Gestión de usuarios y asignación a sucursales</p>
           </div>
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={() => {
-                setEditingUser(null);
-                setFormData({ name: '', email: '', password: '', role: 'cobrador', codigoGestor: '', isActive: true });
-              }}>
-                <Plus className="h-4 w-4 mr-2" />
-                Nuevo Usuario
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-md">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
-                </DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Nombre completo</Label>
-                  <Input
-                    id="name"
-                    type="text"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    required
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="password">
-                    {editingUser ? 'Nueva contraseña (opcional)' : 'Contraseña'}
-                  </Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                    required={!editingUser}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="role">Rol</Label>
-                  <Select 
-                    value={formData.role} 
-                    onValueChange={(value) => setFormData({ ...formData, role: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar rol" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(ROLES).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="codigoGestor">Código de Gestor/Cobrador (opcional)</Label>
-                  <Input
-                    id="codigoGestor"
-                    type="text"
-                    placeholder="Ej: G001, COB-01, etc."
-                    value={formData.codigoGestor}
-                    onChange={(e) => setFormData({ ...formData, codigoGestor: e.target.value })}
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Utilizado para asignar clientes automáticamente al importar
-                  </p>
-                </div>
-                <div className="flex justify-end gap-3">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setIsDialogOpen(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="submit">
-                    {editingUser ? 'Actualizar' : 'Crear'}
-                  </Button>
-                </div>
-              </form>
-            </DialogContent>
-          </Dialog>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={handleSyncVendedores}
+              disabled={syncing}
+              className="gap-2 border-emerald-300 text-emerald-800 hover:bg-emerald-50 text-xs font-bold"
+            >
+              <RefreshCw className={cn("h-3.5 w-3.5", syncing && "animate-spin text-emerald-600")} />
+              {syncing ? 'Sincronizando...' : 'Asegurar 1 Vendedor por Sucursal'}
+            </Button>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <Button onClick={() => {
+                  setEditingUser(null);
+                  setFormData({ name: '', email: '', password: '', role: 'vendedor', sucursalId: '', codigoGestor: '', isActive: true });
+                }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nuevo Usuario
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>
+                    {editingUser ? 'Editar Usuario' : 'Nuevo Usuario'}
+                  </DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  <div>
+                    <Label htmlFor="name">Nombre completo</Label>
+                    <Input
+                      id="name"
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="password">
+                      {editingUser ? 'Nueva contraseña (opcional)' : 'Contraseña'}
+                    </Label>
+                    <Input
+                      id="password"
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                      required={!editingUser}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="role">Rol</Label>
+                    <Select 
+                      value={formData.role} 
+                      onValueChange={(value) => setFormData({ ...formData, role: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar rol" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(ROLES).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="sucursalId">Sucursal Asignada</Label>
+                    <Select 
+                      value={formData.sucursalId || 'none'} 
+                      onValueChange={(value) => setFormData({ ...formData, sucursalId: value === 'none' ? '' : value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Seleccionar sucursal..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Sin sucursal fija / General</SelectItem>
+                        {sucursales.map((s) => (
+                          <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      El usuario asumirá automáticamente su catálogo e inventario al ingresar al Kiosco
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="codigoGestor">Código de Gestor/Cobrador (opcional)</Label>
+                    <Input
+                      id="codigoGestor"
+                      type="text"
+                      placeholder="Ej: G001, COB-01, etc."
+                      value={formData.codigoGestor}
+                      onChange={(e) => setFormData({ ...formData, codigoGestor: e.target.value })}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Utilizado para asignar clientes automáticamente al importar
+                    </p>
+                  </div>
+                  <div className="flex justify-end gap-3">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={() => setIsDialogOpen(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button type="submit">
+                      {editingUser ? 'Actualizar' : 'Crear'}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
 
         {/* Filtros */}
@@ -335,8 +407,16 @@ export default function UsuariosPage() {
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <Shield className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm">{ROLES[usuario.role as keyof typeof ROLES]}</span>
+                      <span className="text-sm font-medium">{ROLES[usuario.role as keyof typeof ROLES] || usuario.role}</span>
                     </div>
+                    {usuario.sucursal?.nombre && (
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-emerald-600" />
+                        <span className="text-xs font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          {usuario.sucursal.nombre}
+                        </span>
+                      </div>
+                    )}
                     {(usuario as any).codigoGestor && (
                       <div className="flex items-center gap-2">
                         <UserCheck className="h-4 w-4 text-gray-400" />

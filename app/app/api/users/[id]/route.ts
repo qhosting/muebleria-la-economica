@@ -24,7 +24,7 @@ export async function PUT(
     }
 
     const body = await request.json();
-    const { email, name, role, codigoGestor, isActive, password } = body;
+    const { email, name, role, codigoGestor, sucursalId, isActive, password } = body;
 
     const updateData: any = {
       email,
@@ -33,6 +33,10 @@ export async function PUT(
       codigoGestor: codigoGestor?.trim() || null,
       isActive,
     };
+
+    if (sucursalId !== undefined) {
+      updateData.sucursalId = sucursalId?.trim() || null;
+    }
 
     if (password) {
       updateData.password = await bcrypt.hash(password, 12);
@@ -47,6 +51,10 @@ export async function PUT(
         name: true,
         role: true,
         codigoGestor: true,
+        sucursalId: true,
+        sucursal: {
+          select: { id: true, nombre: true }
+        },
         isActive: true,
         updatedAt: true,
       },
