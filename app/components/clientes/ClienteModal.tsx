@@ -61,15 +61,15 @@ export function ClienteModal({
   useEffect(() => {
     if (cliente) {
       setFormData({
-        codigoCliente: cliente.codigoCliente || '',
-        nombreCompleto: cliente.nombreCompleto || '',
+        codigoCliente: (cliente.codigoCliente || '').toUpperCase(),
+        nombreCompleto: (cliente.nombreCompleto || '').toUpperCase(),
         telefono: cliente.telefono || '',
-        vendedor: cliente.vendedor || '',
+        vendedor: (cliente.vendedor || '').toUpperCase(),
         cobradorAsignadoId: cliente.cobradorAsignadoId || 'sin-asignar',
         productoId: cliente.productoId || '',
         sucursalId: cliente.sucursalId || '',
-        direccionCompleta: cliente.direccionCompleta || '',
-        descripcionProducto: cliente.descripcionProducto || '',
+        direccionCompleta: (cliente.direccionCompleta || '').toUpperCase(),
+        descripcionProducto: (cliente.descripcionProducto || '').toUpperCase(),
         diaPago: cliente.diaPago.toString() || '1',
         montoPago: cliente.montoPago.toString() || '',
         periodicidad: cliente.periodicidad || 'semanal',
@@ -112,7 +112,7 @@ export function ClienteModal({
       setFormData(prev => ({
         ...prev,
         productoId: prodId,
-        descripcionProducto: producto.nombre,
+        descripcionProducto: (producto.nombre || '').toUpperCase(),
         montoPago: producto.precioVenta.toString(),
         saldoActual: producto.precioVenta.toString() // Inicializa saldo con precio venta
       }));
@@ -129,9 +129,14 @@ export function ClienteModal({
       const url = isEditMode ? `/api/clientes/${cliente.id}` : '/api/clientes';
       const method = isEditMode ? 'PUT' : 'POST';
 
-      // Prepare data with proper null handling for cobrador assignment
+      // Prepare data with uppercase conversion and proper null handling
       const submitData = {
         ...formData,
+        codigoCliente: formData.codigoCliente ? formData.codigoCliente.trim().toUpperCase() : formData.codigoCliente,
+        nombreCompleto: formData.nombreCompleto ? formData.nombreCompleto.trim().toUpperCase() : formData.nombreCompleto,
+        vendedor: formData.vendedor ? formData.vendedor.trim().toUpperCase() : formData.vendedor,
+        direccionCompleta: formData.direccionCompleta ? formData.direccionCompleta.trim().toUpperCase() : formData.direccionCompleta,
+        descripcionProducto: formData.descripcionProducto ? formData.descripcionProducto.trim().toUpperCase() : formData.descripcionProducto,
         cobradorAsignadoId: formData.cobradorAsignadoId === 'sin-asignar' ? null : formData.cobradorAsignadoId
       };
 
@@ -198,6 +203,7 @@ export function ClienteModal({
                 required={!readOnly && !isEditMode}
                 placeholder="Ej: CLI25090949"
                 disabled={readOnly}
+                className="uppercase"
               />
               {!isEditMode && (
                 <p className="text-xs text-gray-500">
@@ -211,10 +217,11 @@ export function ClienteModal({
               <Input
                 id="nombreCompleto"
                 value={formData.nombreCompleto}
-                onChange={(e) => setFormData({ ...formData, nombreCompleto: e.target.value })}
+                onChange={(e) => setFormData({ ...formData, nombreCompleto: e.target.value.toUpperCase() })}
                 required={!readOnly}
-                placeholder="Nombre completo del cliente"
+                placeholder="NOMBRE COMPLETO DEL CLIENTE"
                 disabled={readOnly}
+                className="uppercase"
               />
             </div>
           </div>
@@ -235,9 +242,10 @@ export function ClienteModal({
               <Input
                 id="vendedor"
                 value={formData.vendedor}
-                onChange={(e) => setFormData({ ...formData, vendedor: e.target.value })}
-                placeholder="Nombre del vendedor"
+                onChange={(e) => setFormData({ ...formData, vendedor: e.target.value.toUpperCase() })}
+                placeholder="NOMBRE DEL VENDEDOR"
                 disabled={readOnly}
+                className="uppercase"
               />
             </div>
 
@@ -268,11 +276,12 @@ export function ClienteModal({
             <Textarea
               id="direccionCompleta"
               value={formData.direccionCompleta}
-              onChange={(e) => setFormData({ ...formData, direccionCompleta: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, direccionCompleta: e.target.value.toUpperCase() })}
               required={!readOnly}
-              placeholder="Dirección completa del cliente"
+              placeholder="DIRECCIÓN COMPLETA DEL CLIENTE"
               rows={2}
               disabled={readOnly}
+              className="uppercase"
             />
           </div>
 
@@ -321,11 +330,12 @@ export function ClienteModal({
             <Textarea
               id="descripcionProducto"
               value={formData.descripcionProducto}
-              onChange={(e) => setFormData({ ...formData, descripcionProducto: e.target.value })}
+              onChange={(e) => setFormData({ ...formData, descripcionProducto: e.target.value.toUpperCase() })}
               required={!readOnly}
-              placeholder="Descripción del producto vendido"
+              placeholder="DESCRIPCIÓN DEL PRODUCTO VENDIDO"
               rows={2}
               disabled={readOnly}
+              className="uppercase"
             />
           </div>
 

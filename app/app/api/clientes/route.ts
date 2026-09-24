@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generar código de cliente o usar el proporcionado
-    let codigoCliente = codigoClienteCustom?.trim() || generarCodigoCliente();
+    let codigoCliente = (codigoClienteCustom?.trim() || generarCodigoCliente()).toUpperCase();
 
     // Validar que el código no exista ya
     const existeCliente = await prisma.cliente.findUnique({
@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
       }
       let intentos = 0;
       do {
-        codigoCliente = generarCodigoCliente();
+        codigoCliente = generarCodigoCliente().toUpperCase();
         const existe = await prisma.cliente.findUnique({
           where: { codigoCliente },
         });
@@ -217,16 +217,16 @@ export async function POST(request: NextRequest) {
       // 1. Crear Cliente
       const nuevoCliente = await tx.cliente.create({
         data: {
-          codigoCliente,
+          codigoCliente: codigoCliente.trim().toUpperCase(),
           fechaVenta: fechaVenta ? new Date(fechaVenta) : new Date(),
-          nombreCompleto,
-          telefono,
-          vendedor,
+          nombreCompleto: nombreCompleto.trim().toUpperCase(),
+          telefono: telefono?.trim() || null,
+          vendedor: vendedor ? vendedor.trim().toUpperCase() : null,
           cobradorAsignadoId: cobradorId || null,
           productoId: productoId || null,
           sucursalId: activeSucursalId || null,
-          direccionCompleta,
-          descripcionProducto,
+          direccionCompleta: direccionCompleta.trim().toUpperCase(),
+          descripcionProducto: descripcionProducto.trim().toUpperCase(),
           diaPago: diaPago,
           montoPago: parseFloat(montoPago),
           periodicidad,
