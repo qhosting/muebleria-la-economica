@@ -150,6 +150,29 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
       }
     }
 
+    // 4. Asegurar que los clientes existentes estén estandarizados en MAYÚSCULAS
+    try {
+      await prisma.$executeRawUnsafe(`
+        UPDATE "clientes"
+        SET 
+          "nombreCompleto" = UPPER("nombreCompleto"),
+          "direccionCompleta" = UPPER("direccionCompleta"),
+          "descripcionProducto" = UPPER("descripcionProducto"),
+          "vendedor" = CASE WHEN "vendedor" IS NOT NULL THEN UPPER("vendedor") ELSE NULL END,
+          "codigoCliente" = UPPER("codigoCliente"),
+          "curp" = CASE WHEN "curp" IS NOT NULL THEN UPPER("curp") ELSE NULL END
+        WHERE 
+          "nombreCompleto" != UPPER("nombreCompleto")
+          OR "direccionCompleta" != UPPER("direccionCompleta")
+          OR "descripcionProducto" != UPPER("descripcionProducto")
+          OR ("vendedor" IS NOT NULL AND "vendedor" != UPPER("vendedor"))
+          OR "codigoCliente" != UPPER("codigoCliente")
+          OR ("curp" IS NOT NULL AND "curp" != UPPER("curp"));
+      `);
+    } catch (clientErr) {
+      console.warn('Aviso asegurando mayusculas de clientes:', clientErr);
+    }
+
     return {
       success: true,
       sucursales: Array.from(sucursalesMap.values()),

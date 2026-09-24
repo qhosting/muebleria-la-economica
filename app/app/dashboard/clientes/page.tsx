@@ -24,7 +24,9 @@ import {
   DollarSign,
   Filter,
   Upload,
-  MoreVertical
+  MoreVertical,
+  Sparkles,
+  Loader2
 } from 'lucide-react';
 import { formatCurrency, formatDate, getDayName, getPeriodicidadLabel } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -68,6 +70,7 @@ export default function ClientesPage() {
   const [clienteModalOpen, setClienteModalOpen] = useState(false);
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
+  const [standardizing, setStandardizing] = useState(false);
 
   const userRole = (session?.user as any)?.role;
 
@@ -220,6 +223,25 @@ export default function ClientesPage() {
     setSelectedCliente(null);
   };
 
+  const handleEstandarizarMayusculas = async () => {
+    try {
+      setStandardizing(true);
+      const res = await fetch('/api/clientes/estandarizar-mayusculas', { method: 'POST' });
+      if (res.ok) {
+        const data = await res.json();
+        toast.success(data.mensaje || 'Clientes estandarizados a mayúsculas correctamente');
+        fetchClientes();
+      } else {
+        const err = await res.json();
+        toast.error(err.error || 'Error al estandarizar clientes');
+      }
+    } catch (e) {
+      toast.error('Error de conexión al estandarizar clientes');
+    } finally {
+      setStandardizing(false);
+    }
+  };
+
   // Verificar permisos - cobradores solo pueden ver, no crear
   if (!['admin', 'gestor_cobranza', 'cobrador'].includes(userRole)) {
     return (
@@ -263,10 +285,26 @@ export default function ClientesPage() {
                 label="Exportar"
               />
               {userRole === 'admin' && (
-                <Button variant="outline" onClick={() => setImportModalOpen(true)}>
-                  <Upload className="h-4 w-4 mr-2" />
-                  Importar
-                </Button>
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={handleEstandarizarMayusculas}
+                    disabled={standardizing}
+                    className="border-amber-300 hover:bg-amber-50 text-amber-900"
+                    title="Convertir todos los clientes actuales a MAYÚSCULAS en la base de datos"
+                  >
+                    {standardizing ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin text-amber-600" />
+                    ) : (
+                      <Sparkles className="h-4 w-4 mr-2 text-amber-600" />
+                    )}
+                    Estandarizar Mayúsculas
+                  </Button>
+                  <Button variant="outline" onClick={() => setImportModalOpen(true)}>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importar
+                  </Button>
+                </>
               )}
               <Button onClick={handleCreateCliente}>
                 <Plus className="h-4 w-4 mr-2" />

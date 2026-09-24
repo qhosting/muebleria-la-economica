@@ -9,6 +9,34 @@ import { generarCodigoCliente } from '@/lib/utils';
 import { Prisma } from '@prisma/client';
 // Recargar tipos si hay errores (npx prisma generate)
 
+let lastMayusculasSync = 0;
+async function autoSyncMayusculas() {
+  const now = Date.now();
+  if (now - lastMayusculasSync < 60 * 1000) return;
+  lastMayusculasSync = now;
+  try {
+    await prisma.$executeRawUnsafe(`
+      UPDATE "clientes"
+      SET 
+        "nombreCompleto" = UPPER("nombreCompleto"),
+        "direccionCompleta" = UPPER("direccionCompleta"),
+        "descripcionProducto" = UPPER("descripcionProducto"),
+        "vendedor" = CASE WHEN "vendedor" IS NOT NULL THEN UPPER("vendedor") ELSE NULL END,
+        "codigoCliente" = UPPER("codigoCliente"),
+        "curp" = CASE WHEN "curp" IS NOT NULL THEN UPPER("curp") ELSE NULL END
+      WHERE 
+        "nombreCompleto" != UPPER("nombreCompleto")
+        OR "direccionCompleta" != UPPER("direccionCompleta")
+        OR "descripcionProducto" != UPPER("descripcionProducto")
+        OR ("vendedor" IS NOT NULL AND "vendedor" != UPPER("vendedor"))
+        OR "codigoCliente" != UPPER("codigoCliente")
+        OR ("curp" IS NOT NULL AND "curp" != UPPER("curp"));
+    `);
+  } catch (e) {
+    // Ignorar si hay conflicto temporal
+  }
+}
+
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
@@ -16,6 +44,9 @@ export async function GET(request: NextRequest) {
     if (!session?.user) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
+
+    // Asegurar que todos los clientes en base de datos estén estandarizados en mayúsculas
+    await autoSyncMayusculas();
 
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
