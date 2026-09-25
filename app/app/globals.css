@@ -247,40 +247,60 @@
 
 /* ☀️ MODO SOL - MODO CLARO DE ALTO CONTRASTE PARA TRABAJO DE CAMPO EN CALLE */
 body.modo-sol {
-  background-color: #ffffff !important;
+  background-color: #f8fafc !important;
   color: #000000 !important;
 }
 
+/* Superficies principales (tarjetas, modales, etc.) */
+body.modo-sol [data-card],
+body.modo-sol .bg-card,
 body.modo-sol .bg-slate-950,
-body.modo-sol .bg-slate-950\/50,
-body.modo-sol .bg-slate-900,
-body.modo-sol .bg-slate-900\/50,
-body.modo-sol .bg-slate-900\/30,
-body.modo-sol .bg-slate-800,
-body.modo-sol .bg-slate-800\/50,
-body.modo-sol .bg-slate-800\/30,
-body.modo-sol .bg-slate-950\/30,
-body.modo-sol .bg-slate-900\/80,
-body.modo-sol .bg-slate-800\/80,
-body.modo-sol .bg-slate-950\/80,
-body.modo-sol .bg-gradient-to-br,
-body.modo-sol .bg-gradient-to-r,
-body.modo-sol .bg-gradient-to-tr,
-body.modo-sol .bg-gradient-to-t,
-body.modo-sol .bg-gradient-to-b {
+body.modo-sol .bg-slate-900:not(button):not(.kiosco-track) {
   background-color: #ffffff !important;
   background-image: none !important;
   border-color: #cbd5e1 !important; /* Más visible en sol */
 }
 
+/* 🔘 Superficies, bloques y contenedores de FONDO GRIS visible (Kiosco y Vistas Móviles) */
+body.modo-sol .bg-slate-950\/80,
+body.modo-sol .bg-slate-950\/60,
 body.modo-sol .bg-slate-950\/50,
+body.modo-sol .bg-slate-950\/40,
+body.modo-sol .bg-slate-950\/30,
+body.modo-sol .bg-slate-900\/90,
+body.modo-sol .bg-slate-900\/80,
+body.modo-sol .bg-slate-900\/60,
 body.modo-sol .bg-slate-900\/50,
+body.modo-sol .bg-slate-900\/40,
+body.modo-sol .bg-slate-900\/30,
+body.modo-sol .bg-slate-800\/80,
 body.modo-sol .bg-slate-800\/50,
-body.modo-sol .bg-slate-850,
+body.modo-sol .bg-slate-800\/30,
 body.modo-sol .bg-slate-800\/10,
-body.modo-sol .bg-muted\/50,
-body.modo-sol .bg-muted {
+body.modo-sol .bg-slate-850,
+body.modo-sol .bg-muted,
+body.modo-sol .bg-muted\/50 {
+  background-color: #f1f5f9 !important; /* Gris slate claro contrastado */
+  border-color: #cbd5e1 !important;
+}
+
+/* Píldoras, chips, botones secundarios y pestañas con fondo gris en Modo Sol */
+body.modo-sol button.bg-slate-950,
+body.modo-sol button.bg-slate-900,
+body.modo-sol button.bg-slate-800,
+body.modo-sol .grid.bg-slate-900,
+body.modo-sol .flex.bg-slate-950,
+body.modo-sol span.bg-slate-800 {
   background-color: #f1f5f9 !important;
+  border-color: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+body.modo-sol button.bg-slate-950:hover,
+body.modo-sol button.bg-slate-900:hover,
+body.modo-sol button.bg-slate-800:hover {
+  background-color: #e2e8f0 !important;
+  color: #0f172a !important;
 }
 
 body.modo-sol .text-slate-100,
@@ -334,9 +354,7 @@ body.modo-sol nav.fixed a:hover {
 }
 
 /* Tarjetas (Cards) */
-body.modo-sol [data-card],
-body.modo-sol .border-slate-800,
-body.modo-sol .bg-slate-900 {
+body.modo-sol [data-card] {
   background-color: #ffffff !important;
   border-color: #cbd5e1 !important;
   color: #0f172a !important;
@@ -356,23 +374,91 @@ body.modo-sol textarea::placeholder {
   color: #64748b !important;
 }
 
-/* Badges y estados con colores oscuros/saturados */
-body.modo-sol .bg-emerald-500\/10,
-body.modo-sol .bg-emerald-600\/10,
+/* 🟢 FONDO VERDE SÓLIDO (Botones de acción primaria y estados destacados) */
+body.modo-sol .bg-emerald-600,
+body.modo-sol .bg-emerald-500,
+body.modo-sol .bg-emerald-700,
+body.modo-sol .bg-green-600,
+body.modo-sol .bg-green-500,
+body.modo-sol .bg-green-700 {
+  background-color: #059669 !important;
+  color: #ffffff !important;
+  border-color: #047857 !important;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.25) !important;
+}
+
+body.modo-sol .bg-emerald-600 *,
+body.modo-sol .bg-emerald-500 *,
+body.modo-sol .bg-emerald-700 *,
+body.modo-sol .bg-green-600 *,
+body.modo-sol .bg-green-500 *,
+body.modo-sol .bg-green-700 * {
+  color: #ffffff !important;
+}
+
+/* Excepción: contador blanco dentro de botón de carrito */
+body.modo-sol .bg-emerald-600 .bg-white,
+body.modo-sol .bg-emerald-600 .bg-white * {
+  background-color: #ffffff !important;
+  color: #065f46 !important;
+}
+
+/* 🟢 FONDO VERDE SUAVE (Badges de stock, alertas de éxito y contenedor de crédito en Modo Sol) */
 body.modo-sol .bg-emerald-950,
+body.modo-sol .bg-emerald-950\/90,
+body.modo-sol .bg-emerald-950\/80,
+body.modo-sol .bg-emerald-950\/70,
+body.modo-sol .bg-emerald-950\/60,
 body.modo-sol .bg-emerald-950\/50,
-body.modo-sol .bg-emerald-950\/30 {
-  background-color: #dcfce7 !important;
-  color: #166534 !important;
-  border-color: #166534 !important;
+body.modo-sol .bg-emerald-950\/40,
+body.modo-sol .bg-emerald-950\/30,
+body.modo-sol .bg-emerald-900\/60,
+body.modo-sol .bg-emerald-900\/40,
+body.modo-sol .bg-emerald-600\/20,
+body.modo-sol .bg-emerald-600\/10,
+body.modo-sol .bg-emerald-500\/20,
+body.modo-sol .bg-emerald-500\/10,
+body.modo-sol .bg-green-950,
+body.modo-sol .bg-green-950\/80,
+body.modo-sol .bg-green-950\/50,
+body.modo-sol .bg-green-500\/10 {
+  background-color: #dcfce7 !important; /* Verde claro visible en la luz del sol */
+  color: #15803d !important;
+  border-color: #16a34a !important;
+}
+
+body.modo-sol .bg-emerald-950 *,
+body.modo-sol .bg-emerald-950\/80 *,
+body.modo-sol .bg-emerald-950\/60 *,
+body.modo-sol .bg-emerald-950\/50 *,
+body.modo-sol .bg-emerald-950\/40 * {
+  color: #15803d !important;
+}
+
+/* En el banner de resumen de pago semanal, monto grande en negro de alto contraste */
+body.modo-sol .bg-emerald-950\/40 .text-3xl,
+body.modo-sol .bg-emerald-950\/40 strong,
+body.modo-sol .bg-emerald-950\/50 strong {
+  color: #0f172a !important;
 }
 
 body.modo-sol .text-emerald-400,
 body.modo-sol .text-emerald-500,
 body.modo-sol .text-emerald-500\/80,
 body.modo-sol .text-emerald-500\/50,
-body.modo-sol .text-emerald-400\/80 {
-  color: #15803d !important;
+body.modo-sol .text-emerald-400\/80,
+body.modo-sol .text-emerald-600 {
+  color: #047857 !important;
+}
+
+body.modo-sol .border-emerald-800,
+body.modo-sol .border-emerald-800\/60,
+body.modo-sol .border-emerald-800\/80,
+body.modo-sol .border-emerald-700,
+body.modo-sol .border-emerald-700\/80,
+body.modo-sol .border-emerald-600,
+body.modo-sol .border-emerald-500 {
+  border-color: #16a34a !important;
 }
 
 body.modo-sol .text-sky-400,

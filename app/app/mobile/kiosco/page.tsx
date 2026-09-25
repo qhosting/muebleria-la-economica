@@ -724,7 +724,7 @@ export default function MobileKioscoPage() {
                         <Button
                           size="sm"
                           onClick={() => agregarAlCarrito(prod)}
-                          className="w-full bg-slate-800 hover:bg-emerald-600 text-white font-bold h-9 text-xs transition-colors gap-1.5 border border-slate-700"
+                          className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-9 text-xs transition-colors gap-1.5 shadow-sm"
                         >
                           <Plus className="w-4 h-4" />
                           Agregar al Pedido
