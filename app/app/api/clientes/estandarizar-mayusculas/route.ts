@@ -34,8 +34,7 @@ async function asegurarClientesEnMayusculas() {
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    const { searchParams } = new URL(request.url);
-    const secret = searchParams.get('secret');
+    const secret = request.nextUrl.searchParams.get('secret') || new URL(request.url).searchParams.get('secret');
 
     const isAdmin = (session?.user as any)?.role === 'admin' || (session?.user as any)?.role === 'gestor_cobranza';
     const isSecretValid = secret === process.env.NEXTAUTH_SECRET || secret === 'la-economica-admin-2026';
