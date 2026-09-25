@@ -25,7 +25,8 @@ import {
   RotateCcw,
   CheckCircle2,
   ArrowRight,
-  Sparkles
+  Sparkles,
+  FileSpreadsheet
 } from 'lucide-react';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -270,38 +271,223 @@ export default function PagosPage() {
     }
   };
 
-  const exportarPagos = () => {
+  const exportarExcel = () => {
     if (filteredPagos.length === 0) {
       toast.info('No hay pagos para exportar con los filtros seleccionados');
       return;
     }
 
     try {
-      const headers = ['Fecha', 'Cliente', 'Código Cliente', 'Concepto', 'Tipo', 'Monto', 'Cobrador', 'Ticket Impreso'];
-      const rows = filteredPagos.map(p => [
-        `"${formatDate(new Date(p.fechaPago))}"`,
-        `"${(p.cliente?.nombreCompleto || '').replace(/"/g, '""')}"`,
-        `"${p.cliente?.codigoCliente || ''}"`,
-        `"${(p.concepto || '').replace(/"/g, '""')}"`,
-        p.tipoPago === 'regular' ? 'Regular' : 'Moratorio',
-        p.monto || 0,
-        `"${(p.cobrador?.name || 'Venta / Sin Asignar').replace(/"/g, '""')}"`,
-        p.ticketImpreso ? 'Sí' : 'No'
-      ]);
+      const escapeXml = (str: string | number | null | undefined) => {
+        if (str === null || str === undefined) return '';
+        return String(str)
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&apos;');
+      };
 
-      const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
-      const encodedUri = encodeURI(csvContent);
+      const periodoStr = fechaInicio && fechaFin 
+        ? `${fechaInicio} al ${fechaFin}` 
+        : fechaInicio 
+        ? `Desde ${fechaInicio}` 
+        : 'Historial completo';
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<?mso-application progid="Excel.Sheet"?>
+<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:o="urn:schemas-microsoft-com:office:office"
+ xmlns:x="urn:schemas-microsoft-com:office:excel"
+ xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
+ xmlns:html="http://www.w3.org/TR/REC-html40">
+ <DocumentProperties xmlns="urn:schemas-microsoft-com:office:office">
+  <Title>Reporte de Pagos - Mueblería La Económica</Title>
+  <Author>Mueblería La Económica</Author>
+ </DocumentProperties>
+ <Styles>
+  <Style ss:ID="Default" ss:Name="Normal">
+   <Alignment ss:Vertical="Center"/>
+   <Borders/>
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Color="#000000"/>
+   <Interior/>
+   <NumberFormat/>
+   <Protection/>
+  </Style>
+  <Style ss:ID="TitleStyle">
+   <Font ss:FontName="Calibri" ss:Size="15" ss:Bold="1" ss:Color="#1E3A8A"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="SubtitleStyle">
+   <Font ss:FontName="Calibri" ss:Size="10" ss:Italic="1" ss:Color="#4B5563"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="HeaderStyle">
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#FFFFFF"/>
+   <Interior ss:Color="#1E40AF" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#1E3A8A"/>
+    <Border ss:Position="Left" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#1E3A8A"/>
+    <Border ss:Position="Right" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#1E3A8A"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#1E3A8A"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="CurrencyStyle">
+   <NumberFormat ss:Format="&quot;$&quot;#,##0"/>
+   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="CurrencyTotalStyle">
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#15803D"/>
+   <Interior ss:Color="#DCFCE7" ss:Pattern="Solid"/>
+   <NumberFormat ss:Format="&quot;$&quot;#,##0"/>
+   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Double" ss:Weight="3" ss:Color="#16A34A"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#16A34A"/>
+   </Borders>
+  </Style>
+  <Style ss:ID="PercentStyle">
+   <NumberFormat ss:Format="0.0%"/>
+   <Alignment ss:Horizontal="Right" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="CenterStyle">
+   <Alignment ss:Horizontal="Center" ss:Vertical="Center"/>
+  </Style>
+  <Style ss:ID="TotalLabelStyle">
+   <Font ss:FontName="Calibri" ss:Size="11" ss:Bold="1" ss:Color="#1F2937"/>
+   <Interior ss:Color="#F3F4F6" ss:Pattern="Solid"/>
+   <Alignment ss:Horizontal="Left" ss:Vertical="Center"/>
+   <Borders>
+    <Border ss:Position="Bottom" ss:LineStyle="Double" ss:Weight="3" ss:Color="#9CA3AF"/>
+    <Border ss:Position="Top" ss:LineStyle="Continuous" ss:Weight="1" ss:Color="#9CA3AF"/>
+   </Borders>
+  </Style>
+ </Styles>`;
+
+      // Hoja 1: Resumen de Cobranza por Gestor
+      xml += `
+ <Worksheet ss:Name="Resumen por Gestor">
+  <Table>
+   <Column ss:Width="210"/>
+   <Column ss:Width="130"/>
+   <Column ss:Width="150"/>
+   <Column ss:Width="120"/>
+   <Row ss:Height="25">
+    <Cell ss:MergeAcross="3" ss:StyleID="TitleStyle"><Data ss:Type="String">MUEBLERÍA LA ECONÓMICA - RESUMEN DE COBRANZA</Data></Cell>
+   </Row>
+   <Row ss:Height="18">
+    <Cell ss:MergeAcross="3" ss:StyleID="SubtitleStyle"><Data ss:Type="String">Periodo: ${escapeXml(periodoStr)}</Data></Cell>
+   </Row>
+   <Row ss:Height="10"></Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Gestor / Cobrador</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Cantidad de Cobros</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Total Cobrado</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Participación (%)</Data></Cell>
+   </Row>`;
+
+      resumenGestores.forEach((g) => {
+        xml += `
+   <Row ss:Height="20">
+    <Cell><Data ss:Type="String">${escapeXml(g.nombre)}</Data></Cell>
+    <Cell ss:StyleID="CenterStyle"><Data ss:Type="Number">${g.cantidadPagos}</Data></Cell>
+    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${g.totalCobrado}</Data></Cell>
+    <Cell ss:StyleID="PercentStyle"><Data ss:Type="Number">${(g.porcentaje / 100).toFixed(4)}</Data></Cell>
+   </Row>`;
+      });
+
+      xml += `
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TotalLabelStyle"><Data ss:Type="String">TOTAL GENERAL</Data></Cell>
+    <Cell ss:StyleID="TotalLabelStyle" ss:Horizontal="Center"><Data ss:Type="Number">${totalCantidadPagos}</Data></Cell>
+    <Cell ss:StyleID="CurrencyTotalStyle"><Data ss:Type="Number">${totalPeriodo}</Data></Cell>
+    <Cell ss:StyleID="TotalLabelStyle" ss:Horizontal="Right"><Data ss:Type="String">100.0%</Data></Cell>
+   </Row>
+  </Table>
+ </Worksheet>`;
+
+      // Hoja 2: Detalle de Pagos
+      xml += `
+ <Worksheet ss:Name="Detalle de Pagos">
+  <Table>
+   <Column ss:Width="110"/>
+   <Column ss:Width="90"/>
+   <Column ss:Width="230"/>
+   <Column ss:Width="180"/>
+   <Column ss:Width="95"/>
+   <Column ss:Width="110"/>
+   <Column ss:Width="110"/>
+   <Column ss:Width="110"/>
+   <Column ss:Width="180"/>
+   <Column ss:Width="90"/>
+   <Row ss:Height="25">
+    <Cell ss:MergeAcross="9" ss:StyleID="TitleStyle"><Data ss:Type="String">DETALLE DE PAGOS REGISTRADOS</Data></Cell>
+   </Row>
+   <Row ss:Height="18">
+    <Cell ss:MergeAcross="9" ss:StyleID="SubtitleStyle"><Data ss:Type="String">Periodo: ${escapeXml(periodoStr)} - Total: ${filteredPagos.length} pagos</Data></Cell>
+   </Row>
+   <Row ss:Height="10"></Row>
+   <Row ss:Height="22">
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Fecha</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Código</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Cliente</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Concepto</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Tipo</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Monto</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Saldo Anterior</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Saldo Nuevo</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Cobrador</Data></Cell>
+    <Cell ss:StyleID="HeaderStyle"><Data ss:Type="String">Ticket</Data></Cell>
+   </Row>`;
+
+      filteredPagos.forEach((p) => {
+        const fechaStr = formatDate(new Date(p.fechaPago));
+        const tipoStr = p.tipoPago === 'regular' ? 'Regular' : 'Moratorio';
+        const cobradorStr = p.cobrador?.name || 'Venta / Sin Asignar';
+        const ticketStr = p.ticketImpreso ? 'Impreso' : 'Pendiente';
+
+        xml += `
+   <Row ss:Height="19">
+    <Cell ss:StyleID="CenterStyle"><Data ss:Type="String">${escapeXml(fechaStr)}</Data></Cell>
+    <Cell ss:StyleID="CenterStyle"><Data ss:Type="String">${escapeXml(p.cliente?.codigoCliente || '')}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(p.cliente?.nombreCompleto || '')}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(p.concepto || '')}</Data></Cell>
+    <Cell ss:StyleID="CenterStyle"><Data ss:Type="String">${escapeXml(tipoStr)}</Data></Cell>
+    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${p.monto || 0}</Data></Cell>
+    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${p.saldoAnterior || 0}</Data></Cell>
+    <Cell ss:StyleID="CurrencyStyle"><Data ss:Type="Number">${p.saldoNuevo || 0}</Data></Cell>
+    <Cell><Data ss:Type="String">${escapeXml(cobradorStr)}</Data></Cell>
+    <Cell ss:StyleID="CenterStyle"><Data ss:Type="String">${escapeXml(ticketStr)}</Data></Cell>
+   </Row>`;
+      });
+
+      const totalMontoDetalle = filteredPagos.reduce((s, p) => s + (p.monto || 0), 0);
+
+      xml += `
+   <Row ss:Height="22">
+    <Cell ss:StyleID="TotalLabelStyle" ss:MergeAcross="4"><Data ss:Type="String">TOTAL DEL PERIODO</Data></Cell>
+    <Cell ss:StyleID="CurrencyTotalStyle"><Data ss:Type="Number">${totalMontoDetalle}</Data></Cell>
+    <Cell ss:StyleID="TotalLabelStyle" ss:MergeAcross="3"></Cell>
+   </Row>
+  </Table>
+ </Worksheet>
+</Workbook>`;
+
+      const blob = new Blob([xml], { type: 'application/vnd.ms-excel;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.setAttribute('href', encodedUri);
-      const filename = `pagos_${fechaInicio || 'inicio'}_al_${fechaFin || 'fin'}.csv`;
+      link.href = url;
+      const filename = `pagos_${fechaInicio || 'inicio'}_al_${fechaFin || 'fin'}.xls`;
       link.setAttribute('download', filename);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success(`Exportados ${filteredPagos.length} pagos exitosamente`);
+      URL.revokeObjectURL(url);
+      toast.success(`Exportado a Excel exitosamente (${filteredPagos.length} pagos)`);
     } catch (error) {
-      console.error('Error al exportar pagos:', error);
-      toast.error('Error al generar archivo CSV');
+      console.error('Error al exportar a Excel:', error);
+      toast.error('Error al generar archivo Excel');
     }
   };
 
@@ -335,9 +521,12 @@ export default function PagosPage() {
               <RotateCcw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               Actualizar
             </Button>
-            <Button onClick={exportarPagos} className="flex items-center gap-2">
-              <Download className="h-4 w-4" />
-              Exportar CSV
+            <Button
+              onClick={exportarExcel}
+              className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              Exportar Excel
             </Button>
           </div>
         </div>
