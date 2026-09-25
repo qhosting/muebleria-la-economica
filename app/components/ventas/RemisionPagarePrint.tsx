@@ -394,27 +394,37 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
           <div className="border-2 border-blue-900 rounded-md p-2.5 bg-blue-50/20">
             <div className="flex justify-between items-center border-b-2 border-blue-900 pb-1.5 mb-1.5 text-xs">
               <span className="bg-blue-900 text-white font-black px-3 py-0.5 rounded uppercase tracking-wider text-[10px]">
-                PAGARÉ
+                PAGARÉ MERCANTIL
               </span>
               <div className="flex items-center gap-1.5">
                 <span className="font-bold text-blue-950">BUENO POR:</span>
                 <span className="font-black text-sm text-blue-900 border-b-2 border-blue-900 px-1.5">
-                  {formatCurrency(montoPagare)}
+                  {formatCurrency(montoPagare, 2)} M.N.
                 </span>
               </div>
             </div>
 
+            {/* MONTO EN LETRA DESTACADO Y FORMAL (PESOS M.N. / MXN) */}
+            <div className="bg-white border-2 border-blue-800 rounded px-2.5 py-1.5 mb-1.5 flex flex-wrap items-center justify-between text-[11px] shadow-2xs">
+              <span className="font-extrabold text-blue-950 uppercase text-[9.5px] tracking-wide">
+                CANTIDAD CON LETRA:
+              </span>
+              <span className="font-black text-gray-950 tracking-tight">
+                ( {importeEnLetras} )
+              </span>
+            </div>
+
             <p className="text-[10px] leading-relaxed text-gray-800 text-left my-1.5">
-              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE A LA ORDEN DE <strong className="text-blue-950">MUEBLERÍA LA ECONÓMICA</strong> LA CANTIDAD DE{' '}
-              <strong className="text-gray-950">{formatCurrency(montoPagare)} ({importeEnLetras})</strong> EL DÍA{' '}
-              <strong className="text-blue-950">{venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}</strong> EN {sucursalActiva.nombre}. VALOR RECIBIDO A MI ENTERA SATISFACCIÓN. EN CASO DE MORA CAUSARÁ INTERÉS DEL <strong>{venta.interesMoratorioMensual || 10}%</strong> MENSUAL.
+              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DE <strong className="text-blue-950">MUEBLERÍA LA ECONÓMICA</strong> EN SU DOMICILIO EN {sucursalActiva.nombre}, LA CANTIDAD DE{' '}
+              <strong className="text-gray-950">{formatCurrency(montoPagare, 2)} M.N. ({importeEnLetras})</strong> EL DÍA{' '}
+              <strong className="text-blue-950">{venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}</strong>. VALOR RECIBIDO A MI ENTERA SATISFACCIÓN. EN CASO DE MORA CAUSARÁ INTERÉS DEL <strong>{venta.interesMoratorioMensual || 10}%</strong> MENSUAL.
             </p>
 
             {venta.tipoVenta === 'credito' && (
               <div className="text-[10px] text-blue-950 bg-blue-100/50 border border-blue-200 rounded px-2 py-1 flex flex-wrap justify-between gap-2 mt-1.5 font-medium">
-                <span>Enganche: <strong>{formatCurrency(venta.enganche || 0)}</strong></span>
-                <span>Saldo Financiado: <strong>{formatCurrency(venta.saldoFinanciado || 0)}</strong></span>
-                <span>Abono Semanal: <strong>{formatCurrency(venta.montoCuota || 0)} ({venta.periodicidad || 'semanal'})</strong></span>
+                <span>Enganche: <strong>{formatCurrency(venta.enganche || 0, 2)}</strong></span>
+                <span>Saldo Financiado: <strong>{formatCurrency(venta.saldoFinanciado || 0, 2)}</strong></span>
+                <span>Abono Semanal: <strong>{formatCurrency(venta.montoCuota || 0, 2)} ({venta.periodicidad || 'semanal'})</strong></span>
               </div>
             )}
 
@@ -485,25 +495,33 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
           </div>
 
           {/* RESUMEN DE PLAN DE PAGOS DEL CLIENTE */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-2 text-center text-xs">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-1.5 text-center text-xs">
             <div className="bg-white border rounded-md p-1.5 shadow-2xs">
               <div className="text-[9px] text-gray-500 font-bold uppercase">Total Venta</div>
-              <div className="font-extrabold text-sm text-gray-900">{formatCurrency(venta.total)}</div>
+              <div className="font-extrabold text-sm text-gray-900">{formatCurrency(venta.total, 2)}</div>
             </div>
             <div className="bg-white border rounded-md p-1.5 shadow-2xs">
               <div className="text-[9px] text-gray-500 font-bold uppercase">Enganche</div>
-              <div className="font-extrabold text-sm text-blue-700">{formatCurrency(venta.enganche || 0)}</div>
+              <div className="font-extrabold text-sm text-blue-700">{formatCurrency(venta.enganche || 0, 2)}</div>
             </div>
             <div className="bg-white border rounded-md p-1.5 shadow-2xs">
               <div className="text-[9px] text-gray-500 font-bold uppercase">Saldo a Pagar</div>
-              <div className="font-extrabold text-sm text-amber-700">{formatCurrency(montoPagare)}</div>
+              <div className="font-extrabold text-sm text-amber-700">{formatCurrency(montoPagare, 2)}</div>
             </div>
             <div className="bg-white border rounded-md p-1.5 shadow-2xs">
               <div className="text-[9px] text-gray-500 font-bold uppercase">Abono Semanal</div>
               <div className="font-extrabold text-sm text-emerald-700">
-                {formatCurrency(venta.montoCuota || 0)}
+                {formatCurrency(venta.montoCuota || 0, 2)}
               </div>
             </div>
+          </div>
+
+          {/* MONTO EN LETRA DESTACADO EN COPIA CLIENTE */}
+          <div className="text-[10.5px] bg-white border border-slate-300 rounded-md px-2.5 py-1 mb-2 text-slate-800 flex justify-between items-center shadow-2xs">
+            <span><strong>Saldo Financiado en Letra:</strong> ( {importeEnLetras} )</span>
+            <span className="text-[9px] font-extrabold text-blue-800 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+              PESOS M.N. (MXN)
+            </span>
           </div>
 
           {/* ARTÍCULOS AMPARADOS */}

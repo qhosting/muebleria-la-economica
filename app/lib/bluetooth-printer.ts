@@ -2,6 +2,8 @@
 // Servicio de impresión por Bluetooth para tickets de cobranza
 'use client';
 
+import { numeroALetras } from './catalogo-kiosco';
+
 // Definiciones de tipos para Web Bluetooth API
 declare global {
   interface Navigator {
@@ -749,6 +751,28 @@ class BluetoothPrinterService {
         }
       }
       ticket += this.COMMANDS.BOLD_OFF;
+
+      // Monto con letra formal en Pesos M.N. / MXN
+      const saldoOtotal = data.tipoVenta === 'credito' && (data.saldoFinanciado || 0) > 0
+        ? data.saldoFinanciado
+        : data.total;
+      const montoLetra = numeroALetras(saldoOtotal);
+
+      ticket += this.createDivider('-') + this.LF;
+      ticket += this.COMMANDS.BOLD_ON;
+      ticket += 'CANTIDAD CON LETRA (PESOS M.N.):' + this.LF;
+      ticket += this.COMMANDS.BOLD_OFF;
+      ticket += `(${montoLetra})` + this.LF;
+
+      if (data.tipoVenta === 'credito') {
+        ticket += this.createDivider('-') + this.LF;
+        ticket += this.COMMANDS.CENTER;
+        ticket += this.COMMANDS.BOLD_ON;
+        ticket += 'PAGARE MERCANTIL' + this.LF;
+        ticket += this.COMMANDS.BOLD_OFF;
+        ticket += this.COMMANDS.LEFT;
+        ticket += `Debo(emos) y pagare(mos) incondicionalmente a la orden de MUEBLERIA LA ECONOMICA la cantidad de ${this.formatCurrency(saldoOtotal)} M.N. (${montoLetra}) en los plazos convenidos.` + this.LF;
+      }
 
       ticket += this.createDivider('=') + this.LF;
       ticket += this.LF;

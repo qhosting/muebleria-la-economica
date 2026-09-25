@@ -50,6 +50,7 @@ import { formatCurrency } from '@/lib/utils';
 import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, calcularPlanCredito, SUCURSALES_SISTEMA } from '@/lib/catalogo-kiosco';
 import { SignaturePadModal } from '@/components/ventas/SignaturePadModal';
 import { DigitalizadorModal } from '@/components/boveda/digitalizador-modal';
+import { RemisionPagarePrint } from '@/components/ventas/RemisionPagarePrint';
 import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
 
 interface ItemCarrito {
@@ -96,6 +97,7 @@ export default function MobileKioscoPage() {
 
   // Venta completada (Éxito)
   const [ventaCompletada, setVentaCompletada] = useState<any | null>(null);
+  const [remisionParaImprimir, setRemisionParaImprimir] = useState<any | null>(null);
   const [guardandoVenta, setGuardandoVenta] = useState(false);
 
   // Sucursal del vendedor / contexto móvil
@@ -436,6 +438,13 @@ export default function MobileKioscoPage() {
           direccion: direccionCliente,
           codigoCliente: resultado.nuevoCodigoCliente
         },
+        nombreCliente,
+        telefonoCliente,
+        direccionCliente,
+        codigoCliente: resultado.nuevoCodigoCliente,
+        firmaCliente,
+        sucursalId: sucursalSeleccionada,
+        sucursalNombre: sucursalActual?.nombre,
         tipoVenta,
         total: totalArticulos,
         enganche: planCredito.enganche,
@@ -448,6 +457,12 @@ export default function MobileKioscoPage() {
           cantidad: item.cantidad,
           precioUnitario: item.precioUnitario,
           subtotal: item.subtotal
+        })),
+        detalles: carrito.map(item => ({
+          concepto: item.producto.nombre,
+          cantidad: item.cantidad,
+          precioUnitario: item.precioUnitario,
+          importe: item.subtotal
         }))
       });
 
@@ -784,6 +799,16 @@ export default function MobileKioscoPage() {
                   >
                     <Share2 className="w-4 h-4" />
                     Enviar WhatsApp
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setRemisionParaImprimir(ventaCompletada)}
+                    className="col-span-2 bg-slate-900 border-blue-500/50 hover:bg-slate-800 text-blue-400 font-bold gap-1.5 text-xs h-10"
+                  >
+                    <FileText className="w-4 h-4" />
+                    Ver / Descargar Pagaré Oficial y Remisión (PDF)
                   </Button>
                 </div>
 
@@ -1225,6 +1250,37 @@ export default function MobileKioscoPage() {
                       <Button
                         size="sm"
                         variant="outline"
+                        onClick={() => setRemisionParaImprimir({
+                          folio: v.folio,
+                          fecha: v.fecha || new Date(),
+                          nombreCliente: v.nombreCliente,
+                          telefonoCliente: v.telefonoCliente,
+                          direccionCliente: v.direccionCliente || '',
+                          tipoVenta: v.tipoVenta,
+                          total: v.total,
+                          enganche: v.enganche || 0,
+                          saldoFinanciado: v.saldoFinanciado || 0,
+                          plazoSemanas: v.plazoSemanas || 26,
+                          montoCuota: v.montoCuota || 0,
+                          diaPago: v.diaPago || '1',
+                          sucursalId: v.sucursalId || sucursalSeleccionada,
+                          sucursalNombre: v.sucursalNombre || sucursalActual?.nombre,
+                          detalles: v.detalles?.map((d: any) => ({
+                            concepto: d.concepto,
+                            cantidad: d.cantidad,
+                            precioUnitario: d.precioUnitario,
+                            importe: d.subtotal || (d.cantidad * d.precioUnitario)
+                          })) || [{ concepto: 'Artículos varios', cantidad: 1, precioUnitario: v.total, importe: v.total }]
+                        })}
+                        className="bg-slate-950 border-slate-800 hover:bg-slate-800 text-blue-400 font-semibold text-xs h-8 px-2 gap-1"
+                      >
+                        <FileText className="w-3.5 h-3.5" />
+                        Pagaré PDF
+                      </Button>
+
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => compartirWhatsApp({
                           folio: v.folio,
                           cliente: { nombre: v.nombreCliente, telefono: v.telefonoCliente, direccion: v.direccionCliente || '' },
@@ -1487,6 +1543,14 @@ export default function MobileKioscoPage() {
             </div>
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Componente de Pagaré y Remisión Oficial (Impresión / Descarga PDF) */}
+      {remisionParaImprimir && (
+        <RemisionPagarePrint
+          venta={remisionParaImprimir}
+          onClose={() => setRemisionParaImprimir(null)}
+        />
       )}
     </div>
   );

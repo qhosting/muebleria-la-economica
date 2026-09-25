@@ -916,7 +916,8 @@ export const CATALOGO_PRODUCTOS_INICIAL: CatalogoItem[] = PRODUCTOS_LIBRETA_BASE
 }));
 
 // Conversión de importes numéricos a texto formal mexicano (ej: "CUATRO MIL QUINIENTOS PESOS 00/100 M.N.")
-export function numeroALetras(monto: number): string {
+export function numeroALetras(monto: number | string | null | undefined): string {
+  const num = typeof monto === 'number' && !isNaN(monto) ? Math.abs(monto) : Number(monto) || 0;
   const unidades = ['', 'UN', 'DOS', 'TRES', 'CUATRO', 'CINCO', 'SEIS', 'SIETE', 'OCHO', 'NUEVE'];
   const decenasEspeciales = ['DIEZ', 'ONCE', 'DOCE', 'TRECE', 'CATORCE', 'QUINCE', 'DIECISÉIS', 'DIECISIETE', 'DIECIOCHO', 'DIECINUEVE'];
   const decenas = ['', '', 'VEINTE', 'TREINTA', 'CUARENTA', 'CINCUENTA', 'SESENTA', 'SETENTA', 'OCHENTA', 'NOVENTA'];
@@ -946,11 +947,12 @@ export function numeroALetras(monto: number): string {
     return res.trim();
   }
 
-  const partes = monto.toFixed(2).split('.');
+  const partes = num.toFixed(2).split('.');
   let entero = parseInt(partes[0], 10);
   const centavos = partes[1] || '00';
 
   if (entero === 0) return `CERO PESOS ${centavos}/100 M.N.`;
+  if (entero === 1) return `UN PESO ${centavos}/100 M.N.`;
 
   let resultado = '';
   const millones = Math.floor(entero / 1000000);
