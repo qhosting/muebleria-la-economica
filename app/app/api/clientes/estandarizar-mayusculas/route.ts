@@ -5,7 +5,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
-export async function asegurarClientesEnMayusculas() {
+async function asegurarClientesEnMayusculas() {
   try {
     const resultado = await prisma.$executeRawUnsafe(`
       UPDATE "clientes"
