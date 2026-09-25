@@ -276,3 +276,147 @@ export async function POST(request: NextRequest) {
         );
     }
 }
+
+// DELETE - Deshacer / Revertir movimiento de inventario
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+
+        if (!session?.user) {
+            return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get('id');
+
+        if (!id) {
+            return NextResponse.json({ error: 'ID de movimiento requerido' }, { status: 400 });
+        }
+
+        const mov = await prisma.movimientoInventario.findUnique({
+            where: { id },
+            include: {
+                producto: true,
+                sucursalOrigen: true,
+                sucursalDestino: true
+            }
+        });
+
+        if (!mov) {
+            return NextResponse.json({ error: 'Movimiento no encontrado' }, { status: 404 });
+        }
+
+        await prisma.$transaction(async (tx: any) => {
+            const cantidadNum = mov.cantidad;
+            const productoId = mov.productoId;
+
+            if (mov.tipoMovimiento === 'traspaso') {
+                // Revertir traspaso:
+                // 1. Restar de destino
+                if (mov.sucursalDestinoId) {
+                    const stockDest = await tx.stock.findUnique({
+                        where: {
+                            productoId_sucursalId: {
+                                productoId,
+                                sucursalId: mov.sucursalDestinoId
+                            }
+                        }
+                    });
+                    if (stockDest) {
+                        await tx.stock.update({
+                            where: { id: stockDest.id },
+                            data: { cantidad: { decrement: cantidadNum } }
+                        });
+                    }
+                }
+
+                // 2. Regresar a origen
+                if (mov.sucursalOrigenId) {
+                    const stockOrig = await tx.stock.findUnique({
+                        where: {
+                            productoId_sucursalId: {
+                                productoId,
+                                sucursalId: mov.sucursalOrigenId
+                            }
+                        }
+                    });
+                    if (stockOrig) {
+                        await tx.stock.update({
+                            where: { id: stockOrig.id },
+                            data: { cantidad: { increment: cantidadNum } }
+                        });
+                    } else {
+                        await tx.stock.create({
+                            data: {
+                                productoId,
+                                sucursalId: mov.sucursalOrigenId,
+                                cantidad: cantidadNum
+                            }
+                        });
+                    }
+                }
+            } else if (mov.tipoMovimiento === 'entrada') {
+                // Revertir entrada: restar de destino
+                if (mov.sucursalDestinoId) {
+                    const stockDest = await tx.stock.findUnique({
+                        where: {
+                            productoId_sucursalId: {
+                                productoId,
+                                sucursalId: mov.sucursalDestinoId
+                            }
+                        }
+                    });
+                    if (stockDest) {
+                        await tx.stock.update({
+                            where: { id: stockDest.id },
+                            data: { cantidad: { decrement: cantidadNum } }
+                        });
+                    }
+                }
+            } else if (mov.tipoMovimiento === 'salida' || mov.tipoMovimiento === 'venta') {
+                // Revertir salida: regresar a origen
+                if (mov.sucursalOrigenId) {
+                    const stockOrig = await tx.stock.findUnique({
+                        where: {
+                            productoId_sucursalId: {
+                                productoId,
+                                sucursalId: mov.sucursalOrigenId
+                            }
+                        }
+                    });
+                    if (stockOrig) {
+                        await tx.stock.update({
+                            where: { id: stockOrig.id },
+                            data: { cantidad: { increment: cantidadNum } }
+                        });
+                    } else {
+                        await tx.stock.create({
+                            data: {
+                                productoId,
+                                sucursalId: mov.sucursalOrigenId,
+                                cantidad: cantidadNum
+                            }
+                        });
+                    }
+                }
+            }
+
+            // Eliminar el registro del movimiento deshecho
+            await tx.movimientoInventario.delete({
+                where: { id }
+            });
+        });
+
+        return NextResponse.json({
+            success: true,
+            message: `Movimiento de ${mov.tipoMovimiento} deshecho correctamente. El inventario ha sido restablecido.`
+        });
+
+    } catch (error: any) {
+        console.error('Error al deshacer movimiento:', error);
+        return NextResponse.json(
+            { error: error.message || 'Error al revertir el movimiento' },
+            { status: 500 }
+        );
+    }
+}
