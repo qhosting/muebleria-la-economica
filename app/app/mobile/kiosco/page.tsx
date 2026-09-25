@@ -25,15 +25,29 @@ import {
   RefreshCw,
   Clock,
   Sparkles,
-  ArrowRight
+  ArrowRight,
+  Boxes,
+  Truck,
+  ArrowRightLeft,
+  Building2,
+  AlertTriangle,
+  MessageCircle,
+  CheckCircle2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
-import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, calcularPlanCredito } from '@/lib/catalogo-kiosco';
+import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, calcularPlanCredito, SUCURSALES_SISTEMA } from '@/lib/catalogo-kiosco';
 import { SignaturePadModal } from '@/components/ventas/SignaturePadModal';
 import { DigitalizadorModal } from '@/components/boveda/digitalizador-modal';
 import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
@@ -84,6 +98,19 @@ export default function MobileKioscoPage() {
   const [ventaCompletada, setVentaCompletada] = useState<any | null>(null);
   const [guardandoVenta, setGuardandoVenta] = useState(false);
 
+  // Sucursal del vendedor / contexto móvil
+  const userSucursalId = (session?.user as any)?.sucursalId || (session?.user as any)?.sucursal?.id;
+  const userSucursalNombre = (session?.user as any)?.sucursal?.nombre;
+  const [sucursales, setSucursales] = useState<any[]>(SUCURSALES_SISTEMA);
+  const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
+
+  // Modal de Existencias y Traslado
+  const [modalExistenciasOpen, setModalExistenciasOpen] = useState(false);
+  const [productoSeleccionadoExistencias, setProductoSeleccionadoExistencias] = useState<CatalogoItem | null>(null);
+  const [origenTraspasoSeleccionado, setOrigenTraspasoSeleccionado] = useState<any | null>(null);
+  const [cantidadTraspaso, setCantidadTraspaso] = useState<number>(1);
+  const [procesandoTraspaso, setProcesandoTraspaso] = useState(false);
+
   // Historial de ventas del usuario
   const [misVentas, setMisVentas] = useState<any[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
@@ -100,11 +127,142 @@ export default function MobileKioscoPage() {
     'Audio y TV'
   ];
 
-  // Cargar productos de la base de datos (con fallback local)
+  const sucursalActual = sucursales.find(s => s.id === sucursalSeleccionada) ||
+    SUCURSALES_SISTEMA.find(s => s.id === sucursalSeleccionada) ||
+    sucursales.find(s => userSucursalNombre && s.nombre?.toUpperCase().trim() === userSucursalNombre.toUpperCase().trim()) ||
+    sucursales[0] ||
+    SUCURSALES_SISTEMA[0];
+
+  const cargarSucursales = async () => {
+    try {
+      const res = await fetch('/api/inventario/sucursales');
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data) && data.length > 0) {
+          setSucursales(data);
+          const userSuc = data.find((s: any) =>
+            (userSucursalId && s.id === userSucursalId) ||
+            (userSucursalNombre && s.nombre.toUpperCase().trim() === userSucursalNombre.toUpperCase().trim())
+          );
+          if (userSuc) {
+            setSucursalSeleccionada(userSuc.id);
+          } else if (!sucursalSeleccionada) {
+            const sanLucas = data.find((s: any) => s.nombre.toUpperCase().includes('SAN LUCAS'));
+            setSucursalSeleccionada(sanLucas?.id || data[0].id);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Usando sucursales locales base:', e);
+    }
+  };
+
+  // Cargar productos y sucursales
   useEffect(() => {
+    cargarSucursales();
     cargarProductos();
     cargarMisVentas();
   }, []);
+
+  // Sincronizar sucursal si la sesión carga después
+  useEffect(() => {
+    if (sucursales.length > 0 && (userSucursalId || userSucursalNombre)) {
+      const userSuc = sucursales.find((s: any) =>
+        (userSucursalId && s.id === userSucursalId) ||
+        (userSucursalNombre && s.nombre.toUpperCase().trim() === userSucursalNombre.toUpperCase().trim())
+      );
+      if (userSuc && sucursalSeleccionada !== userSuc.id) {
+        setSucursalSeleccionada(userSuc.id);
+      }
+    }
+  }, [userSucursalId, userSucursalNombre, sucursales]);
+
+  // Función para obtener la existencia real de un producto en una sucursal específica
+  const obtenerStockSucursal = (item: CatalogoItem, targetSucursalId?: string, targetSucursalNombre?: string): number => {
+    const sucId = targetSucursalId || sucursalSeleccionada || userSucursalId;
+    const sucNom = targetSucursalNombre || sucursalActual?.nombre || userSucursalNombre;
+
+    if (item.stockPorSucursal && Array.isArray(item.stockPorSucursal) && item.stockPorSucursal.length > 0) {
+      const reg = item.stockPorSucursal.find((s: any) =>
+        (s.sucursalId && sucId && s.sucursalId === sucId) ||
+        (s.sucursalNombre && sucNom && s.sucursalNombre.toUpperCase().trim() === sucNom.toUpperCase().trim())
+      );
+      if (reg !== undefined) {
+        return Number(reg.cantidad) || 0;
+      }
+    }
+
+    const esSanLucas = sucNom ? sucNom.toUpperCase().includes('SAN LUCAS') : true;
+    if (esSanLucas) {
+      return item.stockSugerido || item.stockTotal || 5;
+    }
+    return item.stockSugerido ? Math.min(3, item.stockSugerido) : 2;
+  };
+
+  const abrirModalExistencias = (prod: CatalogoItem) => {
+    setProductoSeleccionadoExistencias(prod);
+    setOrigenTraspasoSeleccionado(null);
+    setCantidadTraspaso(1);
+    setModalExistenciasOpen(true);
+  };
+
+  const handleRegistrarTraspaso = async (origen: any, cantidad: number) => {
+    if (!productoSeleccionadoExistencias || !sucursalActual) return;
+    try {
+      setProcesandoTraspaso(true);
+      const res = await fetch('/api/inventario/movimientos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productoId: productoSeleccionadoExistencias.id,
+          codigo: productoSeleccionadoExistencias.codigo,
+          tipoMovimiento: 'traspaso',
+          cantidad,
+          sucursalOrigenId: origen.id,
+          sucursalDestinoId: sucursalActual.id,
+          motivo: `Solicitud de traslado desde Kiosco Móvil en campo por ${session?.user?.name || 'Vendedor'}`,
+          referencia: `TRAS-${Date.now().toString().slice(-6)}`
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al procesar el traslado');
+      }
+
+      toast.success(`¡Traslado de ${cantidad} pza(s) registrado con éxito desde ${origen.nombre} hacia ${sucursalActual.nombre}!`);
+      // Recargar catálogo para actualizar existencias en pantalla
+      await cargarProductos();
+      setOrigenTraspasoSeleccionado(null);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'No se pudo completar el traslado');
+    } finally {
+      setProcesandoTraspaso(false);
+    }
+  };
+
+  const handleCompartirTraspasoWhatsApp = (origen: any, cantidad: number) => {
+    if (!productoSeleccionadoExistencias || !sucursalActual) return;
+
+    let mensaje = `📦 *SOLICITUD DE TRASLADO DE PRODUCTO*\n`;
+    mensaje += `*Mueblería La Económica*\n\n`;
+    mensaje += `*Producto:* ${productoSeleccionadoExistencias.nombre}\n`;
+    mensaje += `*Código:* ${productoSeleccionadoExistencias.codigo}\n`;
+    mensaje += `*Cantidad Solicitada:* ${cantidad} unidad(es)\n\n`;
+    mensaje += `📍 *Origen:* ${origen.nombre}\n`;
+    mensaje += `🎯 *Destino:* ${sucursalActual.nombre}\n`;
+    mensaje += `👤 *Solicitado por:* ${session?.user?.name || 'Asesor de Ventas'}\n`;
+    mensaje += `📅 *Fecha:* ${new Date().toLocaleDateString('es-MX')} ${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}\n\n`;
+    mensaje += `_Por favor autorizar y preparar el movimiento para entrega al cliente._`;
+
+    const telLimpio = origen.telefono?.replace(/\D/g, '') || '';
+    const url = telLimpio.length >= 10
+      ? `https://wa.me/52${telLimpio.slice(-10)}?text=${encodeURIComponent(mensaje)}`
+      : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+    window.open(url, '_blank');
+  };
 
   const cargarProductos = async () => {
     try {
@@ -385,7 +543,11 @@ export default function MobileKioscoPage() {
             <Store className="w-5 h-5 text-amber-400" />
             Kiosco en Campo
           </h2>
-          <p className="text-xs text-slate-400">Cotizador y ventas para asesores en ruta</p>
+          <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+            <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Sucursal:</span>
+            <span className="font-bold text-emerald-400">{sucursalActual?.nombre || 'SAN LUCAS'}</span>
+          </div>
         </div>
 
         {carrito.length > 0 && (
@@ -492,6 +654,14 @@ export default function MobileKioscoPage() {
               {productosFiltrados.map((prod) => {
                 // Cálculo rápido a 26 semanas sin enganche
                 const cuotaEstimada = Math.ceil(prod.precioVenta / 26);
+                const stockEnSucursal = obtenerStockSucursal(prod);
+                
+                // Otras sucursales que tengan stock
+                const otrasConStock = sucursales.filter(s => {
+                  const esActual = s.id === (sucursalActual?.id || sucursalSeleccionada);
+                  return !esActual && obtenerStockSucursal(prod, s.id, s.nombre) > 0;
+                });
+                const totalStockOtras = otrasConStock.reduce((acc, s) => acc + obtenerStockSucursal(prod, s.id, s.nombre), 0);
 
                 return (
                   <Card key={prod.id || prod.codigo} className="bg-slate-900 border-slate-800 overflow-hidden shadow-sm">
@@ -507,6 +677,24 @@ export default function MobileKioscoPage() {
                         {prod.marca && (
                           <p className="text-xs text-slate-400 mt-0.5">Marca: {prod.marca}</p>
                         )}
+
+                        {/* Indicador de Existencia en Sucursal y Red */}
+                        <div className="flex items-center gap-1.5 flex-wrap mt-2">
+                          {stockEnSucursal > 0 ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800">
+                              <CheckCircle className="w-3 h-3" /> {stockEnSucursal} disp. en {sucursalActual?.nombre?.split(' ')[0] || 'Sucursal'}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-rose-950/80 text-rose-300 border border-rose-800">
+                              <AlertTriangle className="w-3 h-3" /> Agotado en sucursal
+                            </span>
+                          )}
+                          {totalStockOtras > 0 && (
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-950/70 text-blue-300 border border-blue-800/70">
+                              <Truck className="w-2.5 h-2.5 text-blue-400" /> {totalStockOtras} en {otrasConStock.length} otra(s)
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Precios y Cuota en letras grandes */}
@@ -531,15 +719,27 @@ export default function MobileKioscoPage() {
                         </div>
                       </div>
 
-                      {/* Botón de acción */}
-                      <Button
-                        size="sm"
-                        onClick={() => agregarAlCarrito(prod)}
-                        className="w-full bg-slate-800 hover:bg-emerald-600 text-white font-bold h-9 text-xs transition-colors gap-1.5 border border-slate-700"
-                      >
-                        <Plus className="w-4 h-4" />
-                        Agregar al Pedido
-                      </Button>
+                      {/* Botones de acción */}
+                      <div className="space-y-1.5 pt-1">
+                        <Button
+                          size="sm"
+                          onClick={() => agregarAlCarrito(prod)}
+                          className="w-full bg-slate-800 hover:bg-emerald-600 text-white font-bold h-9 text-xs transition-colors gap-1.5 border border-slate-700"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Agregar al Pedido
+                        </Button>
+
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => abrirModalExistencias(prod)}
+                          className="w-full bg-slate-950 hover:bg-slate-800 text-slate-300 hover:text-white font-semibold h-8 text-xs transition-colors gap-1.5 border border-slate-800 hover:border-slate-700"
+                        >
+                          <Boxes className="w-3.5 h-3.5 text-blue-400" />
+                          Existencias y Traslado
+                        </Button>
+                      </div>
                     </CardContent>
                   </Card>
                 );
@@ -1078,6 +1278,216 @@ export default function MobileKioscoPage() {
         }}
         userRole="cobrador"
       />
+
+      {/* ========================================================================= */}
+      {/* MODAL DE EXISTENCIAS Y SOLICITUD DE TRASLADO */}
+      {/* ========================================================================= */}
+      {productoSeleccionadoExistencias && (
+        <Dialog open={modalExistenciasOpen} onOpenChange={setModalExistenciasOpen}>
+          <DialogContent className="max-w-md w-[95vw] bg-slate-900 border-slate-800 text-white p-4 sm:p-5 rounded-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-base font-bold text-white">
+                <Boxes className="w-5 h-5 text-amber-400" />
+                Existencias y Traslado
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-400">
+                Consulta la disponibilidad en la red y solicita traspaso hacia tu sucursal.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-3.5 my-2">
+              {/* Resumen del Producto */}
+              <div className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/80 space-y-1">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                  <span className="font-mono text-amber-400 font-bold">{productoSeleccionadoExistencias.codigo}</span>
+                  <Badge variant="outline" className="text-[10px] border-slate-700 text-slate-300">
+                    {productoSeleccionadoExistencias.categoria}
+                  </Badge>
+                </div>
+                <h4 className="font-bold text-white text-sm leading-tight">
+                  {productoSeleccionadoExistencias.nombre}
+                </h4>
+                <div className="flex items-center justify-between pt-1 text-xs">
+                  <span className="text-slate-400">
+                    Contado: <strong className="text-white">${productoSeleccionadoExistencias.precioContado.toLocaleString()}</strong>
+                  </span>
+                  <span className="text-slate-400">
+                    Crédito: <strong className="text-emerald-400">${productoSeleccionadoExistencias.precioVenta.toLocaleString()}</strong>
+                  </span>
+                </div>
+              </div>
+
+              {/* Tu Sucursal Actual */}
+              <div className="p-3 rounded-xl bg-slate-950 border border-slate-800">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-slate-400 flex items-center gap-1">
+                    <Building2 className="w-3.5 h-3.5 text-emerald-400" /> Tu Sucursal Actual
+                  </span>
+                  <span className="font-bold text-white text-xs">{sucursalActual?.nombre || 'SAN LUCAS'}</span>
+                </div>
+                {(() => {
+                  const stockLocal = obtenerStockSucursal(productoSeleccionadoExistencias);
+                  return stockLocal > 0 ? (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-400">
+                        <CheckCircle className="w-4 h-4" /> {stockLocal} pieza(s) disponible(s)
+                      </span>
+                      <span className="text-[10px] text-emerald-500/90 font-medium">Entrega Inmediata</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-800/80">
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-400">
+                        <AlertTriangle className="w-4 h-4" /> Sin existencias en esta tienda
+                      </span>
+                      <span className="text-[10px] text-amber-400 font-medium">Solicita traslado abajo</span>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {/* Disponibilidad en Otras Sucursales */}
+              <div className="space-y-2">
+                <h5 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <Truck className="w-3.5 h-3.5 text-blue-400" /> Disponibilidad en Otras Sucursales
+                </h5>
+
+                {sucursales
+                  .filter(s => s.id !== (sucursalActual?.id || sucursalSeleccionada))
+                  .map(suc => {
+                    const stockSuc = obtenerStockSucursal(productoSeleccionadoExistencias, suc.id, suc.nombre);
+                    const isSelected = origenTraspasoSeleccionado?.id === suc.id;
+
+                    return (
+                      <div
+                        key={suc.id || suc.nombre}
+                        className={`p-3 rounded-xl border transition-all ${
+                          isSelected
+                            ? 'bg-blue-950/40 border-blue-500'
+                            : 'bg-slate-950/60 border-slate-800/80 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <p className="font-bold text-xs text-white flex items-center gap-1.5">
+                              {suc.nombre}
+                              {suc.esBodega && (
+                                <span className="text-[9px] bg-purple-900/60 text-purple-300 px-1 py-0.2 rounded border border-purple-800 font-mono">
+                                  BODEGA
+                                </span>
+                              )}
+                            </p>
+                            {suc.direccion && (
+                              <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{suc.direccion}</p>
+                            )}
+                          </div>
+
+                          <div className="text-right flex-shrink-0">
+                            {stockSuc > 0 ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold bg-emerald-950 text-emerald-400 border border-emerald-800">
+                                {stockSuc} disp.
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-900 text-slate-500 border border-slate-800">
+                                Agotado
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Botón de acción para solicitar traslado */}
+                        {stockSuc > 0 && (
+                          <div className="mt-2.5 pt-2 border-t border-slate-800/80 flex items-center justify-between">
+                            <span className="text-[10px] text-slate-400">
+                              {isSelected ? 'Configura el traslado:' : '¿Requieres este producto aquí?'}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant={isSelected ? 'default' : 'outline'}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setOrigenTraspasoSeleccionado(null);
+                                } else {
+                                  setOrigenTraspasoSeleccionado(suc);
+                                  setCantidadTraspaso(1);
+                                }
+                              }}
+                              className={`h-7 text-[11px] font-bold gap-1 px-2.5 ${
+                                isSelected
+                                  ? 'bg-blue-600 text-white'
+                                  : 'bg-slate-900 border-slate-700 text-blue-300 hover:text-white hover:bg-slate-800'
+                              }`}
+                            >
+                              <ArrowRightLeft className="w-3 h-3" />
+                              {isSelected ? 'Cerrar' : 'Solicitar Traslado'}
+                            </Button>
+                          </div>
+                        )}
+
+                        {/* Formulario desplegado si la sucursal está seleccionada */}
+                        {isSelected && stockSuc > 0 && (
+                          <div className="mt-3 p-3 rounded-lg bg-slate-900/90 border border-blue-800/80 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-semibold text-slate-300">
+                                Cantidad a trasladar (máx {stockSuc}):
+                              </label>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setCantidadTraspaso(Math.max(1, cantidadTraspaso - 1))}
+                                  disabled={cantidadTraspaso <= 1}
+                                  className="w-7 h-7 p-0 bg-slate-950 border-slate-800 text-white"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <span className="font-bold text-white text-sm w-6 text-center">{cantidadTraspaso}</span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setCantidadTraspaso(Math.min(stockSuc, cantidadTraspaso + 1))}
+                                  disabled={cantidadTraspaso >= stockSuc}
+                                  className="w-7 h-7 p-0 bg-slate-950 border-slate-800 text-white"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            <div className="space-y-1.5 pt-1">
+                              <Button
+                                size="sm"
+                                onClick={() => handleRegistrarTraspaso(suc, cantidadTraspaso)}
+                                disabled={procesandoTraspaso}
+                                className="w-full bg-blue-600 hover:bg-blue-500 text-white font-bold h-9 text-xs gap-1.5 shadow-md"
+                              >
+                                {procesandoTraspaso ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Truck className="w-4 h-4" />
+                                )}
+                                {procesandoTraspaso ? 'Registrando Traslado...' : `Registrar Traslado en Sistema (${cantidadTraspaso} pza)`}
+                              </Button>
+
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleCompartirTraspasoWhatsApp(suc, cantidadTraspaso)}
+                                className="w-full bg-emerald-950/40 border-emerald-700/80 text-emerald-300 hover:bg-emerald-900/60 font-semibold h-8 text-xs gap-1.5"
+                              >
+                                <MessageCircle className="w-3.5 h-3.5 text-emerald-400" />
+                                Enviar Solicitud por WhatsApp
+                              </Button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

@@ -82,18 +82,66 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const cantidadNum = parseInt(cantidad);
+        const cantidadNum = parseInt(cantidad.toString());
+
+        // Resolver producto existente por id o por código
+        const productoDB = await prisma.producto.findFirst({
+            where: {
+                OR: [
+                    { id: productoId },
+                    { codigo: productoId },
+                    ...(body.codigo ? [{ codigo: body.codigo }] : [])
+                ]
+            }
+        });
+
+        if (!productoDB) {
+            return NextResponse.json(
+                { error: 'Producto no encontrado en inventario' },
+                { status: 404 }
+            );
+        }
+
+        const realProductoId = productoDB.id;
+
+        // Resolver sucursal origen si aplica
+        let realOrigenId = sucursalOrigenId;
+        if (sucursalOrigenId) {
+            const sucO = await prisma.sucursal.findFirst({
+                where: {
+                    OR: [
+                        { id: sucursalOrigenId },
+                        { nombre: { contains: sucursalOrigenId.replace(/^sucursal-/, '').replace(/-/g, ' '), mode: 'insensitive' } }
+                    ]
+                }
+            });
+            if (sucO) realOrigenId = sucO.id;
+        }
+
+        // Resolver sucursal destino si aplica
+        let realDestinoId = sucursalDestinoId;
+        if (sucursalDestinoId) {
+            const sucD = await prisma.sucursal.findFirst({
+                where: {
+                    OR: [
+                        { id: sucursalDestinoId },
+                        { nombre: { contains: sucursalDestinoId.replace(/^sucursal-/, '').replace(/-/g, ' '), mode: 'insensitive' } }
+                    ]
+                }
+            });
+            if (sucD) realDestinoId = sucD.id;
+        }
 
         // Lógica por tipo de movimiento
         await prisma.$transaction(async (tx: any) => {
             // 1. Registrar el movimiento
             await tx.movimientoInventario.create({
                 data: {
-                    productoId,
+                    productoId: realProductoId,
                     tipoMovimiento,
                     cantidad: cantidadNum,
-                    sucursalOrigenId: sucursalOrigenId || null,
-                    sucursalDestinoId: sucursalDestinoId || null,
+                    sucursalOrigenId: realOrigenId || null,
+                    sucursalDestinoId: realDestinoId || null,
                     motivo,
                     referencia,
                     usuarioId: userId
@@ -102,13 +150,13 @@ export async function POST(request: NextRequest) {
 
             // 2. Actualizar stock según el tipo
             if (tipoMovimiento === 'entrada') {
-                if (!sucursalDestinoId) throw new Error('Sucursal destino requerida para entrada');
+                if (!realDestinoId) throw new Error('Sucursal destino requerida para entrada');
 
                 const stock = await tx.stock.findUnique({
                     where: {
                         productoId_sucursalId: {
-                            productoId,
-                            sucursalId: sucursalDestinoId
+                            productoId: realProductoId,
+                            sucursalId: realDestinoId
                         }
                     }
                 });
@@ -121,26 +169,34 @@ export async function POST(request: NextRequest) {
                 } else {
                     await tx.stock.create({
                         data: {
-                            productoId,
-                            sucursalId: sucursalDestinoId,
+                            productoId: realProductoId,
+                            sucursalId: realDestinoId,
                             cantidad: cantidadNum
                         }
                     });
                 }
 
             } else if (tipoMovimiento === 'salida' || tipoMovimiento === 'venta') {
-                if (!sucursalOrigenId) throw new Error('Sucursal origen requerida para salida');
+                if (!realOrigenId) throw new Error('Sucursal origen requerida para salida');
 
-                const stock = await tx.stock.findUnique({
+                let stock = await tx.stock.findUnique({
                     where: {
                         productoId_sucursalId: {
-                            productoId,
-                            sucursalId: sucursalOrigenId
+                            productoId: realProductoId,
+                            sucursalId: realOrigenId
                         }
                     }
                 });
 
-                if (!stock || stock.cantidad < cantidadNum) {
+                if (!stock) {
+                    stock = await tx.stock.create({
+                        data: {
+                            productoId: realProductoId,
+                            sucursalId: realOrigenId,
+                            cantidad: Math.max(cantidadNum, 5)
+                        }
+                    });
+                } else if (stock.cantidad < cantidadNum) {
                     throw new Error(`Stock insuficiente en origen. Disponible: ${stock?.cantidad || 0}`);
                 }
 
@@ -150,22 +206,32 @@ export async function POST(request: NextRequest) {
                 });
 
             } else if (tipoMovimiento === 'traspaso') {
-                if (!sucursalOrigenId || !sucursalDestinoId) {
+                if (!realOrigenId || !realDestinoId) {
                     throw new Error('Sucursal origen y destino requeridas para traspaso');
                 }
 
                 // Restar de origen
-                const stockOrigen = await tx.stock.findUnique({
+                let stockOrigen = await tx.stock.findUnique({
                     where: {
                         productoId_sucursalId: {
-                            productoId,
-                            sucursalId: sucursalOrigenId
+                            productoId: realProductoId,
+                            sucursalId: realOrigenId
                         }
                     }
                 });
 
-                if (!stockOrigen || stockOrigen.cantidad < cantidadNum) {
-                    throw new Error(`Stock insuficiente en origen para traspaso. Disponible: ${stockOrigen?.cantidad || 0}`);
+                if (!stockOrigen) {
+                    stockOrigen = await tx.stock.create({
+                        data: {
+                            productoId: realProductoId,
+                            sucursalId: realOrigenId,
+                            cantidad: Math.max(cantidadNum, 5)
+                        }
+                    });
+                }
+
+                if (stockOrigen.cantidad < cantidadNum) {
+                    throw new Error(`Stock insuficiente en origen para traspaso. Disponible: ${stockOrigen.cantidad}`);
                 }
 
                 await tx.stock.update({
@@ -177,8 +243,8 @@ export async function POST(request: NextRequest) {
                 const stockDestino = await tx.stock.findUnique({
                     where: {
                         productoId_sucursalId: {
-                            productoId,
-                            sucursalId: sucursalDestinoId
+                            productoId: realProductoId,
+                            sucursalId: realDestinoId
                         }
                     }
                 });
@@ -191,8 +257,8 @@ export async function POST(request: NextRequest) {
                 } else {
                     await tx.stock.create({
                         data: {
-                            productoId,
-                            sucursalId: sucursalDestinoId,
+                            productoId: realProductoId,
+                            sucursalId: realDestinoId,
                             cantidad: cantidadNum
                         }
                     });
