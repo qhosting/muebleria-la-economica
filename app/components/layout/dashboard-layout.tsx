@@ -66,7 +66,7 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 print:bg-white print:min-h-0">
       <Sidebar
         session={session}
         isCollapsed={isCollapsed}
@@ -74,12 +74,12 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
       />
       <div
         className={cn(
-          "flex flex-col min-h-screen transition-all duration-300 ease-in-out",
+          "flex flex-col min-h-screen transition-all duration-300 ease-in-out print:pl-0 print:min-h-0",
           isCollapsed ? "lg:pl-16" : "lg:pl-64"
         )}
       >
         {/* Header con búsqueda global */}
-        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm">
+        <header className="sticky top-0 z-30 bg-white border-b border-gray-200 shadow-sm print:hidden">
           <div className="flex items-center justify-between px-4 lg:px-8 h-16">
             <div className="flex-1 max-w-2xl">
               <BusquedaGlobal />
@@ -90,7 +90,7 @@ export function DashboardLayout({ children, className }: DashboardLayoutProps) {
           </div>
         </header>
         
-        <main className={cn("flex-1 p-4 lg:p-8 transition-all duration-300", className)}>
+        <main className={cn("flex-1 p-4 lg:p-8 transition-all duration-300 print:p-0 print:m-0", className)}>
           {children}
         </main>
       </div>
