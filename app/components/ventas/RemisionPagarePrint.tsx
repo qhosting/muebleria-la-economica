@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Printer, Download, X, FileText, Loader2 } from 'lucide-react';
+import { Printer, Download, X, FileText, Loader2, Scissors, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { numeroALetras, formatearFechaLegal, SUCURSALES_SISTEMA } from '@/lib/catalogo-kiosco';
 import { toast } from 'sonner';
@@ -99,7 +99,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
           <style>
             @page {
               size: letter portrait;
-              margin: 6mm 8mm;
+              margin: 4mm 6mm;
             }
             html, body {
               background: #ffffff !important;
@@ -171,7 +171,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
       const pageWidth = pdf.internal.pageSize.getWidth();
       const pageHeight = pdf.internal.pageSize.getHeight();
       
-      const margin = 8;
+      const margin = 6;
       const printWidth = pageWidth - (margin * 2);
       const printHeight = (canvas.height * printWidth) / canvas.width;
 
@@ -198,8 +198,8 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
     }
   };
 
-  // Mínimo 6 filas para que el formato luzca idéntico a la remisión física
-  const filasMinimas = Math.max(6, venta.detalles?.length || 0);
+  // 3 filas compactas para asegurar que quepa exactamente en la mitad de la hoja
+  const filasMinimas = Math.max(3, venta.detalles?.length || 0);
   const filasCompletas = Array.from({ length: filasMinimas }).map((_, i) => {
     return venta.detalles && venta.detalles[i] ? venta.detalles[i] : null;
   });
@@ -232,7 +232,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
           }
           @page {
             size: letter portrait;
-            margin: 6mm 8mm;
+            margin: 4mm 6mm;
           }
         }
       `}} />
@@ -246,7 +246,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
               Remisión y Pagaré Oficial Nº {folioFormateado}
             </h2>
             <p className="text-xs text-gray-500">
-              Mueblería La Económica • Sucursal {sucursalActiva.nombre}
+              Formato de Hoja Completa: Original Tienda (Pagaré) + Copia Cliente (Cláusulas)
             </p>
           </div>
         </div>
@@ -284,234 +284,271 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
         </div>
       </div>
 
-      {/* Contenedor del Documento Físico (Ajustado para caber en 1 sola hoja carta) */}
+      {/* Contenedor de Hoja Completa (Mitad Superior: Original Tienda / Mitad Inferior: Copia Cliente) */}
       <div
         id="remision-pagare-documento"
         ref={printRef}
-        className="w-full max-w-4xl bg-white p-5 md:p-8 shadow-2xl rounded-b-xl border print:shadow-none print:border-none print:p-0 print:max-w-none print:w-full text-gray-900 font-sans"
+        className="w-full max-w-4xl bg-white p-4 md:p-6 shadow-2xl rounded-b-xl border print:shadow-none print:border-none print:p-0 print:max-w-none print:w-full text-gray-900 font-sans"
       >
-        {/* ENCABEZADO */}
-        <div className="flex justify-between items-start border-b-2 border-blue-900 pb-2 mb-2">
-          <div className="flex-1">
-            <h1 className="text-xl md:text-2xl font-extrabold tracking-wider text-blue-900 uppercase font-serif">
-              MUEBLERÍA LA ECONÓMICA
-            </h1>
-            <p className="text-xs font-bold text-blue-800 uppercase tracking-wide mt-0.5">
-              SUCURSAL {sucursalActiva.nombre}
-            </p>
-            <p className="text-xs font-semibold text-gray-700 mt-0.5 uppercase tracking-tight">
-              {sucursalActiva.direccion} • Tel. {sucursalActiva.telefono}
-            </p>
-            <p className="text-[10px] text-gray-500 font-medium">
-              {sucursalActiva.ciudad}
-            </p>
+        {/* ========================================================= */}
+        {/* MITAD SUPERIOR: REMISIÓN + PAGARÉ (ORIGINAL TIENDA)      */}
+        {/* ========================================================= */}
+        <div className="border-2 border-blue-900 rounded-lg p-2.5 bg-white relative">
+          {/* ENCABEZADO SUPERIOR */}
+          <div className="flex justify-between items-start border-b border-blue-900 pb-1.5 mb-1.5">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h1 className="text-lg md:text-xl font-extrabold tracking-wider text-blue-900 uppercase font-serif">
+                  MUEBLERÍA LA ECONÓMICA
+                </h1>
+                <span className="bg-blue-900 text-white text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                  ORIGINAL TIENDA
+                </span>
+              </div>
+              <p className="text-[10px] font-bold text-blue-800 uppercase tracking-tight">
+                SUCURSAL {sucursalActiva.nombre} • Tel. {sucursalActiva.telefono}
+              </p>
+              <p className="text-[9px] text-gray-600">
+                {sucursalActiva.direccion}, {sucursalActiva.ciudad}
+              </p>
+            </div>
+
+            {/* Cuadro de Folio Remisión */}
+            <div className="border-2 border-blue-900 rounded overflow-hidden text-center min-w-[110px] shadow-xs">
+              <div className="bg-blue-900 text-white font-bold text-[10px] py-0.5 uppercase tracking-wider">
+                REMISIÓN
+              </div>
+              <div className="py-0.5 px-2 text-base md:text-lg font-black text-red-600 tracking-widest">
+                Nº {folioFormateado}
+              </div>
+            </div>
           </div>
 
-          {/* Cuadro de Folio Remisión */}
-          <div className="border-2 border-blue-900 rounded-md overflow-hidden text-center min-w-[130px] shadow-xs">
-            <div className="bg-blue-900 text-white font-bold text-[11px] py-0.5 tracking-wider uppercase">
-              REMISIÓN
+          {/* FECHA Y DATOS DEL CLIENTE EN 1 BLOQUE COMPACTO */}
+          <div className="flex flex-wrap items-center justify-between text-[11px] mb-1.5 px-1 bg-gray-50/70 border border-gray-200 rounded p-1">
+            <div className="flex items-center gap-1">
+              <span className="font-bold text-blue-950">Cliente:</span>
+              <span className="font-bold text-gray-900 uppercase">{venta.nombreCliente}</span>
+              <span className="text-[10px] text-gray-500 font-medium">({venta.codigoCliente || 'CL-PENDIENTE'})</span>
             </div>
-            <div className="py-1 px-3 text-lg md:text-xl font-black text-red-600 tracking-widest">
-              Nº {folioFormateado}
+            <div className="text-[10px] font-semibold text-gray-700">
+              Aculco, Méx., a <strong className="text-gray-900">{fechaLegal.dia}</strong> de <strong className="text-gray-900 uppercase">{fechaLegal.mes}</strong> de 20<strong className="text-gray-900">{fechaLegal.anio.slice(-2)}</strong>
+            </div>
+          </div>
+
+          <div className="text-[10px] text-gray-700 px-1 mb-1.5 flex flex-wrap justify-between border-b pb-1">
+            <span><strong>Dirección:</strong> {venta.direccionCliente || 'Domicilio Conocido'}, {venta.ciudadCliente || 'Aculco'}</span>
+            {venta.telefonoCliente && <span><strong>Tel:</strong> {venta.telefonoCliente}</span>}
+          </div>
+
+          {/* TABLA DE PRODUCTOS COMPACTA */}
+          <div className="relative border border-blue-900 rounded overflow-hidden mb-1.5">
+            <table className="w-full text-[10px] relative z-10 border-collapse">
+              <thead>
+                <tr className="bg-blue-900 text-white font-bold">
+                  <th className="py-0.5 px-2 text-center border-r border-blue-800 w-[10%]">CANT.</th>
+                  <th className="py-0.5 px-2 text-left border-r border-blue-800 w-[70%]">CONCEPTO</th>
+                  <th className="py-0.5 px-2 text-right w-[20%]">IMPORTE</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-blue-100">
+                {filasCompletas.slice(0, 3).map((item, idx) => (
+                  <tr key={idx} className="h-[20px]">
+                    <td className="py-0.2 px-2 text-center font-bold text-gray-900 border-r border-blue-100">
+                      {item ? item.cantidad : ''}
+                    </td>
+                    <td className="py-0.2 px-2 font-medium text-gray-900 border-r border-blue-100 uppercase truncate">
+                      {item ? item.concepto : ''}
+                    </td>
+                    <td className="py-0.2 px-2 text-right font-bold text-gray-900">
+                      {item ? formatCurrency(item.importe) : ''}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* RESUMEN TOTAL SUPERIOR */}
+          <div className="flex justify-between items-center bg-gray-50 border border-blue-900 rounded px-2 py-0.5 mb-1.5 text-[10px]">
+            <span className="font-extrabold text-red-600 uppercase text-[9px]">
+              SE LE COBRARÁ EL 20% EN CASO DE DEVOLUCIÓN
+            </span>
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-blue-950">TOTAL:</span>
+              <span className="font-black text-sm text-gray-950 bg-white px-2 py-0.2 border border-blue-900 rounded">
+                {formatCurrency(venta.total)}
+              </span>
+            </div>
+          </div>
+
+          {/* SECCIÓN DEL PAGARÉ MERCANTIL (ORIGINAL) */}
+          <div className="border border-blue-900 rounded p-1.5 bg-blue-50/20">
+            <div className="flex justify-between items-center border-b border-blue-900 pb-1 mb-1 text-[10px]">
+              <span className="bg-blue-900 text-white font-black px-2 py-0.2 rounded uppercase tracking-wider text-[9px]">
+                PAGARÉ
+              </span>
+              <div className="flex items-center gap-1">
+                <span className="font-bold text-blue-950">BUENO POR:</span>
+                <span className="font-black text-xs text-blue-900 border-b border-blue-900 px-1">
+                  {formatCurrency(montoPagare)}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-[8.5px] leading-tight text-gray-800 text-justify tracking-tight">
+              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE A LA ORDEN DE <strong className="text-blue-950">MUEBLERÍA LA ECONÓMICA</strong> LA CANTIDAD DE{' '}
+              <strong className="text-gray-950">{formatCurrency(montoPagare)} ({importeEnLetras})</strong> EL DÍA{' '}
+              <strong>{venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}</strong> EN {sucursalActiva.nombre}. VALOR RECIBIDO A MI ENTERA SATISFACCIÓN. EN CASO DE MORA CAUSARÁ INTERÉS DEL <strong>{venta.interesMoratorioMensual || 10}%</strong> MENSUAL.
+            </p>
+
+            {venta.tipoVenta === 'credito' && (
+              <div className="text-[8px] text-blue-950 flex justify-between gap-1 mt-0.5 font-medium border-t border-blue-100 pt-0.5">
+                <span>Enganche: <strong>{formatCurrency(venta.enganche || 0)}</strong></span>
+                <span>Saldo: <strong>{formatCurrency(venta.saldoFinanciado || 0)}</strong></span>
+                <span>Abono: <strong>{formatCurrency(venta.montoCuota || 0)} ({venta.periodicidad || 'semanal'})</strong></span>
+              </div>
+            )}
+
+            {/* FIRMA DE CONFORMIDAD */}
+            <div className="mt-1 flex justify-end">
+              <div className="w-48 text-center">
+                {venta.firmaCliente ? (
+                  <div className="border-b border-gray-900 pb-0.5">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={venta.firmaCliente}
+                      alt="Firma del cliente"
+                      className="max-h-8 mx-auto object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="border-b border-gray-900 h-6 mb-0.5"></div>
+                )}
+                <div className="text-[9px] font-extrabold text-gray-900 uppercase tracking-wide">
+                  ACEPTO (AMOS) • FIRMA DEL COMPRADOR
+                </div>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* FECHA FORMAL */}
-        <div className="text-right text-xs font-semibold text-gray-800 mb-2 tracking-wide">
-          Aculco, Edo. de Méx., a{' '}
-          <span className="border-b border-gray-900 px-2 font-bold">
-            {fechaLegal.dia}
-          </span>{' '}
-          de{' '}
-          <span className="border-b border-gray-900 px-3 font-bold">
-            {fechaLegal.mes}
-          </span>{' '}
-          de 20
-          <span className="border-b border-gray-900 px-2 font-bold">
-            {fechaLegal.anio.slice(-2)}
+        {/* ========================================================= */}
+        {/* LÍNEA DE CORTE DIVISORIA                                  */}
+        {/* ========================================================= */}
+        <div className="relative my-2 flex items-center justify-center text-[9px] text-gray-500 font-bold uppercase tracking-wider">
+          <div className="absolute inset-0 flex items-center">
+            <div className="w-full border-t border-dashed border-gray-400"></div>
+          </div>
+          <span className="relative bg-white px-3 py-0.5 flex items-center gap-1.5 rounded-full border border-gray-300 shadow-xs">
+            <Scissors className="h-3 w-3 text-gray-600" />
+            LÍNEA DE CORTE • COPIA PARA EL CLIENTE
           </span>
         </div>
 
-        {/* DATOS DEL CLIENTE */}
-        <div className="border-2 border-blue-900 rounded-lg p-2 space-y-1 mb-2.5 text-xs bg-blue-50/20">
-          <div className="flex items-center">
-            <span className="font-bold text-blue-950 w-20">Nombre:</span>
-            <span className="flex-1 border-b border-dotted border-gray-600 font-semibold px-2 uppercase text-gray-900">
-              {venta.nombreCliente}
-            </span>
-          </div>
-          <div className="flex items-center">
-            <span className="font-bold text-blue-950 w-20">Dirección:</span>
-            <span className="flex-1 border-b border-dotted border-gray-600 px-2 text-gray-800">
-              {venta.direccionCliente || 'Domicilio Conocido'}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center flex-1">
-              <span className="font-bold text-blue-950 w-20">Ciudad:</span>
-              <span className="flex-1 border-b border-dotted border-gray-600 px-2 text-gray-800">
-                {venta.ciudadCliente || 'Aculco, Edo. de Méx.'}
-              </span>
-            </div>
-            {venta.telefonoCliente && (
-              <div className="flex items-center ml-3">
-                <span className="font-bold text-blue-950 mr-1.5">Teléfono:</span>
-                <span className="border-b border-dotted border-gray-600 px-2 text-gray-800 font-medium">
-                  {venta.telefonoCliente}
+        {/* ========================================================= */}
+        {/* MITAD INFERIOR: COMPROBANTE + CLÁUSULAS (COPIA CLIENTE)   */}
+        {/* ========================================================= */}
+        <div className="border-2 border-slate-700 rounded-lg p-2.5 bg-slate-50/40 relative">
+          {/* ENCABEZADO INFERIOR */}
+          <div className="flex justify-between items-start border-b border-slate-400 pb-1.5 mb-1.5">
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-base md:text-lg font-extrabold tracking-wider text-slate-900 uppercase font-serif">
+                  MUEBLERÍA LA ECONÓMICA
+                </h2>
+                <span className="bg-emerald-700 text-white text-[9px] font-bold px-1.5 py-0.2 rounded uppercase tracking-wider">
+                  COPIA CLIENTE
                 </span>
               </div>
-            )}
-          </div>
-        </div>
-
-        {/* TABLA DE PRODUCTOS CON MARCA DE AGUA */}
-        <div className="relative border-2 border-blue-900 rounded-lg overflow-hidden mb-2">
-          {/* Marca de agua central */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none opacity-[0.05] rotate-[-15deg] z-0">
-            <span className="text-5xl md:text-6xl font-black font-serif text-blue-900 uppercase text-center leading-tight">
-              MUEBLERÍA<br />LA ECONÓMICA
-            </span>
-          </div>
-
-          <table className="w-full text-xs relative z-10 border-collapse">
-            <thead>
-              <tr className="bg-blue-900 text-white font-bold tracking-wide">
-                <th className="py-1 px-3 text-center border-r border-blue-800 w-[12%]">
-                  CANT.
-                </th>
-                <th className="py-1 px-3 text-center border-r border-blue-800 w-[68%]">
-                  CONCEPTO
-                </th>
-                <th className="py-1 px-3 text-center w-[20%]">
-                  IMPORTE
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-blue-200">
-              {filasCompletas.map((item, idx) => (
-                <tr key={idx} className="h-[26px]">
-                  <td className="py-0.5 px-3 text-center font-bold text-gray-900 border-r border-blue-200">
-                    {item ? item.cantidad : ''}
-                  </td>
-                  <td className="py-0.5 px-3 font-medium text-gray-900 border-r border-blue-200 uppercase truncate max-w-md">
-                    {item ? item.concepto : ''}
-                  </td>
-                  <td className="py-0.5 px-3 text-right font-bold text-gray-900">
-                    {item ? formatCurrency(item.importe) : ''}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* PIE DE TABLA: LEYENDA DEL 20% Y TOTAL */}
-        <div className="flex flex-col sm:flex-row justify-between items-center border-2 border-blue-900 rounded-lg p-2 mb-2 bg-gray-50 gap-2">
-          <div className="text-xs font-extrabold text-red-600 tracking-wide uppercase text-center sm:text-left">
-            SE LE COBRARÁ EL 20% EN CASO DE DEVOLUCIÓN
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="font-extrabold text-blue-950 text-sm md:text-base">
-              TOTAL $
-            </span>
-            <div className="bg-white border-2 border-blue-900 rounded-md px-3 py-0.5 text-base md:text-lg font-black text-gray-950 tracking-wider">
-              {formatCurrency(venta.total)}
-            </div>
-          </div>
-        </div>
-
-        {/* SECCIÓN DEL PAGARÉ MERCANTIL */}
-        <div className="border-2 border-blue-900 rounded-lg p-2.5 md:p-3 bg-white shadow-xs">
-          {/* Barra superior de pagaré */}
-          <div className="flex flex-wrap items-center justify-between gap-1.5 border-b-2 border-blue-900 pb-1.5 mb-1.5">
-            <div className="text-xs font-bold text-gray-900">
-              No. DE CLIENTE:{' '}
-              <span className="font-black text-blue-900 px-1.5 py-0.5 bg-blue-100 rounded border border-blue-300">
-                {venta.codigoCliente || 'CL-PENDIENTE'}
-              </span>
+              <p className="text-[9px] font-semibold text-slate-700 uppercase">
+                COMPROBANTE DE COMPRA Y CONTRATO DE CRÉDITO • SUCURSAL {sucursalActiva.nombre}
+              </p>
             </div>
 
-            <div className="bg-blue-900 text-white font-black text-xs px-3 py-0.5 rounded tracking-widest uppercase">
-              PAGARÉ
-            </div>
-
-            <div className="flex items-center gap-1 text-xs">
-              <span className="font-bold text-blue-950">BUENO POR:</span>
-              <span className="font-black text-sm text-blue-900 border-b-2 border-blue-900 px-1.5">
-                {formatCurrency(montoPagare)}
-              </span>
-            </div>
-          </div>
-
-          {/* CUERPO LEGAL DEL PAGARÉ */}
-          <div className="text-[10px] md:text-[11px] leading-snug text-gray-800 text-justify space-y-1">
-            <p>
-              A <span className="font-bold border-b border-gray-600 px-1.5">{fechaLegal.dia}</span> DE{' '}
-              <span className="font-bold border-b border-gray-600 px-2 uppercase">{fechaLegal.mes}</span> DEL 20
-              <span className="font-bold border-b border-gray-600 px-1.5">{fechaLegal.anio.slice(-2)}</span>.
-            </p>
-            <p className="tracking-tight">
-              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE A LA ORDEN DE{' '}
-              <strong className="text-blue-950">MUEBLERÍA LA ECONÓMICA</strong> LA CANTIDAD DE{' '}
-              <strong className="border-b border-gray-800 px-1 text-gray-950 uppercase">
-                {formatCurrency(montoPagare)} ({importeEnLetras})
-              </strong>{' '}
-              EL DÍA{' '}
-              <strong className="border-b border-gray-800 px-1.5">
-                {venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}
-              </strong>{' '}
-              EN EL DOMICILIO SEÑALADO O EN LA SUCURSAL / MATRIZ ({sucursalActiva.nombre} - {sucursalActiva.ciudad}).
-            </p>
-            <p className="tracking-tight">
-              VALOR DE LA MERCANCÍA RECIBIDA A MI (NUESTRA) ENTERA SATISFACCIÓN. ESTE DOCUMENTO CAUSARÁ
-              INTERÉS MORATORIO DEL{' '}
-              <strong className="border-b border-gray-800 px-1.5 text-red-600 font-bold">
-                {venta.interesMoratorioMensual || 10}%
-              </strong>{' '}
-              MENSUAL SI NO ES LIQUIDADO A SU VENCIMIENTO.
-            </p>
-
-            {/* RESUMEN DEL PLAN DE CRÉDITO SI APLICA */}
-            {venta.tipoVenta === 'credito' && (
-              <div className="bg-blue-50/70 border border-blue-200 rounded p-1.5 text-[9px] md:text-[10px] text-blue-950 flex flex-wrap justify-between gap-1.5 mt-1 print:bg-transparent print:border-gray-300">
-                <span>Enganche: <strong>{formatCurrency(venta.enganche || 0)}</strong></span>
-                <span>Saldo a Financiar: <strong>{formatCurrency(venta.saldoFinanciado || 0)}</strong></span>
-                <span>Periodicidad: <strong className="capitalize">{venta.periodicidad || 'semanal'}</strong></span>
-                <span>Abono / Cuota: <strong>{formatCurrency(venta.montoCuota || 0)}</strong></span>
+            <div className="text-right">
+              <div className="text-xs font-black text-slate-900">
+                REM. Nº {folioFormateado}
               </div>
+              <div className="text-[9px] text-slate-600 font-medium">
+                Fecha: {fechaLegal.dia}/{fechaLegal.mes}/{fechaLegal.anio}
+              </div>
+            </div>
+          </div>
+
+          {/* RESUMEN DE PLAN DE PAGOS DEL CLIENTE */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2 text-center text-[10px]">
+            <div className="bg-white border rounded p-1">
+              <div className="text-[8px] text-gray-500 font-bold uppercase">Total Venta</div>
+              <div className="font-extrabold text-gray-900">{formatCurrency(venta.total)}</div>
+            </div>
+            <div className="bg-white border rounded p-1">
+              <div className="text-[8px] text-gray-500 font-bold uppercase">Enganche</div>
+              <div className="font-extrabold text-blue-700">{formatCurrency(venta.enganche || 0)}</div>
+            </div>
+            <div className="bg-white border rounded p-1">
+              <div className="text-[8px] text-gray-500 font-bold uppercase">Saldo a Pagar</div>
+              <div className="font-extrabold text-amber-700">{formatCurrency(montoPagare)}</div>
+            </div>
+            <div className="bg-white border rounded p-1">
+              <div className="text-[8px] text-gray-500 font-bold uppercase">Abono Semanal</div>
+              <div className="font-extrabold text-emerald-700">
+                {formatCurrency(venta.montoCuota || 0)}
+              </div>
+            </div>
+          </div>
+
+          {/* ARTÍCULOS AMPARADOS */}
+          <div className="text-[9px] bg-white border rounded px-2 py-1 mb-2 text-gray-800">
+            <strong>Artículos: </strong>
+            {venta.detalles && venta.detalles.length > 0 ? (
+              venta.detalles.map((d, i) => `${d.cantidad}x ${d.concepto}`).join(' • ')
+            ) : (
+              'Artículos detallados en remisión original'
             )}
           </div>
 
-          {/* FIRMA DE CONFORMIDAD */}
-          <div className="mt-3 pt-1 flex justify-end">
-            <div className="w-56 text-center">
-              {venta.firmaCliente ? (
-                <div className="mb-0.5 border-b border-gray-900 pb-0.5">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={venta.firmaCliente}
-                    alt="Firma del cliente"
-                    className="max-h-12 mx-auto object-contain"
-                  />
-                </div>
-              ) : (
-                <div className="border-b-2 border-gray-900 h-10 mb-0.5"></div>
-              )}
-              <div className="text-[11px] md:text-xs font-extrabold text-gray-900 tracking-wider uppercase">
-                ACEPTO (AMOS)
+          {/* CLÁUSULAS Y CONDICIONES GENERALES DE CRÉDITO Y GARANTÍA */}
+          <div className="border border-slate-300 rounded p-2 bg-white mb-1.5">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-900 border-b pb-1 mb-1 uppercase tracking-wide">
+              <ShieldCheck className="h-3.5 w-3.5 text-blue-700" />
+              TÉRMINOS, CONDICIONES Y CLÁUSULAS DE GARANTÍA
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-3 gap-y-1 text-[8.5px] leading-tight text-gray-800 text-justify">
+              <div>
+                <p>
+                  <strong>1. PAGO Y RECIBOS OFICIALES:</strong> El comprador se compromete a cubrir sus abonos semanales puntualmente los días <strong>{venta.diaPago ? `DÍA ${venta.diaPago}` : 'pactados'}</strong> con el gestor de cobranza autorizado en su domicilio o en sucursal. <strong>Exija siempre su ticket/recibo impreso</strong> como único comprobante válido de pago.
+                </p>
+                <p className="mt-1">
+                  <strong>2. GARANTÍA DE MUEBLES:</strong> Toda la mercancía cuenta con garantía contra defectos de fabricación. La garantía no aplica en averías por mal uso, negligencia, sobrepeso, humedad o agentes externos no atribuibles a la calidad del mueble.
+                </p>
+                <p className="mt-1">
+                  <strong>3. RESERVA DE DOMINIO:</strong> La propiedad de los artículos se transfiere formalmente al comprador al liquidar el 100% del saldo financiado.
+                </p>
               </div>
-              <div className="text-[9px] text-gray-600 uppercase font-medium">
-                Firma del Deudor / Comprador
+
+              <div>
+                <p>
+                  <strong>4. DEVOLUCIÓN O CANCELACIÓN:</strong> En caso de cancelación voluntaria o devolución de la mercancía por causas ajenas a la mueblería, aplicará una penalización del <strong>20% del valor total</strong> por concepto de gastos administrativos, logística y depreciación del bien.
+                </p>
+                <p className="mt-1">
+                  <strong>5. MORA Y VENCIMIENTO:</strong> Todo pago no cubierto en el plazo estipulado causará el interés moratorio del <strong>{venta.interesMoratorioMensual || 10}% mensual</strong> pactado en el pagaré mercantil original.
+                </p>
+                <p className="mt-1">
+                  <strong>6. ATENCIÓN Y ACLARACIONES:</strong> Para aclaraciones, soporte o reportes comuníquese al teléfono <strong>{sucursalActiva.telefono}</strong> o en <strong>{sucursalActiva.direccion}</strong>.
+                </p>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* PIE DE PÁGINA IMPRESO */}
-        <div className="mt-2 text-center text-[9px] text-gray-500 font-medium">
-          Mueblería La Económica • Sistema Integral de Kiosco y Crédito
+          {/* PIE DE COPIA CLIENTE */}
+          <div className="flex justify-between items-center text-[8.5px] text-gray-600 px-1">
+            <span className="font-semibold text-emerald-800">
+              ✓ ¡Gracias por su compra! Conserve este comprobante como póliza de garantía.
+            </span>
+            <span>Mueblería La Económica • Atención al Cliente</span>
+          </div>
         </div>
       </div>
     </div>
