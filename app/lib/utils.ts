@@ -12,11 +12,11 @@ export function formatCurrency(
   decimalsOrOptions: number | boolean | {
     minimumFractionDigits?: number;
     maximumFractionDigits?: number;
-  } = 2
+  } = 0
 ): string {
   const num = typeof amount === 'number' && !isNaN(amount) ? amount : Number(amount) || 0;
-  let minDecimals = 2;
-  let maxDecimals = 2;
+  let minDecimals = 0;
+  let maxDecimals = 0;
 
   if (typeof decimalsOrOptions === 'number') {
     minDecimals = decimalsOrOptions;

@@ -308,7 +308,7 @@ export default function KioscoVentasPage() {
 
   // Agregar artículo personalizado
   const handleAgregarPersonalizado = () => {
-    const precio = parseFloat(customProduct.precio);
+    const precio = Math.round(parseFloat(customProduct.precio));
     if (!customProduct.concepto || isNaN(precio) || precio <= 0) {
       toast.error('Ingrese un concepto válido y un precio mayor a 0');
       return;
@@ -1043,9 +1043,10 @@ export default function KioscoVentasPage() {
                           <Input
                             type="number"
                             min="0"
+                            step="1"
                             value={enganche || ''}
                             placeholder="$0"
-                            onChange={e => setEnganche(parseFloat(e.target.value) || 0)}
+                            onChange={e => setEnganche(Math.round(parseFloat(e.target.value) || 0))}
                             className="h-8 text-xs font-bold text-green-700"
                           />
                         </div>
@@ -1328,6 +1329,7 @@ export default function KioscoVentasPage() {
                 <Label className="text-xs">Precio Unitario ($) *</Label>
                 <Input
                   type="number"
+                  step="1"
                   placeholder="ej. 4500"
                   value={customProduct.precio}
                   onChange={e => setCustomProduct({ ...customProduct, precio: e.target.value })}
