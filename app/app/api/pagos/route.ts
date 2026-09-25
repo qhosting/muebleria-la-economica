@@ -32,8 +32,14 @@ export async function GET(request: NextRequest) {
 
     if (fechaDesde || fechaHasta) {
       where.fechaPago = {};
-      if (fechaDesde) where.fechaPago.gte = new Date(fechaDesde);
-      if (fechaHasta) where.fechaPago.lte = new Date(fechaHasta);
+      if (fechaDesde) {
+        const dDesde = new Date(fechaDesde.length === 10 ? `${fechaDesde}T00:00:00` : fechaDesde);
+        where.fechaPago.gte = dDesde;
+      }
+      if (fechaHasta) {
+        const dHasta = new Date(fechaHasta.length === 10 ? `${fechaHasta}T23:59:59.999` : fechaHasta);
+        where.fechaPago.lte = dHasta;
+      }
     }
 
     const userRole = (session.user as any).role;
@@ -78,6 +84,18 @@ export async function GET(request: NextRequest) {
     const pagosMoratorios = pagos.filter((p: any) => p.tipoPago === 'moratorio').length;
     const ticketsImpresos = pagos.filter((p: any) => p.ticketImpreso).length;
 
+    // Resumen agrupado por cobrador para el rango consultado
+    const cobradorMap = new Map<string, { id: string; nombre: string; totalCobrado: number; cantidadPagos: number }>();
+    pagos.forEach((p: any) => {
+      const cId = p.cobradorId || 'sin_asignar';
+      const cNombre = p.cobrador?.name || 'Venta / Sin Asignar';
+      const prev = cobradorMap.get(cId) || { id: cId, nombre: cNombre, totalCobrado: 0, cantidadPagos: 0 };
+      prev.totalCobrado += parseFloat(p.monto.toString());
+      prev.cantidadPagos += 1;
+      cobradorMap.set(cId, prev);
+    });
+    const resumenPorCobrador = Array.from(cobradorMap.values()).sort((a, b) => b.totalCobrado - a.totalCobrado);
+
     // Convert Decimal fields to numbers for JSON serialization
     const pagosSerializados = pagos.map((pago: any) => ({
       ...pago,
@@ -95,6 +113,7 @@ export async function GET(request: NextRequest) {
         pagosMoratorios,
         ticketsImpresos,
       },
+      resumenPorCobrador,
       pagination: {
         total,
         pages: Math.ceil(total / limit),
