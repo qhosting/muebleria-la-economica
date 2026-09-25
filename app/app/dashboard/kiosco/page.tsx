@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Store,
@@ -33,7 +33,16 @@ import {
   FileText,
   UserCheck,
   ShieldCheck,
-  Lock
+  Lock,
+  Boxes,
+  Truck,
+  ArrowRightLeft,
+  Building2,
+  AlertTriangle,
+  MessageCircle,
+  CheckCircle,
+  ArrowRight,
+  Loader2
 } from 'lucide-react';
 import { formatCurrency, getDayName, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -97,9 +106,16 @@ export default function KioscoVentasPage() {
     direccion?: string;
   } | null>(null);
 
-  // Historial de ventas recientes
+  // Pestañas Principales (Catálogo, Remisión/Pedido, Historial)
+  const [tabPrincipal, setTabPrincipal] = useState<'catalogo' | 'pedido' | 'historial'>('catalogo');
   const [historialVentas, setHistorialVentas] = useState<any[]>([]);
-  const [tabPrincipal, setTabPrincipal] = useState<'kiosco' | 'historial'>('kiosco');
+
+  // Modal de Existencias y Traslado
+  const [modalExistenciasOpen, setModalExistenciasOpen] = useState(false);
+  const [productoSeleccionadoExistencias, setProductoSeleccionadoExistencias] = useState<CatalogoItem | null>(null);
+  const [origenTraspasoSeleccionado, setOrigenTraspasoSeleccionado] = useState<any | null>(null);
+  const [cantidadTraspaso, setCantidadTraspaso] = useState<number>(1);
+  const [procesandoTraspaso, setProcesandoTraspaso] = useState(false);
 
   useEffect(() => {
     cargarDatosIniciales();
@@ -245,14 +261,18 @@ export default function KioscoVentasPage() {
     toast.success(`Cliente seleccionado: ${c.nombreCompleto} (${c.codigoCliente})`);
   };
 
-  // Función para obtener la existencia real de un producto en la sucursal activa
-  const obtenerStockSucursal = (item: CatalogoItem): number => {
+  // Función para obtener la existencia real de un producto en la sucursal activa o especificada
+  const obtenerStockSucursal = (item: any, targetSucursalId?: string, targetSucursalNombre?: string): number => {
+    if (!item) return 0;
+    const sucId = targetSucursalId || sucursalSeleccionada || sucursalActual?.id;
+    const sucNom = targetSucursalNombre || sucursalActual?.nombre || '';
+
     // 1. Revisar stock por sucursal si viene de la base de datos
     if (item.stockPorSucursal && Array.isArray(item.stockPorSucursal) && item.stockPorSucursal.length > 0) {
       const reg = item.stockPorSucursal.find((s: any) => 
-        (s.sucursalId && sucursalSeleccionada && s.sucursalId === sucursalSeleccionada) ||
-        (s.sucursalNombre && sucursalActual?.nombre && 
-         s.sucursalNombre.toUpperCase().trim() === sucursalActual.nombre.toUpperCase().trim())
+        (s.sucursalId && sucId && s.sucursalId === sucId) ||
+        (s.sucursalNombre && sucNom && 
+         s.sucursalNombre.toUpperCase().trim() === sucNom.toUpperCase().trim())
       );
       if (reg !== undefined) {
         return Number(reg.cantidad) || 0;
@@ -260,14 +280,11 @@ export default function KioscoVentasPage() {
     }
 
     // 2. Si no hay registro explícito en BD para esta sucursal:
-    // Los productos cargados primero del catálogo físico pertenecen principalmente a SAN LUCAS 3ER CUARTEL
-    const esSanLucas = sucursalActual?.nombre?.toUpperCase().includes('SAN LUCAS');
+    const esSanLucas = sucNom.toUpperCase().includes('SAN LUCAS');
     if (esSanLucas) {
       return item.stockSugerido || item.stockTotal || 5;
     }
 
-    // Para cualquier otra sucursal (AMEALCO, LA ESTANCIA SJR, SAN ILDEFONSO),
-    // si aún no se han sincronizado registros en BD, mostrar stock inicial para que el catálogo opere
     return item.stockSugerido ? Math.min(3, item.stockSugerido) : 2;
   };
 
@@ -355,6 +372,75 @@ export default function KioscoVentasPage() {
     const nuevo = [...carrito];
     nuevo.splice(index, 1);
     setCarrito(nuevo);
+  };
+
+  const abrirModalExistencias = (prod: CatalogoItem) => {
+    setProductoSeleccionadoExistencias(prod);
+    setOrigenTraspasoSeleccionado(null);
+    setCantidadTraspaso(1);
+    setModalExistenciasOpen(true);
+  };
+
+  const handleRegistrarTraspaso = async (origen: any, cantidad: number) => {
+    if (!productoSeleccionadoExistencias || !sucursalActual) return;
+    try {
+      setProcesandoTraspaso(true);
+      const res = await fetch('/api/inventario/movimientos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          productoId: productoSeleccionadoExistencias.id,
+          codigo: productoSeleccionadoExistencias.codigo,
+          tipoMovimiento: 'traspaso',
+          cantidad,
+          sucursalOrigenId: origen.id,
+          sucursalDestinoId: sucursalActual.id,
+          motivo: `Solicitud de traslado desde Kiosco por ${vendedorNombre || session?.user?.name || 'Vendedor'}`,
+          referencia: `TRAS-KIOSCO-${Date.now().toString().slice(-6)}`
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al procesar el traslado');
+      }
+
+      toast.success(`¡Traslado de ${cantidad} pza(s) registrado con éxito desde ${origen.nombre} hacia ${sucursalActual.nombre}!`);
+      // Recargar catálogo de inventario
+      const prodRes = await fetch('/api/inventario/productos');
+      if (prodRes.ok) {
+        const prodData = await prodRes.json();
+        setProductosDB(prodData);
+      }
+      setOrigenTraspasoSeleccionado(null);
+    } catch (e: any) {
+      console.error(e);
+      toast.error(e.message || 'No se pudo completar el traslado');
+    } finally {
+      setProcesandoTraspaso(false);
+    }
+  };
+
+  const handleCompartirTraspasoWhatsApp = (origen: any, cantidad: number) => {
+    if (!productoSeleccionadoExistencias || !sucursalActual) return;
+
+    let mensaje = `📦 *SOLICITUD DE TRASLADO DE PRODUCTO*\n`;
+    mensaje += `*Mueblería La Económica*\n\n`;
+    mensaje += `*Producto:* ${productoSeleccionadoExistencias.nombre}\n`;
+    mensaje += `*Código:* ${productoSeleccionadoExistencias.codigo}\n`;
+    mensaje += `*Cantidad Solicitada:* ${cantidad} unidad(es)\n\n`;
+    mensaje += `📍 *Origen:* ${origen.nombre}\n`;
+    mensaje += `🎯 *Destino:* ${sucursalActual.nombre}\n`;
+    mensaje += `👤 *Solicitado por:* ${vendedorNombre || session?.user?.name || 'Asesor Kiosco'}\n`;
+    mensaje += `📅 *Fecha:* ${new Date().toLocaleDateString('es-MX')} ${new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}\n\n`;
+    mensaje += `_Por favor autorizar y preparar el movimiento para entrega al cliente._`;
+
+    const telLimpio = origen.telefono?.replace(/\D/g, '') || '';
+    const url = telLimpio.length >= 10
+      ? `https://wa.me/52${telLimpio.slice(-10)}?text=${encodeURIComponent(mensaje)}`
+      : `https://wa.me/?text=${encodeURIComponent(mensaje)}`;
+
+    window.open(url, '_blank');
   };
 
   // Cálculos del Carrito y Financiamiento
@@ -615,53 +701,130 @@ export default function KioscoVentasPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          {/* Botón rápido si hay artículos en la remisión */}
+          {carrito.length > 0 && (
             <Button
-              className={cn(
-                "gap-2 font-bold transition-all border",
-                tabPrincipal === 'kiosco'
-                  ? "bg-white text-blue-950 border-white hover:bg-blue-50 shadow-sm"
-                  : "bg-white/15 text-white border-white/40 hover:bg-white/25 hover:text-white"
-              )}
-              onClick={() => setTabPrincipal('kiosco')}
+              onClick={() => setTabPrincipal('pedido')}
+              className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-10 px-4 gap-2 shadow-md border border-emerald-400/40"
             >
               <ShoppingCart className="h-4 w-4" />
-              Mostrador
+              <span>{formatCurrency(totalBruto)}</span>
+              <span className="w-5 h-5 rounded-full bg-white text-emerald-800 text-[11px] font-black flex items-center justify-center ml-1">
+                {carrito.reduce((s, i) => s + i.cantidad, 0)}
+              </span>
             </Button>
-            <Button
-              className={cn(
-                "gap-2 font-bold transition-all border",
-                tabPrincipal === 'historial'
-                  ? "bg-white text-blue-950 border-white hover:bg-blue-50 shadow-sm"
-                  : "bg-white/15 text-white border-white/40 hover:bg-white/25 hover:text-white"
-              )}
-              onClick={() => {
-                setTabPrincipal('historial');
-                cargarHistorial();
-              }}
-            >
-              <History className="h-4 w-4" />
-              Historial de Remisiones
-            </Button>
-          </div>
+          )}
         </div>
 
-        {tabPrincipal === 'kiosco' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* PANEL IZQUIERDO: CATÁLOGO TÁCTIL (7 columnas) */}
-            <div className="lg:col-span-7 space-y-4">
-              <Card className="shadow-md border-slate-200">
-                <CardHeader className="pb-3">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div>
-                      <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                        <Package className="h-5 w-5 text-blue-700" />
-                        Catálogo de Productos
-                      </CardTitle>
-                      <CardDescription>
-                        Seleccione artículos para agregarlos a la remisión
-                      </CardDescription>
-                    </div>
+        {/* PESTAÑAS PRINCIPALES DEL KIOSCO (Igual que en Kiosco en campo) */}
+        <div className="grid grid-cols-3 gap-2 p-1.5 bg-slate-100 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold shadow-inner">
+          <button
+            type="button"
+            onClick={() => setTabPrincipal('catalogo')}
+            className={cn(
+              "py-2.5 px-3 sm:px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 sm:gap-2",
+              tabPrincipal === 'catalogo'
+                ? "bg-blue-800 text-white shadow-md font-extrabold"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+            )}
+          >
+            <Package className="h-4 w-4 shrink-0" />
+            <span>Catálogo</span>
+            <span className={cn(
+              "text-[11px] px-1.5 py-0.5 rounded-full font-bold",
+              tabPrincipal === 'catalogo' ? "bg-blue-900 text-blue-200" : "bg-slate-200 text-slate-700"
+            )}>
+              {catalogoFiltrado.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setTabPrincipal('pedido')}
+            className={cn(
+              "py-2.5 px-3 sm:px-4 rounded-xl transition-all relative flex items-center justify-center gap-1.5 sm:gap-2",
+              tabPrincipal === 'pedido'
+                ? "bg-blue-800 text-white shadow-md font-extrabold"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+            )}
+          >
+            <ShoppingCart className="h-4 w-4 shrink-0" />
+            <span>Cotizar / Remisión</span>
+            {carrito.length > 0 && (
+              <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white font-black text-[11px] px-2 py-0.5 shadow-sm ml-1">
+                {carrito.reduce((s, i) => s + i.cantidad, 0)} arts • {formatCurrency(totalBruto)}
+              </Badge>
+            )}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setTabPrincipal('historial');
+              cargarHistorial();
+            }}
+            className={cn(
+              "py-2.5 px-3 sm:px-4 rounded-xl transition-all flex items-center justify-center gap-1.5 sm:gap-2",
+              tabPrincipal === 'historial'
+                ? "bg-blue-800 text-white shadow-md font-extrabold"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/60"
+            )}
+          >
+            <History className="h-4 w-4 shrink-0" />
+            <span>Historial</span>
+            {historialVentas.length > 0 && (
+              <span className={cn(
+                "text-[11px] px-1.5 py-0.5 rounded-full font-bold",
+                tabPrincipal === 'historial' ? "bg-blue-900 text-blue-200" : "bg-slate-200 text-slate-700"
+              )}>
+                {historialVentas.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {/* ========================================================================= */}
+        {/* PESTAÑA 1: CATÁLOGO DE PRODUCTOS (VISTA AMPLIA Y CÓMODA) */}
+        {/* ========================================================================= */}
+        {tabPrincipal === 'catalogo' && (
+          <div className="space-y-4">
+            {/* Banner flotante si hay artículos en la remisión */}
+            {carrito.length > 0 && (
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-950 shadow-sm gap-2">
+                <div className="flex items-center gap-2.5">
+                  <ShoppingCart className="h-5 w-5 text-emerald-700 shrink-0" />
+                  <div>
+                    <p className="font-bold text-sm">
+                      Tienes {carrito.reduce((s, i) => s + i.cantidad, 0)} artículo(s) en la remisión ({formatCurrency(totalBruto)})
+                    </p>
+                    <p className="text-xs text-emerald-700">
+                      Continúa agregando productos o pasa al cierre de venta cuando estés listo.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => setTabPrincipal('pedido')}
+                  className="bg-emerald-700 hover:bg-emerald-800 text-white font-bold gap-1.5 text-xs shadow shrink-0"
+                >
+                  Ir a Cotizar / Cerrar Venta
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </div>
+            )}
+
+            <Card className="shadow-md border-slate-200">
+              <CardHeader className="pb-3">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                  <div>
+                    <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                      <Package className="h-5 w-5 text-blue-700" />
+                      Catálogo de Productos
+                    </CardTitle>
+                    <CardDescription>
+                      Seleccione artículos para agregarlos a la remisión o consulte existencias en sucursales
+                    </CardDescription>
+                  </div>
 
                     <Button
                       size="sm"
@@ -706,12 +869,12 @@ export default function KioscoVentasPage() {
                     ))}
                   </div>
 
-                  {/* Grid de Productos */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[560px] overflow-y-auto pr-1">
+                  {/* Grid de Productos - Diseño Amplio y Cómodo */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[640px] overflow-y-auto pr-1 pb-4">
                     {catalogoFiltrado.length === 0 ? (
-                      <div className="col-span-2 text-center py-12 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-gray-500 text-sm space-y-2">
-                        <Package className="h-8 w-8 mx-auto text-gray-400" />
-                        <p className="font-semibold text-gray-700">
+                      <div className="col-span-full text-center py-16 px-4 bg-slate-50 rounded-xl border border-dashed border-slate-300 text-gray-500 text-sm space-y-2">
+                        <Package className="h-10 w-10 mx-auto text-gray-400" />
+                        <p className="font-semibold text-gray-700 text-base">
                           No hay productos con existencia disponible en {sucursalActual?.nombre || 'esta sucursal'}.
                         </p>
                         <p className="text-xs text-gray-400">
@@ -723,203 +886,285 @@ export default function KioscoVentasPage() {
                     ) : (
                       catalogoFiltrado.map(prod => {
                         const stockDisp = obtenerStockSucursal(prod);
+                        const totalStockOtras = sucursales
+                          .filter(s => s.id !== (sucursalActual?.id || sucursalSeleccionada))
+                          .reduce((acc, s) => acc + obtenerStockSucursal(prod, s.id, s.nombre), 0);
+                        const cantEnCarrito = carrito.find(c => c.productoId === prod.id || c.concepto === prod.nombre)?.cantidad || 0;
+
                         return (
-                        <div
-                          key={prod.id}
-                          onClick={() => agregarAlCarrito(prod)}
-                          className="group border border-slate-200 rounded-xl p-3.5 bg-white hover:border-blue-500 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
-                        >
-                          <div>
-                            <div className="flex justify-between items-start gap-1 mb-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <Badge variant="outline" className="text-[10px] font-bold text-blue-800 bg-blue-50 border-blue-200">
-                                  {prod.categoria}
-                                </Badge>
-                                <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/80">
-                                  {sucursalActual?.nombre || 'SAN LUCAS'}
-                                </span>
-                                <span className="text-[10px] font-extrabold text-blue-800 bg-blue-100/70 px-1.5 py-0.5 rounded border border-blue-200">
-                                  📦 {stockDisp} disp.
-                                </span>
-                              </div>
-                              {prod.tamano && (
-                                <span className="text-[10px] text-gray-500 font-medium">
-                                  {prod.tamano}
-                                </span>
-                              )}
-                            </div>
-
-                            <h3 className="font-bold text-gray-900 text-sm line-clamp-1 group-hover:text-blue-700 transition-colors">
-                              {prod.nombre}
-                            </h3>
-
-                            <p className="text-[11px] text-gray-500 line-clamp-2 mt-0.5">
-                              {prod.descripcion || `Marca ${prod.marca} ${prod.modelo || ''}`}
-                            </p>
-                          </div>
-
-                          <div className="flex justify-between items-end mt-3 pt-2 border-t border-slate-100">
+                          <div
+                            key={prod.id}
+                            className="group border border-slate-200 hover:border-blue-400 rounded-xl p-3.5 bg-white shadow-sm hover:shadow-md transition-all flex flex-col justify-between"
+                          >
                             <div>
-                              <div className="text-xs text-gray-400 font-medium">
-                                {tipoVenta === 'credito' ? 'Precio Crédito' : 'Precio Contado'}
+                              <div className="flex justify-between items-start gap-1 mb-1.5 flex-wrap">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <Badge variant="outline" className="text-[10px] font-bold text-blue-800 bg-blue-50 border-blue-200">
+                                    {prod.categoria}
+                                  </Badge>
+                                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200/80">
+                                    {sucursalActual?.nombre || 'SAN LUCAS'}
+                                  </span>
+                                  <span className="text-[10px] font-extrabold text-blue-800 bg-blue-100/70 px-1.5 py-0.5 rounded border border-blue-200">
+                                    📦 {stockDisp} disp.
+                                  </span>
+                                  {totalStockOtras > 0 && (
+                                    <span className="text-[9px] font-semibold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200" title={`Hay ${totalStockOtras} piezas en otras sucursales`}>
+                                      🌐 {totalStockOtras} en red
+                                    </span>
+                                  )}
+                                </div>
+                                {prod.tamano && (
+                                  <span className="text-[10px] text-gray-500 font-medium">
+                                    {prod.tamano}
+                                  </span>
+                                )}
                               </div>
-                              <div className="text-base font-black text-gray-950">
-                                {formatCurrency(tipoVenta === 'credito' ? prod.precioVenta : prod.precioContado)}
-                              </div>
+
+                              <h3 className="font-bold text-gray-900 text-sm line-clamp-2 group-hover:text-blue-700 transition-colors">
+                                {prod.nombre}
+                              </h3>
+
+                              <p className="text-[11px] text-gray-500 line-clamp-2 mt-1">
+                                {prod.descripcion || `Marca ${prod.marca} ${prod.modelo || ''}`}
+                              </p>
                             </div>
 
-                            <Button
-                              size="sm"
-                              className="h-8 w-8 p-0 rounded-full bg-blue-50 text-blue-700 group-hover:bg-blue-700 group-hover:text-white transition-colors"
-                            >
-                              <Plus className="h-4 w-4" />
-                            </Button>
+                            <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-2.5">
+                              <div className="flex items-baseline justify-between">
+                                <div>
+                                  <div className="text-[10px] text-gray-400 font-medium">
+                                    {tipoVenta === 'credito' ? 'Precio Crédito' : 'Precio Contado'}
+                                  </div>
+                                  <div className="text-base font-black text-gray-950">
+                                    {formatCurrency(tipoVenta === 'credito' ? prod.precioVenta : prod.precioContado)}
+                                  </div>
+                                </div>
+                                {tipoVenta === 'credito' && (
+                                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
+                                    {formatCurrency(Math.ceil((prod.precioVenta - (prod.precioVenta * 0.1)) / 16))}/sem
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Botones de acción solicitados */}
+                              <div className="space-y-1.5 pt-0.5">
+                                <Button
+                                  size="sm"
+                                  onClick={() => agregarAlCarrito(prod)}
+                                  className="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold h-9 text-xs transition-colors gap-1.5 shadow-sm"
+                                >
+                                  <Plus className="h-4 w-4" />
+                                  {cantEnCarrito > 0 ? `Agregar más (${cantEnCarrito} en remisión)` : 'Agregar a la Remisión'}
+                                </Button>
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => abrirModalExistencias(prod)}
+                                  className="w-full bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-950 font-semibold h-8 text-xs transition-colors gap-1.5 border border-slate-300"
+                                >
+                                  <Boxes className="h-3.5 w-3.5 text-blue-600" />
+                                  Existencias y Traslado
+                                </Button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ); })
+                        );
+                      })
                     )}
                   </div>
                 </CardContent>
               </Card>
             </div>
+          )}
 
-            {/* PANEL DERECHO: CARRITO Y CONFIGURACIÓN DE CRÉDITO (5 columnas) */}
-            <div className="lg:col-span-5 space-y-4">
-              <Card className="shadow-lg border-blue-100 bg-white">
-                <CardHeader className="pb-3 border-b bg-slate-50/70 rounded-t-xl">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                      <ShoppingCart className="h-5 w-5 text-blue-700" />
-                      Remisión de Venta
-                    </CardTitle>
-                    <Badge variant="secondary" className="font-bold">
-                      {carrito.reduce((s, i) => s + i.cantidad, 0)} artículos
-                    </Badge>
-                  </div>
-
-                  {/* Sucursal Activa */}
-                  <div className="flex items-center justify-between mt-2 px-2.5 py-1.5 bg-blue-50 border border-blue-200/80 rounded-lg text-xs">
-                    <div className="flex items-center gap-1.5 text-blue-950 font-bold">
-                      <Store className="h-3.5 w-3.5 text-blue-700" />
-                      <span>Sucursal:</span>
-                    </div>
-                    <Select value={sucursalSeleccionada} onValueChange={handleCambiarSucursal}>
-                      <SelectTrigger className="h-6 text-xs bg-white border-blue-300 w-48 font-semibold px-2 py-0">
-                        <SelectValue placeholder="Seleccionar" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {sucursales.map(s => (
-                          <SelectItem key={s.id} value={s.id} className="text-xs font-medium">
-                            {s.nombre}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Selector Contado vs Crédito */}
-                  <div className="grid grid-cols-2 gap-2 mt-2 bg-slate-200/70 p-1 rounded-lg">
-                    <button
-                      type="button"
-                      onClick={() => setTipoVenta('credito')}
-                      className={`py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                        tipoVenta === 'credito'
-                          ? 'bg-blue-800 text-white shadow'
-                          : 'text-gray-700 hover:text-gray-950'
-                      }`}
+          {/* ========================================================================= */}
+          {/* PESTAÑA 2: COTIZAR / REMISIÓN Y CIERRE DE VENTA */}
+          {/* ========================================================================= */}
+          {tabPrincipal === 'pedido' && (
+            <div className="space-y-4">
+              {carrito.length === 0 ? (
+                <Card className="shadow-md border-slate-200">
+                  <CardContent className="py-16 text-center space-y-3">
+                    <ShoppingCart className="h-12 w-12 mx-auto text-slate-300" />
+                    <h3 className="text-base font-bold text-gray-800">No hay artículos en la remisión</h3>
+                    <p className="text-xs text-gray-500 max-w-sm mx-auto">
+                      Selecciona productos desde el catálogo para agregarlos a esta remisión de venta o cotización.
+                    </p>
+                    <Button
+                      onClick={() => setTabPrincipal('catalogo')}
+                      className="bg-blue-800 hover:bg-blue-900 text-white font-bold gap-1.5 text-xs shadow mt-2"
                     >
-                      <CreditCard className="h-3.5 w-3.5" />
-                      Levantamiento Crédito
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipoVenta('contado')}
-                      className={`py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                        tipoVenta === 'contado'
-                          ? 'bg-emerald-700 text-white shadow'
-                          : 'text-gray-700 hover:text-gray-950'
-                      }`}
-                    >
-                      <DollarSign className="h-3.5 w-3.5" />
-                      Venta de Contado
-                    </button>
-                  </div>
-                </CardHeader>
-
-                <CardContent className="p-4 space-y-4">
-                  {/* LISTA DE ARTÍCULOS EN EL CARRITO */}
-                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-                    {carrito.length === 0 ? (
-                      <div className="text-center py-6 text-gray-400 text-xs font-medium border border-dashed rounded-lg">
-                        Seleccione productos del catálogo para agregarlos aquí
-                      </div>
-                    ) : (
-                      carrito.map((item, idx) => (
-                        <div
-                          key={idx}
-                          className="flex items-center justify-between p-2 rounded-lg bg-slate-50 border border-slate-200 text-xs gap-2"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-gray-900 truncate">
-                              {item.concepto}
-                            </p>
-                            <div className="flex items-center gap-1.5 text-gray-500 mt-0.5">
-                              <span>Precio:</span>
-                              <input
-                                type="number"
-                                value={item.precioUnitario}
-                                onChange={e => modificarPrecio(idx, parseFloat(e.target.value))}
-                                className="w-20 px-1 py-0.5 border rounded text-right font-medium text-gray-900"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Control de cantidad */}
-                          <div className="flex items-center gap-1">
+                      <Package className="h-4 w-4" />
+                      Ir al Catálogo de Productos
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+                  {/* PANEL IZQUIERDO: DETALLE DE ARTÍCULOS EN REMISIÓN (7 columnas) */}
+                  <div className="lg:col-span-7 space-y-4">
+                    <Card className="shadow-md border-slate-200">
+                      <CardHeader className="pb-3 border-b bg-slate-50/70">
+                        <div className="flex justify-between items-center">
+                          <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                            <ShoppingCart className="h-4 w-4 text-blue-700" />
+                            Artículos en la Remisión ({carrito.reduce((s, i) => s + i.cantidad, 0)})
+                          </CardTitle>
+                          <div className="flex items-center gap-2">
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => modificarCantidad(idx, -1)}
-                              className="h-6 w-6 p-0 rounded"
+                              onClick={() => setTabPrincipal('catalogo')}
+                              className="text-xs text-blue-700 border-blue-200 hover:bg-blue-50 h-7 font-semibold"
                             >
-                              <Minus className="h-3 w-3" />
+                              + Agregar más
                             </Button>
-                            <span className="font-bold w-6 text-center text-sm">
-                              {item.cantidad}
-                            </span>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => modificarCantidad(idx, 1)}
-                              className="h-6 w-6 p-0 rounded"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </Button>
-                          </div>
-
-                          <div className="text-right min-w-[65px]">
-                            <div className="font-black text-gray-950 text-xs">
-                              {formatCurrency(item.importe)}
-                            </div>
                             <button
-                              onClick={() => eliminarDelCarrito(idx)}
-                              className="text-red-500 hover:text-red-700 text-[10px] mt-0.5"
+                              onClick={() => setCarrito([])}
+                              className="text-xs text-rose-600 hover:underline font-semibold"
                             >
-                              Quitar
+                              Vaciar
                             </button>
                           </div>
                         </div>
-                      ))
-                    )}
+                      </CardHeader>
+                      <CardContent className="p-4 space-y-3">
+                        <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                          {carrito.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs gap-3"
+                            >
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-gray-900 text-sm truncate">
+                                  {item.concepto}
+                                </p>
+                                <div className="flex items-center gap-2 text-gray-500 mt-1">
+                                  <span>Precio Unitario:</span>
+                                  <input
+                                    type="number"
+                                    value={item.precioUnitario}
+                                    onChange={e => modificarPrecio(idx, parseFloat(e.target.value))}
+                                    className="w-24 px-2 py-0.5 border rounded text-right font-bold text-gray-900 bg-white"
+                                  />
+                                </div>
+                              </div>
+
+                              {/* Control de cantidad */}
+                              <div className="flex items-center gap-1.5 bg-white border rounded-lg p-1">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => modificarCantidad(idx, -1)}
+                                  className="h-6 w-6 p-0 rounded hover:bg-slate-100"
+                                >
+                                  <Minus className="h-3 w-3" />
+                                </Button>
+                                <span className="font-black w-7 text-center text-sm">
+                                  {item.cantidad}
+                                </span>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={() => modificarCantidad(idx, 1)}
+                                  className="h-6 w-6 p-0 rounded hover:bg-slate-100"
+                                >
+                                  <Plus className="h-3 w-3" />
+                                </Button>
+                              </div>
+
+                              <div className="text-right min-w-[80px]">
+                                <div className="font-black text-gray-950 text-sm">
+                                  {formatCurrency(item.importe)}
+                                </div>
+                                <button
+                                  onClick={() => eliminarDelCarrito(idx)}
+                                  className="text-rose-500 hover:text-rose-700 text-[11px] font-semibold mt-0.5"
+                                >
+                                  Eliminar
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Banner de Total */}
+                        <div className="bg-blue-50 border border-blue-200 p-3 rounded-xl flex justify-between items-center mt-2">
+                          <span className="font-bold text-blue-950 text-sm">Total de la Remisión:</span>
+                          <span className="font-black text-2xl text-blue-900">
+                            {formatCurrency(totalBruto)}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
 
-                  {/* TOTAL */}
-                  <div className="bg-slate-100 p-3 rounded-lg flex justify-between items-center">
-                    <span className="font-bold text-gray-700 text-sm">Total de la Venta:</span>
-                    <span className="font-black text-xl text-blue-900">
-                      {formatCurrency(totalBruto)}
-                    </span>
-                  </div>
+                  {/* PANEL DERECHO: VENDEDOR, CLIENTE Y CIERRE (5 columnas) */}
+                  <div className="lg:col-span-5 space-y-4">
+                    <Card className="shadow-lg border-blue-100 bg-white">
+                      <CardHeader className="pb-3 border-b bg-slate-50/70 rounded-t-xl">
+                        <div className="flex justify-between items-center">
+                          <CardTitle className="text-base font-bold text-gray-900 flex items-center gap-2">
+                            <Store className="h-4 w-4 text-blue-700" />
+                            Emisión y Condiciones
+                          </CardTitle>
+                          <Badge variant="secondary" className="font-bold text-xs">
+                            Total: {formatCurrency(totalBruto)}
+                          </Badge>
+                        </div>
+
+                        {/* Sucursal Activa */}
+                        <div className="flex items-center justify-between mt-2 px-2.5 py-1.5 bg-blue-50 border border-blue-200/80 rounded-lg text-xs">
+                          <div className="flex items-center gap-1.5 text-blue-950 font-bold">
+                            <Store className="h-3.5 w-3.5 text-blue-700" />
+                            <span>Sucursal:</span>
+                          </div>
+                          <Select value={sucursalSeleccionada} onValueChange={handleCambiarSucursal}>
+                            <SelectTrigger className="h-6 text-xs bg-white border-blue-300 w-48 font-semibold px-2 py-0">
+                              <SelectValue placeholder="Seleccionar" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {sucursales.map(s => (
+                                <SelectItem key={s.id} value={s.id} className="text-xs font-medium">
+                                  {s.nombre}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {/* Selector Contado vs Crédito */}
+                        <div className="grid grid-cols-2 gap-2 mt-2 bg-slate-200/70 p-1 rounded-lg">
+                          <button
+                            type="button"
+                            onClick={() => setTipoVenta('credito')}
+                            className={`py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                              tipoVenta === 'credito'
+                                ? 'bg-blue-800 text-white shadow'
+                                : 'text-gray-700 hover:text-gray-950'
+                            }`}
+                          >
+                            <CreditCard className="h-3.5 w-3.5" />
+                            Levantamiento Crédito
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setTipoVenta('contado')}
+                            className={`py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+                              tipoVenta === 'contado'
+                                ? 'bg-emerald-700 text-white shadow'
+                                : 'text-gray-700 hover:text-gray-950'
+                            }`}
+                          >
+                            <DollarSign className="h-3.5 w-3.5" />
+                            Venta de Contado
+                          </button>
+                        </div>
+                      </CardHeader>
+
+                      <CardContent className="p-4 space-y-4">
 
                   {/* SELECCIÓN DE VENDEDOR DE MOSTRADOR */}
                   <div className="bg-slate-50 border border-slate-200 p-2.5 rounded-lg space-y-1.5">
@@ -1187,12 +1432,18 @@ export default function KioscoVentasPage() {
                       : 'Completar Venta e Imprimir Remisión'}
                   </Button>
                 </CardContent>
-              </Card>
+                    </Card>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        ) : (
-          /* TAB DE HISTORIAL DE VENTAS Y REIMPRESIONES */
-          <Card className="shadow-md">
+          )}
+
+          {/* ========================================================================= */}
+          {/* PESTAÑA 3: HISTORIAL DE VENTAS Y REIMPRESIONES */}
+          {/* ========================================================================= */}
+          {tabPrincipal === 'historial' && (
+            <Card className="shadow-md">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-lg font-bold text-gray-900">
@@ -1371,6 +1622,227 @@ export default function KioscoVentasPage() {
             isAdmin={['admin', 'gestor_cobranza'].includes((session?.user as any)?.role?.toLowerCase())}
             userRole={(session?.user as any)?.role}
           />
+        )}
+
+        {/* MODAL DE EXISTENCIAS Y TRASLADO ENTRE SUCURSALES */}
+        {productoSeleccionadoExistencias && (
+          <Dialog open={modalExistenciasOpen} onOpenChange={setModalExistenciasOpen}>
+            <DialogContent className="max-w-lg w-[95vw] bg-white text-slate-900 p-5 rounded-2xl max-h-[90vh] overflow-y-auto shadow-2xl border-slate-200">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-lg font-bold text-gray-900">
+                  <Boxes className="w-5 h-5 text-blue-700" />
+                  Existencias y Traslado entre Sucursales
+                </DialogTitle>
+                <DialogDescription className="text-xs text-gray-500">
+                  Consulta el inventario disponible en toda la red y solicita traslado inmediato a tu sucursal.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 my-2">
+                {/* Resumen del Producto */}
+                <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-mono text-blue-700 font-bold bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                      {productoSeleccionadoExistencias.codigo}
+                    </span>
+                    <Badge variant="outline" className="text-xs font-semibold">
+                      {productoSeleccionadoExistencias.categoria}
+                    </Badge>
+                  </div>
+                  <h4 className="font-bold text-gray-900 text-base leading-snug">
+                    {productoSeleccionadoExistencias.nombre}
+                  </h4>
+                  <p className="text-xs text-gray-500">
+                    {productoSeleccionadoExistencias.descripcion || `Marca ${productoSeleccionadoExistencias.marca}`}
+                  </p>
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-xs">
+                    <span className="text-gray-600">
+                      Precio Contado: <strong className="text-gray-900 text-sm">{formatCurrency(productoSeleccionadoExistencias.precioContado)}</strong>
+                    </span>
+                    <span className="text-gray-600">
+                      Precio Crédito: <strong className="text-emerald-700 text-sm">{formatCurrency(productoSeleccionadoExistencias.precioVenta)}</strong>
+                    </span>
+                  </div>
+                </div>
+
+                {/* Tu Sucursal Actual */}
+                <div className="p-3.5 rounded-xl bg-blue-50/60 border border-blue-200">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span className="text-blue-900 font-bold flex items-center gap-1.5">
+                      <Building2 className="w-4 h-4 text-blue-700" /> Tu Sucursal Actual
+                    </span>
+                    <span className="font-extrabold text-blue-950 text-xs bg-blue-100/80 px-2 py-0.5 rounded">
+                      {sucursalActual?.nombre || 'SAN LUCAS'}
+                    </span>
+                  </div>
+                  {(() => {
+                    const stockLocal = obtenerStockSucursal(productoSeleccionadoExistencias);
+                    return stockLocal > 0 ? (
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-200/80">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                          <CheckCircle className="w-4 h-4" /> {stockLocal} pieza(s) disponible(s) en piso
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded">
+                          Entrega Inmediata
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-blue-200/80">
+                        <span className="inline-flex items-center gap-1.5 text-xs font-bold text-rose-600">
+                          <AlertTriangle className="w-4 h-4" /> Sin existencias en esta tienda
+                        </span>
+                        <span className="text-[11px] font-semibold text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded">
+                          Solicita traslado abajo
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Disponibilidad en Otras Sucursales */}
+                <div className="space-y-2.5">
+                  <h5 className="text-xs font-bold text-gray-700 uppercase tracking-wider flex items-center gap-1.5">
+                    <Truck className="w-4 h-4 text-blue-700" /> Disponibilidad en Otras Sucursales
+                  </h5>
+
+                  {sucursales
+                    .filter(s => s.id !== (sucursalActual?.id || sucursalSeleccionada))
+                    .map(suc => {
+                      const stockSuc = obtenerStockSucursal(productoSeleccionadoExistencias, suc.id, suc.nombre);
+                      const isSelected = origenTraspasoSeleccionado?.id === suc.id;
+
+                      return (
+                        <div
+                          key={suc.id || suc.nombre}
+                          className={`p-3.5 rounded-xl border transition-all ${
+                            isSelected
+                              ? 'bg-blue-50/50 border-blue-500 shadow-sm'
+                              : 'bg-white border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <p className="font-bold text-xs text-gray-900 flex items-center gap-1.5">
+                                {suc.nombre}
+                                {suc.esBodega && (
+                                  <span className="text-[9px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded border border-purple-200 font-bold">
+                                    BODEGA
+                                  </span>
+                                )}
+                              </p>
+                              {suc.direccion && (
+                                <p className="text-[11px] text-gray-500 line-clamp-1 mt-0.5">{suc.direccion}</p>
+                              )}
+                            </div>
+
+                            <div className="text-right flex-shrink-0">
+                              {stockSuc > 0 ? (
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200">
+                                  {stockSuc} disp.
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                                  Agotado
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Botón de acción para solicitar traslado */}
+                          {stockSuc > 0 && (
+                            <div className="mt-2.5 pt-2 border-t border-slate-100 flex items-center justify-between">
+                              <span className="text-xs text-gray-500">
+                                {isSelected ? 'Configura la cantidad:' : '¿Requieres este producto aquí?'}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant={isSelected ? 'default' : 'outline'}
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setOrigenTraspasoSeleccionado(null);
+                                  } else {
+                                    setOrigenTraspasoSeleccionado(suc);
+                                    setCantidadTraspaso(1);
+                                  }
+                                }}
+                                className={`h-8 text-xs font-bold gap-1.5 px-3 ${
+                                  isSelected
+                                    ? 'bg-blue-700 hover:bg-blue-800 text-white'
+                                    : 'border-blue-200 text-blue-700 hover:bg-blue-50'
+                                }`}
+                              >
+                                <ArrowRightLeft className="w-3.5 h-3.5" />
+                                {isSelected ? 'Cerrar Solicitud' : 'Solicitar Traslado'}
+                              </Button>
+                            </div>
+                          )}
+
+                          {/* Formulario desplegado si la sucursal está seleccionada */}
+                          {isSelected && stockSuc > 0 && (
+                            <div className="mt-3 p-3.5 rounded-xl bg-slate-50 border border-blue-200 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <label className="text-xs font-semibold text-gray-700">
+                                  Cantidad a trasladar (máx {stockSuc}):
+                                </label>
+                                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-1">
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setCantidadTraspaso(Math.max(1, cantidadTraspaso - 1))}
+                                    disabled={cantidadTraspaso <= 1}
+                                    className="w-7 h-7 p-0"
+                                  >
+                                    <Minus className="w-3.5 h-3.5" />
+                                  </Button>
+                                  <span className="font-black text-gray-900 text-sm w-7 text-center">
+                                    {cantidadTraspaso}
+                                  </span>
+                                  <Button
+                                    size="sm"
+                                    variant="ghost"
+                                    onClick={() => setCantidadTraspaso(Math.min(stockSuc, cantidadTraspaso + 1))}
+                                    disabled={cantidadTraspaso >= stockSuc}
+                                    className="w-7 h-7 p-0"
+                                  >
+                                    <Plus className="w-3.5 h-3.5" />
+                                  </Button>
+                                </div>
+                              </div>
+
+                              <div className="space-y-2 pt-1">
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleRegistrarTraspaso(suc, cantidadTraspaso)}
+                                  disabled={procesandoTraspaso}
+                                  className="w-full bg-blue-700 hover:bg-blue-800 text-white font-bold h-9 text-xs gap-1.5 shadow"
+                                >
+                                  {procesandoTraspaso ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Truck className="w-4 h-4" />
+                                  )}
+                                  {procesandoTraspaso ? 'Registrando Traslado...' : `Registrar Traslado en Sistema (${cantidadTraspaso} pza)`}
+                                </Button>
+
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleCompartirTraspasoWhatsApp(suc, cantidadTraspaso)}
+                                  className="w-full bg-emerald-50 hover:bg-emerald-100 border-emerald-300 text-emerald-800 font-semibold h-8 text-xs gap-1.5"
+                                >
+                                  <MessageCircle className="w-4 h-4 text-emerald-600" />
+                                  Enviar Solicitud por WhatsApp
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         )}
       </div>
     </DashboardLayout>
