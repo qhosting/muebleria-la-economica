@@ -35,6 +35,7 @@ async function asegurarCatalogoInicial() {
         for (const item of CATALOGO_PRODUCTOS_INICIAL) {
             const pContado = item.precioContado || item.precioVenta;
             const p12M = item.precioVenta;
+            const p1M = item.precio1Mes || Math.round(pContado * 1.05);
             const p4M = item.precio4Meses || Math.round(pContado * 1.15);
             const desc = (item.descripcion || `Marca ${item.marca} ${item.modelo || ''}`.trim()).toUpperCase();
 
@@ -45,6 +46,7 @@ async function asegurarCatalogoInicial() {
                     categoria: item.categoria,
                     precioCompra: pContado,
                     precioContado: pContado,
+                    precio1Mes: p1M,
                     precio4Meses: p4M,
                     precio12Meses: p12M,
                     precioVenta: p12M,
@@ -58,6 +60,7 @@ async function asegurarCatalogoInicial() {
                     categoria: item.categoria,
                     precioCompra: pContado,
                     precioContado: pContado,
+                    precio1Mes: p1M,
                     precio4Meses: p4M,
                     precio12Meses: p12M,
                     precioVenta: p12M,
@@ -154,10 +157,12 @@ export async function GET(request: NextRequest) {
             const pCompra = producto.precioCompra ? Math.round(parseFloat(producto.precioCompra.toString())) : 0;
             const pVenta = producto.precioVenta ? Math.round(parseFloat(producto.precioVenta.toString())) : 0;
             const pContado = producto.precioContado != null ? Math.round(parseFloat(producto.precioContado.toString())) : pCompra;
+            const p1M = producto.precio1Mes != null ? Math.round(parseFloat(producto.precio1Mes.toString())) : 0;
             const p4M = producto.precio4Meses != null ? Math.round(parseFloat(producto.precio4Meses.toString())) : 0;
             const p12M = producto.precio12Meses != null ? Math.round(parseFloat(producto.precio12Meses.toString())) : pVenta;
 
             // Enganche del 40% fijo según el precio (sin decimales)
+            const enganche1Mes = Math.round(p1M * 0.40);
             const enganche4Meses = Math.round(p4M * 0.40);
             const enganche12Meses = Math.round(p12M * 0.40);
 
@@ -168,8 +173,10 @@ export async function GET(request: NextRequest) {
                 precioCompra: pCompra,
                 precioVenta: pVenta,
                 precioContado: pContado,
+                precio1Mes: p1M,
                 precio4Meses: p4M,
                 precio12Meses: p12M,
+                enganche1Mes,
                 enganche4Meses,
                 enganche12Meses,
                 stockTotal,
@@ -264,6 +271,7 @@ export async function POST(request: NextRequest) {
             categoria,
             precioCompra,
             precioContado,
+            precio1Mes,
             precio4Meses,
             precio12Meses,
             precioVenta,
@@ -283,6 +291,7 @@ export async function POST(request: NextRequest) {
 
         const pCompra = Math.round(parseFloat(precioCompra) || 0);
         const pContado = precioContado !== undefined && precioContado !== '' ? Math.round(parseFloat(precioContado)) : pCompra;
+        const p1M = precio1Mes !== undefined && precio1Mes !== '' ? Math.round(parseFloat(precio1Mes)) : 0;
         const p4M = precio4Meses !== undefined && precio4Meses !== '' ? Math.round(parseFloat(precio4Meses)) : 0;
         const p12M = precio12Meses !== undefined && precio12Meses !== '' ? Math.round(parseFloat(precio12Meses)) : Math.round(parseFloat(precioVenta) || 0);
         const pVenta = p12M || Math.round(parseFloat(precioVenta) || 0) || pContado;
@@ -309,6 +318,7 @@ export async function POST(request: NextRequest) {
                 categoria: categoria || 'Otros',
                 precioCompra: pCompra,
                 precioContado: pContado,
+                precio1Mes: p1M,
                 precio4Meses: p4M,
                 precio12Meses: p12M,
                 precioVenta: pVenta,
@@ -369,6 +379,7 @@ export async function PUT(request: NextRequest) {
             categoria,
             precioCompra,
             precioContado,
+            precio1Mes,
             precio4Meses,
             precio12Meses,
             precioVenta,
@@ -389,6 +400,7 @@ export async function PUT(request: NextRequest) {
         if (categoria) updateData.categoria = categoria;
         if (precioCompra !== undefined) updateData.precioCompra = Math.round(parseFloat(precioCompra) || 0);
         if (precioContado !== undefined) updateData.precioContado = Math.round(parseFloat(precioContado) || 0);
+        if (precio1Mes !== undefined) updateData.precio1Mes = Math.round(parseFloat(precio1Mes) || 0);
         if (precio4Meses !== undefined) updateData.precio4Meses = Math.round(parseFloat(precio4Meses) || 0);
         if (precio12Meses !== undefined) {
             updateData.precio12Meses = Math.round(parseFloat(precio12Meses) || 0);

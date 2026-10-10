@@ -58,6 +58,7 @@ export interface CatalogoItem {
   descripcion?: string;
   precioVenta: number;
   precioContado: number;
+  precio1Mes?: number;
   precio4Meses?: number;
   precio12Meses?: number;
   engancheFijo?: number;

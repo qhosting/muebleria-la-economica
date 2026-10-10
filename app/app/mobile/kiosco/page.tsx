@@ -994,8 +994,9 @@ export default function MobileKioscoPage() {
                         <span className="text-slate-400 font-semibold">Plazo del Crédito:</span>
                         <span className="font-bold text-amber-400">{plazoSemanas} Semanas ({Math.round(plazoSemanas / 4.3)} meses)</span>
                       </div>
-                      <div className="grid grid-cols-5 gap-1 text-xs font-bold">
+                      <div className="grid grid-cols-6 gap-1 text-xs font-bold">
                         {[
+                          { sem: 4, label: '1 Mes' },
                           { sem: 13, label: '3 Meses' },
                           { sem: 17, label: '4 Meses' },
                           { sem: 26, label: '6 Meses' },

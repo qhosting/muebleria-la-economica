@@ -1335,6 +1335,7 @@ export default function KioscoVentasPage() {
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
+                              <SelectItem value="4">4 semanas (1 mes)</SelectItem>
                               <SelectItem value="13">13 semanas (3 meses)</SelectItem>
                               <SelectItem value="17">17 semanas (4 meses)</SelectItem>
                               <SelectItem value="26">26 semanas (6 meses)</SelectItem>

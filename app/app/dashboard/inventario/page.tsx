@@ -305,6 +305,12 @@ export default function InventarioPage() {
                                                                     <span className="font-bold text-blue-900">{formatCurrency(producto.precioContado || producto.precioCompra)}</span>
                                                                 </div>
                                                                 <div className="flex items-center justify-between gap-2">
+                                                                    <span className="text-gray-500 font-medium">1 Mes:</span>
+                                                                    <span className="font-semibold text-amber-900">
+                                                                        {producto.precio1Mes > 0 ? formatCurrency(producto.precio1Mes) : 'N/D'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between gap-2">
                                                                     <span className="text-gray-500 font-medium">4 Meses:</span>
                                                                     <span className="font-semibold text-purple-900">
                                                                         {producto.precio4Meses > 0 ? formatCurrency(producto.precio4Meses) : 'N/D'}
@@ -316,9 +322,10 @@ export default function InventarioPage() {
                                                                         {formatCurrency(producto.precio12Meses || producto.precioVenta)}
                                                                     </span>
                                                                 </div>
-                                                                <div className="text-[10px] text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded font-semibold mt-1 border border-amber-200/60">
+                                                                <div className="text-[10px] text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded font-semibold mt-1 border border-amber-200/60 leading-tight">
                                                                     Eng. 40%: {formatCurrency(Math.round(((producto.precio12Meses || producto.precioVenta) || 0) * 0.40))} (12M)
-                                                                    {producto.precio4Meses > 0 ? ` / ${formatCurrency(Math.round(producto.precio4Meses * 0.40))} (4M)` : ''}
+                                                                    {producto.precio4Meses > 0 ? ` · ${formatCurrency(Math.round(producto.precio4Meses * 0.40))} (4M)` : ''}
+                                                                    {producto.precio1Mes > 0 ? ` · ${formatCurrency(Math.round(producto.precio1Mes * 0.40))} (1M)` : ''}
                                                                 </div>
                                                             </div>
                                                         </td>

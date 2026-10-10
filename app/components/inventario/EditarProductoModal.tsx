@@ -35,6 +35,7 @@ export function EditarProductoModal({
         categoria: '',
         precioCompra: '',
         precioContado: '',
+        precio1Mes: '',
         precio4Meses: '',
         precio12Meses: '',
         precioVenta: '',
@@ -54,6 +55,9 @@ export function EditarProductoModal({
             const pCompra = parseEntero(producto.precioCompra, '0');
             const pContado = parseEntero(producto.precioContado, pCompra);
             const p12M = parseEntero(producto.precio12Meses, parseEntero(producto.precioVenta, '0'));
+            const p1M = producto.precio1Mes != null && producto.precio1Mes !== '' && producto.precio1Mes !== 0
+                ? parseEntero(producto.precio1Mes, '')
+                : '';
             const p4M = producto.precio4Meses != null && producto.precio4Meses !== '' && producto.precio4Meses !== 0
                 ? parseEntero(producto.precio4Meses, '')
                 : '';
@@ -66,6 +70,7 @@ export function EditarProductoModal({
                 categoria: producto.categoria || 'Muebles',
                 precioCompra: pCompra,
                 precioContado: pContado,
+                precio1Mes: p1M,
                 precio4Meses: p4M,
                 precio12Meses: p12M,
                 precioVenta: p12M || pContado,
@@ -77,6 +82,10 @@ export function EditarProductoModal({
     }, [producto]);
 
     // Cálculos de enganche fijo al 40% según precio (sin decimales)
+    const numPrecio1M = Math.round(parseFloat(formData.precio1Mes) || 0);
+    const enganche1M = Math.round(numPrecio1M * 0.40);
+    const saldo1M = Math.max(0, numPrecio1M - enganche1M);
+
     const numPrecio4M = Math.round(parseFloat(formData.precio4Meses) || 0);
     const enganche4M = Math.round(numPrecio4M * 0.40);
     const saldo4M = Math.max(0, numPrecio4M - enganche4M);
@@ -109,6 +118,7 @@ export function EditarProductoModal({
             descripcion: formData.descripcion ? formData.descripcion.trim().toUpperCase() : '',
             precioCompra: Math.round(parseFloat(formData.precioCompra) || 0),
             precioContado: pContado,
+            precio1Mes: Math.round(parseFloat(formData.precio1Mes) || 0),
             precio4Meses: Math.round(parseFloat(formData.precio4Meses) || 0),
             precio12Meses: p12M,
             precioVenta: p12M || pContado
@@ -151,7 +161,7 @@ export function EditarProductoModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[680px] max-h-[92vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[720px] max-h-[92vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
                         <Tag className="h-5 w-5 text-blue-700" />
@@ -274,8 +284,44 @@ export function EditarProductoModal({
                             </div>
                         </div>
 
-                        {/* Fila 2: 4 Meses y 12 Meses (con Enganche 40% calculado) */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Fila 2: Planes a Crédito: 1 Mes, 4 Meses y 12 Meses (con Enganche 40% fijo calculado) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            {/* Precio 1 Mes */}
+                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-amber-200 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="edit-precio1Mes" className="text-xs font-bold text-amber-900">
+                                        Precio 1 Mes ($)
+                                    </Label>
+                                    <span className="text-[10px] text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded font-semibold">
+                                        1 Mes
+                                    </span>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-amber-600 font-bold">$</span>
+                                    <Input
+                                        id="edit-precio1Mes"
+                                        name="precio1Mes"
+                                        type="number"
+                                        step="1"
+                                        min="0"
+                                        value={formData.precio1Mes}
+                                        onChange={handleChange}
+                                        placeholder="0"
+                                        className="pl-7 text-base font-bold text-amber-900"
+                                    />
+                                </div>
+                                <div className="mt-1 bg-amber-50/80 border border-amber-100 rounded-md p-1.5 text-[11px] space-y-0.5">
+                                    <div className="flex justify-between items-center text-amber-950 font-bold">
+                                        <span>Enganche (40%):</span>
+                                        <span>{formatCurrency(enganche1M)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-gray-500 text-[10px]">
+                                        <span>Saldo a 1 mes:</span>
+                                        <span>{formatCurrency(saldo1M)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Precio 4 Meses */}
                             <div className="grid gap-1 bg-white p-3 rounded-lg border border-purple-200 shadow-xs">
                                 <div className="flex items-center justify-between">
@@ -283,7 +329,7 @@ export function EditarProductoModal({
                                         Precio 4 Meses ($)
                                     </Label>
                                     <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded font-semibold">
-                                        Crédito Corto
+                                        4 Meses
                                     </span>
                                 </div>
                                 <div className="relative">
@@ -302,7 +348,7 @@ export function EditarProductoModal({
                                 </div>
                                 <div className="mt-1 bg-purple-50/80 border border-purple-100 rounded-md p-1.5 text-[11px] space-y-0.5">
                                     <div className="flex justify-between items-center text-purple-950 font-bold">
-                                        <span>Enganche (40% fijo):</span>
+                                        <span>Enganche (40%):</span>
                                         <span>{formatCurrency(enganche4M)}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-gray-500 text-[10px]">
@@ -319,7 +365,7 @@ export function EditarProductoModal({
                                         Precio 12 Meses ($)
                                     </Label>
                                     <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-semibold">
-                                        Precio Lista Crédito
+                                        12 Meses
                                     </span>
                                 </div>
                                 <div className="relative">
@@ -339,7 +385,7 @@ export function EditarProductoModal({
                                 </div>
                                 <div className="mt-1 bg-emerald-50/80 border border-emerald-100 rounded-md p-1.5 text-[11px] space-y-0.5">
                                     <div className="flex justify-between items-center text-emerald-950 font-bold">
-                                        <span>Enganche (40% fijo):</span>
+                                        <span>Enganche (40%):</span>
                                         <span>{formatCurrency(enganche12M)}</span>
                                     </div>
                                     <div className="flex justify-between items-center text-gray-500 text-[10px]">
