@@ -30,12 +30,12 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
         sucursalId: 'todas'
     });
 
-    // Cálculos de enganche fijo al 40% según precio
-    const numPrecio4M = parseFloat(formData.precio4Meses) || 0;
+    // Cálculos de enganche fijo al 40% según precio (sin decimales)
+    const numPrecio4M = Math.round(parseFloat(formData.precio4Meses) || 0);
     const enganche4M = Math.round(numPrecio4M * 0.40);
     const saldo4M = Math.max(0, numPrecio4M - enganche4M);
 
-    const numPrecio12M = parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0;
+    const numPrecio12M = Math.round(parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0);
     const enganche12M = Math.round(numPrecio12M * 0.40);
     const saldo12M = Math.max(0, numPrecio12M - enganche12M);
 
@@ -43,10 +43,10 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
         e.preventDefault();
         setLoading(true);
 
-        const pCompra = parseFloat(formData.precioCompra) || 0;
-        const pContado = parseFloat(formData.precioContado) || pCompra;
-        const p4M = parseFloat(formData.precio4Meses) || 0;
-        const p12M = parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0;
+        const pCompra = Math.round(parseFloat(formData.precioCompra) || 0);
+        const pContado = Math.round(parseFloat(formData.precioContado) || pCompra);
+        const p4M = Math.round(parseFloat(formData.precio4Meses) || 0);
+        const p12M = Math.round(parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0);
 
         const payload = {
             ...formData,
@@ -191,8 +191,8 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                                     name="precioCompra"
                                     type="number"
                                     min="0"
-                                    step="0.01"
-                                    placeholder="0.00"
+                                    step="1"
+                                    placeholder="0"
                                     value={formData.precioCompra}
                                     onChange={handleChange}
                                     className="font-bold text-gray-800"
@@ -207,9 +207,9 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                                     name="precioContado"
                                     type="number"
                                     min="0"
-                                    step="0.01"
+                                    step="1"
                                     required
-                                    placeholder="0.00"
+                                    placeholder="0"
                                     value={formData.precioContado}
                                     onChange={handleChange}
                                     className="font-black text-blue-900"
@@ -227,8 +227,8 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                                     name="precio4Meses"
                                     type="number"
                                     min="0"
-                                    step="0.01"
-                                    placeholder="0.00"
+                                    step="1"
+                                    placeholder="0"
                                     value={formData.precio4Meses}
                                     onChange={handleChange}
                                     className="font-bold text-purple-900"
@@ -252,9 +252,9 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                                     name="precio12Meses"
                                     type="number"
                                     min="0"
-                                    step="0.01"
+                                    step="1"
                                     required
-                                    placeholder="0.00"
+                                    placeholder="0"
                                     value={formData.precio12Meses}
                                     onChange={handleChange}
                                     className="font-black text-emerald-800"

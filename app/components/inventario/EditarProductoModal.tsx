@@ -45,14 +45,18 @@ export function EditarProductoModal({
 
     useEffect(() => {
         if (producto) {
-            const pCompra = producto.precioCompra != null ? producto.precioCompra.toString() : '0';
-            const pContado = producto.precioContado != null && producto.precioContado !== ''
-                ? producto.precioContado.toString()
-                : (producto.precioCompra != null ? producto.precioCompra.toString() : '0');
-            const p12M = producto.precio12Meses != null && producto.precio12Meses !== ''
-                ? producto.precio12Meses.toString()
-                : (producto.precioVenta != null ? producto.precioVenta.toString() : '0');
-            const p4M = producto.precio4Meses != null ? producto.precio4Meses.toString() : '';
+            const parseEntero = (val: any, def: string = '0') => {
+                if (val == null || val === '') return def;
+                const n = Math.round(parseFloat(val.toString()));
+                return isNaN(n) ? def : n.toString();
+            };
+
+            const pCompra = parseEntero(producto.precioCompra, '0');
+            const pContado = parseEntero(producto.precioContado, pCompra);
+            const p12M = parseEntero(producto.precio12Meses, parseEntero(producto.precioVenta, '0'));
+            const p4M = producto.precio4Meses != null && producto.precio4Meses !== '' && producto.precio4Meses !== 0
+                ? parseEntero(producto.precio4Meses, '')
+                : '';
 
             setFormData({
                 id: producto.id || '',
@@ -72,12 +76,12 @@ export function EditarProductoModal({
         }
     }, [producto]);
 
-    // Cálculos de enganche fijo al 40% según precio
-    const numPrecio4M = parseFloat(formData.precio4Meses) || 0;
+    // Cálculos de enganche fijo al 40% según precio (sin decimales)
+    const numPrecio4M = Math.round(parseFloat(formData.precio4Meses) || 0);
     const enganche4M = Math.round(numPrecio4M * 0.40);
     const saldo4M = Math.max(0, numPrecio4M - enganche4M);
 
-    const numPrecio12M = parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0;
+    const numPrecio12M = Math.round(parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0);
     const enganche12M = Math.round(numPrecio12M * 0.40);
     const saldo12M = Math.max(0, numPrecio12M - enganche12M);
 
@@ -88,8 +92,8 @@ export function EditarProductoModal({
             return;
         }
 
-        const pContado = parseFloat(formData.precioContado) || parseFloat(formData.precioCompra) || 0;
-        const p12M = parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0;
+        const pContado = Math.round(parseFloat(formData.precioContado) || parseFloat(formData.precioCompra) || 0);
+        const p12M = Math.round(parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0);
 
         if (pContado < 0 || p12M < 0) {
             toast.error('Los precios no pueden ser negativos');
@@ -103,9 +107,9 @@ export function EditarProductoModal({
             codigo: formData.codigo.trim().toUpperCase(),
             nombre: formData.nombre.trim().toUpperCase(),
             descripcion: formData.descripcion ? formData.descripcion.trim().toUpperCase() : '',
-            precioCompra: parseFloat(formData.precioCompra) || 0,
+            precioCompra: Math.round(parseFloat(formData.precioCompra) || 0),
             precioContado: pContado,
-            precio4Meses: parseFloat(formData.precio4Meses) || 0,
+            precio4Meses: Math.round(parseFloat(formData.precio4Meses) || 0),
             precio12Meses: p12M,
             precioVenta: p12M || pContado
         };
@@ -235,8 +239,9 @@ export function EditarProductoModal({
                                         id="edit-precioCompra"
                                         name="precioCompra"
                                         type="number"
-                                        step="0.01"
+                                        step="1"
                                         min="0"
+                                        placeholder="0"
                                         value={formData.precioCompra}
                                         onChange={handleChange}
                                         className="pl-7 text-base font-bold text-gray-800"
@@ -256,9 +261,10 @@ export function EditarProductoModal({
                                         id="edit-precioContado"
                                         name="precioContado"
                                         type="number"
-                                        step="0.01"
+                                        step="1"
                                         min="0"
                                         required
+                                        placeholder="0"
                                         value={formData.precioContado}
                                         onChange={handleChange}
                                         className="pl-7 text-base font-black text-blue-900"
@@ -286,11 +292,11 @@ export function EditarProductoModal({
                                         id="edit-precio4Meses"
                                         name="precio4Meses"
                                         type="number"
-                                        step="0.01"
+                                        step="1"
                                         min="0"
                                         value={formData.precio4Meses}
                                         onChange={handleChange}
-                                        placeholder="0.00"
+                                        placeholder="0"
                                         className="pl-7 text-base font-bold text-purple-900"
                                     />
                                 </div>
@@ -322,9 +328,10 @@ export function EditarProductoModal({
                                         id="edit-precio12Meses"
                                         name="precio12Meses"
                                         type="number"
-                                        step="0.01"
+                                        step="1"
                                         min="0"
                                         required
+                                        placeholder="0"
                                         value={formData.precio12Meses}
                                         onChange={handleChange}
                                         className="pl-7 text-base font-black text-emerald-800"

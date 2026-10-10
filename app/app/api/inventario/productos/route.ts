@@ -151,13 +151,13 @@ export async function GET(request: NextRequest) {
                 cantidad: s.cantidad || 0
             }));
 
-            const pCompra = producto.precioCompra ? parseFloat(producto.precioCompra.toString()) : 0;
-            const pVenta = producto.precioVenta ? parseFloat(producto.precioVenta.toString()) : 0;
-            const pContado = producto.precioContado != null ? parseFloat(producto.precioContado.toString()) : pCompra;
-            const p4M = producto.precio4Meses != null ? parseFloat(producto.precio4Meses.toString()) : 0;
-            const p12M = producto.precio12Meses != null ? parseFloat(producto.precio12Meses.toString()) : pVenta;
+            const pCompra = producto.precioCompra ? Math.round(parseFloat(producto.precioCompra.toString())) : 0;
+            const pVenta = producto.precioVenta ? Math.round(parseFloat(producto.precioVenta.toString())) : 0;
+            const pContado = producto.precioContado != null ? Math.round(parseFloat(producto.precioContado.toString())) : pCompra;
+            const p4M = producto.precio4Meses != null ? Math.round(parseFloat(producto.precio4Meses.toString())) : 0;
+            const p12M = producto.precio12Meses != null ? Math.round(parseFloat(producto.precio12Meses.toString())) : pVenta;
 
-            // Enganche del 40% fijo según el precio
+            // Enganche del 40% fijo según el precio (sin decimales)
             const enganche4Meses = Math.round(p4M * 0.40);
             const enganche12Meses = Math.round(p12M * 0.40);
 
@@ -285,11 +285,11 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        const pCompra = parseFloat(precioCompra) || 0;
-        const pContado = precioContado !== undefined && precioContado !== '' ? parseFloat(precioContado) : pCompra;
-        const p4M = precio4Meses !== undefined && precio4Meses !== '' ? parseFloat(precio4Meses) : 0;
-        const p12M = precio12Meses !== undefined && precio12Meses !== '' ? parseFloat(precio12Meses) : (parseFloat(precioVenta) || 0);
-        const pVenta = p12M || parseFloat(precioVenta) || pContado;
+        const pCompra = Math.round(parseFloat(precioCompra) || 0);
+        const pContado = precioContado !== undefined && precioContado !== '' ? Math.round(parseFloat(precioContado)) : pCompra;
+        const p4M = precio4Meses !== undefined && precio4Meses !== '' ? Math.round(parseFloat(precio4Meses)) : 0;
+        const p12M = precio12Meses !== undefined && precio12Meses !== '' ? Math.round(parseFloat(precio12Meses)) : Math.round(parseFloat(precioVenta) || 0);
+        const pVenta = p12M || Math.round(parseFloat(precioVenta) || 0) || pContado;
 
         const codigoUpper = codigo.trim().toUpperCase();
 
@@ -391,15 +391,15 @@ export async function PUT(request: NextRequest) {
         if (nombre) updateData.nombre = nombre.trim().toUpperCase();
         if (descripcion !== undefined) updateData.descripcion = descripcion ? descripcion.trim().toUpperCase() : null;
         if (categoria) updateData.categoria = categoria;
-        if (precioCompra !== undefined) updateData.precioCompra = parseFloat(precioCompra) || 0;
-        if (precioContado !== undefined) updateData.precioContado = parseFloat(precioContado) || 0;
-        if (precio4Meses !== undefined) updateData.precio4Meses = parseFloat(precio4Meses) || 0;
+        if (precioCompra !== undefined) updateData.precioCompra = Math.round(parseFloat(precioCompra) || 0);
+        if (precioContado !== undefined) updateData.precioContado = Math.round(parseFloat(precioContado) || 0);
+        if (precio4Meses !== undefined) updateData.precio4Meses = Math.round(parseFloat(precio4Meses) || 0);
         if (precio12Meses !== undefined) {
-            updateData.precio12Meses = parseFloat(precio12Meses) || 0;
-            updateData.precioVenta = parseFloat(precio12Meses) || 0;
+            updateData.precio12Meses = Math.round(parseFloat(precio12Meses) || 0);
+            updateData.precioVenta = Math.round(parseFloat(precio12Meses) || 0);
         } else if (precioVenta !== undefined) {
-            updateData.precioVenta = parseFloat(precioVenta) || 0;
-            if (updateData.precio12Meses === undefined) updateData.precio12Meses = parseFloat(precioVenta) || 0;
+            updateData.precioVenta = Math.round(parseFloat(precioVenta) || 0);
+            if (updateData.precio12Meses === undefined) updateData.precio12Meses = Math.round(parseFloat(precioVenta) || 0);
         }
         if (unidadMedida) updateData.unidadMedida = unidadMedida;
         if (stockMinimo !== undefined) updateData.stockMinimo = parseInt(stockMinimo) || 0;

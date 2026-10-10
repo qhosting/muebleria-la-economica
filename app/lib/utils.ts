@@ -14,7 +14,8 @@ export function formatCurrency(
     maximumFractionDigits?: number;
   } = 0
 ): string {
-  const num = typeof amount === 'number' && !isNaN(amount) ? amount : Number(amount) || 0;
+  const rawNum = typeof amount === 'number' && !isNaN(amount) ? amount : Number(amount) || 0;
+  const num = Math.round(rawNum);
   let minDecimals = 0;
   let maxDecimals = 0;
 
