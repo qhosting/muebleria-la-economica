@@ -278,7 +278,7 @@ export default function InventarioPage() {
                                                     <th className="p-3 font-medium text-gray-600">Código</th>
                                                     <th className="p-3 font-medium text-gray-600">Producto</th>
                                                     <th className="p-3 font-medium text-gray-600">Categoría</th>
-                                                    <th className="p-3 font-medium text-gray-600 text-right">Precio Venta</th>
+                                                    <th className="p-3 font-medium text-gray-600 min-w-[190px]">Precios & Planes (Enganche 40%)</th>
                                                     <th className="p-3 font-medium text-gray-600 text-center">Total Stock</th>
                                                     <th className="p-3 font-medium text-gray-600">Estado</th>
                                                     <th className="p-3 font-medium text-gray-600">Distribución</th>
@@ -290,16 +290,37 @@ export default function InventarioPage() {
                                                     <tr key={producto.id} className="border-b hover:bg-gray-50">
                                                         <td className="p-3 font-medium">{producto.codigo}</td>
                                                         <td className="p-3">
-                                                            <div className="font-medium text-gray-900">{producto.nombre}</div>
+                                                            <div className="font-bold text-gray-900 uppercase">{producto.nombre}</div>
                                                             {producto.descripcion && (
-                                                                <div className="text-xs text-gray-500 truncate max-w-[200px]">
-                                                                    {producto.descripcion}
+                                                                <div className="text-xs text-gray-500 truncate max-w-[240px] uppercase font-medium">
+                                                                    {producto.descripcion.toUpperCase()}
                                                                 </div>
                                                             )}
                                                         </td>
                                                         <td className="p-3 text-gray-600">{producto.categoria || '-'}</td>
-                                                        <td className="p-3 text-right font-medium">
-                                                            {formatCurrency(producto.precioVenta)}
+                                                        <td className="p-3">
+                                                            <div className="flex flex-col gap-0.5 text-xs bg-slate-50/70 p-2 rounded-lg border border-slate-200/80">
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <span className="text-gray-500 font-medium">Contado:</span>
+                                                                    <span className="font-bold text-blue-900">{formatCurrency(producto.precioContado || producto.precioCompra)}</span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <span className="text-gray-500 font-medium">4 Meses:</span>
+                                                                    <span className="font-semibold text-purple-900">
+                                                                        {producto.precio4Meses > 0 ? formatCurrency(producto.precio4Meses) : 'N/D'}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center justify-between gap-2">
+                                                                    <span className="text-gray-500 font-medium">12 Meses:</span>
+                                                                    <span className="font-bold text-emerald-800">
+                                                                        {formatCurrency(producto.precio12Meses || producto.precioVenta)}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="text-[10px] text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded font-semibold mt-1 border border-amber-200/60">
+                                                                    Eng. 40%: {formatCurrency(Math.round(((producto.precio12Meses || producto.precioVenta) || 0) * 0.40))} (12M)
+                                                                    {producto.precio4Meses > 0 ? ` / ${formatCurrency(Math.round(producto.precio4Meses * 0.40))} (4M)` : ''}
+                                                                </div>
+                                                            </div>
                                                         </td>
                                                         <td className="p-3 text-center font-bold text-lg">
                                                             {producto.stockTotal}

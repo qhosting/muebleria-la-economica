@@ -1284,13 +1284,23 @@ export default function KioscoVentasPage() {
 
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <Label className="text-[11px] text-gray-600 font-semibold">Enganche Inicial ($)</Label>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <Label className="text-[11px] text-gray-600 font-semibold">Enganche Inicial ($)</Label>
+                            <button
+                              type="button"
+                              onClick={() => setEnganche(Math.round(totalBruto * 0.40))}
+                              className="text-[10px] text-blue-700 hover:text-blue-900 font-bold underline"
+                              title="Calcular 40% fijo"
+                            >
+                              40% Fijo
+                            </button>
+                          </div>
                           <Input
                             type="number"
                             min="0"
                             step="1"
                             value={enganche || ''}
-                            placeholder="$0"
+                            placeholder={`$${Math.round(totalBruto * 0.40)} (40% fijo)`}
                             onChange={e => setEnganche(Math.round(parseFloat(e.target.value) || 0))}
                             className="h-8 text-xs font-bold text-green-700"
                           />
@@ -1326,9 +1336,10 @@ export default function KioscoVentasPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="13">13 semanas (3 meses)</SelectItem>
+                              <SelectItem value="17">17 semanas (4 meses)</SelectItem>
                               <SelectItem value="26">26 semanas (6 meses)</SelectItem>
                               <SelectItem value="39">39 semanas (9 meses)</SelectItem>
-                              <SelectItem value="52">52 semanas (1 año)</SelectItem>
+                              <SelectItem value="52">52 semanas (12 meses / 1 año)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>

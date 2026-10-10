@@ -949,14 +949,23 @@ export default function MobileKioscoPage() {
                   <div className="space-y-3">
                     {/* Enganche */}
                     <div>
-                      <div className="flex justify-between text-xs mb-1.5">
+                      <div className="flex justify-between items-center text-xs mb-1.5">
                         <span className="text-slate-400 font-semibold">Enganche Inicial:</span>
-                        <span className="font-bold text-white font-mono">${enganche}</span>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setEnganche(Math.round(totalArticulos * 0.40))}
+                            className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold border border-emerald-500/40"
+                          >
+                            40% Fijo (${Math.round(totalArticulos * 0.40)})
+                          </button>
+                          <span className="font-bold text-white font-mono">${enganche}</span>
+                        </div>
                       </div>
                       <div className="grid grid-cols-4 gap-1.5">
-                        {[0, 200, 500, 1000].map(monto => (
+                        {[0, Math.round(totalArticulos * 0.40), 500, 1000].map((monto, idx) => (
                           <button
-                            key={monto}
+                            key={idx}
                             onClick={() => setEnganche(monto)}
                             className={`py-1.5 rounded-lg text-xs font-bold border transition-all ${
                               enganche === monto
@@ -964,7 +973,7 @@ export default function MobileKioscoPage() {
                                 : 'bg-slate-950 text-slate-400 border-slate-800'
                             }`}
                           >
-                            ${monto}
+                            ${monto} {monto === Math.round(totalArticulos * 0.40) && monto > 0 ? '(40%)' : ''}
                           </button>
                         ))}
                       </div>
@@ -985,9 +994,10 @@ export default function MobileKioscoPage() {
                         <span className="text-slate-400 font-semibold">Plazo del Crédito:</span>
                         <span className="font-bold text-amber-400">{plazoSemanas} Semanas ({Math.round(plazoSemanas / 4.3)} meses)</span>
                       </div>
-                      <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
+                      <div className="grid grid-cols-5 gap-1 text-xs font-bold">
                         {[
                           { sem: 13, label: '3 Meses' },
+                          { sem: 17, label: '4 Meses' },
                           { sem: 26, label: '6 Meses' },
                           { sem: 39, label: '9 Meses' },
                           { sem: 52, label: '12 Meses' }
@@ -1001,7 +1011,7 @@ export default function MobileKioscoPage() {
                                 : 'bg-slate-950 text-slate-400 border-slate-800'
                             }`}
                           >
-                            <div>{p.sem} sem</div>
+                            <div>{p.sem} s</div>
                             <div className="text-[9px] font-normal opacity-75">{p.label}</div>
                           </button>
                         ))}

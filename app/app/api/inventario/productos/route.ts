@@ -33,23 +33,34 @@ async function asegurarCatalogoInicial() {
 
         // Crear los productos
         for (const item of CATALOGO_PRODUCTOS_INICIAL) {
+            const pContado = item.precioContado || item.precioVenta;
+            const p12M = item.precioVenta;
+            const p4M = item.precio4Meses || Math.round(pContado * 1.15);
+            const desc = (item.descripcion || `Marca ${item.marca} ${item.modelo || ''}`.trim()).toUpperCase();
+
             const prod = await prisma.producto.upsert({
                 where: { codigo: item.codigo },
                 update: {
-                    nombre: item.nombre,
+                    nombre: item.nombre.toUpperCase(),
                     categoria: item.categoria,
-                    precioCompra: item.precioContado,
-                    precioVenta: item.precioVenta,
-                    descripcion: item.descripcion || `Marca ${item.marca} ${item.modelo || ''}`.trim(),
+                    precioCompra: pContado,
+                    precioContado: pContado,
+                    precio4Meses: p4M,
+                    precio12Meses: p12M,
+                    precioVenta: p12M,
+                    descripcion: desc,
                     isActive: true
                 },
                 create: {
                     codigo: item.codigo,
-                    nombre: item.nombre,
-                    descripcion: item.descripcion || `Marca ${item.marca} ${item.modelo || ''}`.trim(),
+                    nombre: item.nombre.toUpperCase(),
+                    descripcion: desc,
                     categoria: item.categoria,
-                    precioCompra: item.precioContado,
-                    precioVenta: item.precioVenta,
+                    precioCompra: pContado,
+                    precioContado: pContado,
+                    precio4Meses: p4M,
+                    precio12Meses: p12M,
+                    precioVenta: p12M,
                     unidadMedida: 'pieza',
                     stockMinimo: 2,
                     isActive: true
@@ -128,7 +139,7 @@ export async function GET(request: NextRequest) {
             orderBy: { nombre: 'asc' }
         });
 
-        // Formatear productos calculando stocks de forma 100% segura contra nulos
+        // Formatear productos calculando stocks y precios con enganche fijo 40%
         const productosConStock = productos.map((producto: any) => {
             const stocksList = producto.stocks || [];
             const stockTotal = stocksList.reduce((sum: number, s: any) => sum + (s.cantidad || 0), 0);
@@ -142,12 +153,30 @@ export async function GET(request: NextRequest) {
 
             const pCompra = producto.precioCompra ? parseFloat(producto.precioCompra.toString()) : 0;
             const pVenta = producto.precioVenta ? parseFloat(producto.precioVenta.toString()) : 0;
+            const pContado = producto.precioContado != null ? parseFloat(producto.precioContado.toString()) : pCompra;
+            const p4M = producto.precio4Meses != null ? parseFloat(producto.precio4Meses.toString()) : 0;
+            const p12M = producto.precio12Meses != null ? parseFloat(producto.precio12Meses.toString()) : pVenta;
+
+            // Enganche del 40% fijo según el precio
+            const enganche4Meses = Math.round(p4M * 0.40);
+            const enganche12Meses = Math.round(p12M * 0.40);
 
             return {
                 ...producto,
+                nombre: (producto.nombre || '').toUpperCase(),
+                descripcion: (producto.descripcion || '').toUpperCase(),
                 precioCompra: pCompra,
                 precioVenta: pVenta,
+                precioContado: pContado,
+                precio4Meses: p4M,
+                precio12Meses: p12M,
+                enganche4Meses,
+                enganche12Meses,
                 stockTotal,
+                stockPorSucursal,
+                stockBajo: stockTotal <= (producto.stockMinimo || 0)
+            };
+        });
                 stockPorSucursal,
                 stockBajo: stockTotal <= (producto.stockMinimo || 0)
             };
@@ -238,6 +267,9 @@ export async function POST(request: NextRequest) {
             descripcion,
             categoria,
             precioCompra,
+            precioContado,
+            precio4Meses,
+            precio12Meses,
             precioVenta,
             unidadMedida,
             stockMinimo,
@@ -246,12 +278,18 @@ export async function POST(request: NextRequest) {
             imagenUrl
         } = body;
 
-        if (!codigo || !nombre || precioCompra === undefined || precioVenta === undefined) {
+        if (!codigo || !nombre) {
             return NextResponse.json(
-                { error: 'Código, nombre, precio de compra y precio de venta son requeridos' },
+                { error: 'Código y nombre de producto son requeridos' },
                 { status: 400 }
             );
         }
+
+        const pCompra = parseFloat(precioCompra) || 0;
+        const pContado = precioContado !== undefined && precioContado !== '' ? parseFloat(precioContado) : pCompra;
+        const p4M = precio4Meses !== undefined && precio4Meses !== '' ? parseFloat(precio4Meses) : 0;
+        const p12M = precio12Meses !== undefined && precio12Meses !== '' ? parseFloat(precio12Meses) : (parseFloat(precioVenta) || 0);
+        const pVenta = p12M || parseFloat(precioVenta) || pContado;
 
         const codigoUpper = codigo.trim().toUpperCase();
 
@@ -271,10 +309,13 @@ export async function POST(request: NextRequest) {
             data: {
                 codigo: codigoUpper,
                 nombre: nombre.trim().toUpperCase(),
-                descripcion: descripcion ? descripcion.trim() : null,
+                descripcion: descripcion ? descripcion.trim().toUpperCase() : null,
                 categoria: categoria || 'Otros',
-                precioCompra: parseFloat(precioCompra) || 0,
-                precioVenta: parseFloat(precioVenta) || 0,
+                precioCompra: pCompra,
+                precioContado: pContado,
+                precio4Meses: p4M,
+                precio12Meses: p12M,
+                precioVenta: pVenta,
                 unidadMedida: unidadMedida || 'pieza',
                 stockMinimo: parseInt(stockMinimo) || 0,
                 imagenUrl: imagenUrl || null,
@@ -331,6 +372,9 @@ export async function PUT(request: NextRequest) {
             descripcion,
             categoria,
             precioCompra,
+            precioContado,
+            precio4Meses,
+            precio12Meses,
             precioVenta,
             unidadMedida,
             stockMinimo,
@@ -345,10 +389,18 @@ export async function PUT(request: NextRequest) {
         const updateData: any = {};
         if (codigo) updateData.codigo = codigo.trim().toUpperCase();
         if (nombre) updateData.nombre = nombre.trim().toUpperCase();
-        if (descripcion !== undefined) updateData.descripcion = descripcion ? descripcion.trim() : null;
+        if (descripcion !== undefined) updateData.descripcion = descripcion ? descripcion.trim().toUpperCase() : null;
         if (categoria) updateData.categoria = categoria;
         if (precioCompra !== undefined) updateData.precioCompra = parseFloat(precioCompra) || 0;
-        if (precioVenta !== undefined) updateData.precioVenta = parseFloat(precioVenta) || 0;
+        if (precioContado !== undefined) updateData.precioContado = parseFloat(precioContado) || 0;
+        if (precio4Meses !== undefined) updateData.precio4Meses = parseFloat(precio4Meses) || 0;
+        if (precio12Meses !== undefined) {
+            updateData.precio12Meses = parseFloat(precio12Meses) || 0;
+            updateData.precioVenta = parseFloat(precio12Meses) || 0;
+        } else if (precioVenta !== undefined) {
+            updateData.precioVenta = parseFloat(precioVenta) || 0;
+            if (updateData.precio12Meses === undefined) updateData.precio12Meses = parseFloat(precioVenta) || 0;
+        }
         if (unidadMedida) updateData.unidadMedida = unidadMedida;
         if (stockMinimo !== undefined) updateData.stockMinimo = parseInt(stockMinimo) || 0;
 

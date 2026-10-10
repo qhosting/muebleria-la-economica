@@ -282,6 +282,9 @@ model Producto {
   categoria       String?
   precioCompra    Decimal  @db.Decimal(10,2)
   precioVenta     Decimal  @db.Decimal(10,2)
+  precioContado   Decimal? @default(0) @db.Decimal(10,2)
+  precio4Meses    Decimal? @default(0) @db.Decimal(10,2)
+  precio12Meses   Decimal? @default(0) @db.Decimal(10,2)
   unidadMedida    String   @default("pieza") // pieza, juego, set
   stockMinimo     Int      @default(0)
   imagenUrl       String?

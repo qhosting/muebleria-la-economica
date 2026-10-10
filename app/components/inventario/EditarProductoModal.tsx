@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { DollarSign, Package, Tag, Layers, CheckCircle2 } from 'lucide-react';
+import { DollarSign, Tag, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
 
 interface EditarProductoModalProps {
     isOpen: boolean;
@@ -33,6 +34,9 @@ export function EditarProductoModal({
         descripcion: '',
         categoria: '',
         precioCompra: '',
+        precioContado: '',
+        precio4Meses: '',
+        precio12Meses: '',
         precioVenta: '',
         stockMinimo: '2',
         stockTotal: '0',
@@ -41,20 +45,41 @@ export function EditarProductoModal({
 
     useEffect(() => {
         if (producto) {
+            const pCompra = producto.precioCompra != null ? producto.precioCompra.toString() : '0';
+            const pContado = producto.precioContado != null && producto.precioContado !== ''
+                ? producto.precioContado.toString()
+                : (producto.precioCompra != null ? producto.precioCompra.toString() : '0');
+            const p12M = producto.precio12Meses != null && producto.precio12Meses !== ''
+                ? producto.precio12Meses.toString()
+                : (producto.precioVenta != null ? producto.precioVenta.toString() : '0');
+            const p4M = producto.precio4Meses != null ? producto.precio4Meses.toString() : '';
+
             setFormData({
                 id: producto.id || '',
-                codigo: producto.codigo || '',
-                nombre: producto.nombre || '',
-                descripcion: producto.descripcion || '',
+                codigo: (producto.codigo || '').toUpperCase(),
+                nombre: (producto.nombre || '').toUpperCase(),
+                descripcion: (producto.descripcion || '').toUpperCase(),
                 categoria: producto.categoria || 'Muebles',
-                precioCompra: producto.precioCompra?.toString() || '0',
-                precioVenta: producto.precioVenta?.toString() || '0',
+                precioCompra: pCompra,
+                precioContado: pContado,
+                precio4Meses: p4M,
+                precio12Meses: p12M,
+                precioVenta: p12M || pContado,
                 stockMinimo: (producto.stockMinimo || 2).toString(),
                 stockTotal: (producto.stockTotal || 0).toString(),
                 sucursalId: 'todas'
             });
         }
     }, [producto]);
+
+    // Cálculos de enganche fijo al 40% según precio
+    const numPrecio4M = parseFloat(formData.precio4Meses) || 0;
+    const enganche4M = Math.round(numPrecio4M * 0.40);
+    const saldo4M = Math.max(0, numPrecio4M - enganche4M);
+
+    const numPrecio12M = parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0;
+    const enganche12M = Math.round(numPrecio12M * 0.40);
+    const saldo12M = Math.max(0, numPrecio12M - enganche12M);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,19 +88,33 @@ export function EditarProductoModal({
             return;
         }
 
-        const pVenta = parseFloat(formData.precioVenta);
-        if (isNaN(pVenta) || pVenta < 0) {
-            toast.error('Ingrese un precio de venta válido');
+        const pContado = parseFloat(formData.precioContado) || parseFloat(formData.precioCompra) || 0;
+        const p12M = parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0;
+
+        if (pContado < 0 || p12M < 0) {
+            toast.error('Los precios no pueden ser negativos');
             return;
         }
 
         setLoading(true);
 
+        const payload = {
+            ...formData,
+            codigo: formData.codigo.trim().toUpperCase(),
+            nombre: formData.nombre.trim().toUpperCase(),
+            descripcion: formData.descripcion ? formData.descripcion.trim().toUpperCase() : '',
+            precioCompra: parseFloat(formData.precioCompra) || 0,
+            precioContado: pContado,
+            precio4Meses: parseFloat(formData.precio4Meses) || 0,
+            precio12Meses: p12M,
+            precioVenta: p12M || pContado
+        };
+
         try {
             const res = await fetch('/api/inventario/productos', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData)
+                body: JSON.stringify(payload)
             });
 
             if (!res.ok) {
@@ -95,7 +134,11 @@ export function EditarProductoModal({
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        if (name === 'nombre' || name === 'descripcion' || name === 'codigo') {
+            setFormData(prev => ({ ...prev, [name]: value.toUpperCase() }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     const handleSelectChange = (name: string, value: string) => {
@@ -104,7 +147,7 @@ export function EditarProductoModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-[620px] max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-[680px] max-h-[92vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2 text-xl font-bold text-gray-900">
                         <Tag className="h-5 w-5 text-blue-700" />
@@ -166,17 +209,25 @@ export function EditarProductoModal({
                         />
                     </div>
 
-                    {/* SECCIÓN DESTACADA: PRECIOS */}
-                    <div className="p-4 bg-blue-50/70 border border-blue-200 rounded-xl space-y-3">
-                        <div className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                            <DollarSign className="h-4 w-4 text-blue-700" />
-                            MODIFICACIÓN DE PRECIOS
+                    {/* SECCIÓN DESTACADA: ESQUEMA DE PRECIOS CON ENGANCHE 40% FIJO */}
+                    <div className="p-4 bg-gradient-to-br from-blue-50/90 to-indigo-50/70 border border-blue-200 rounded-xl space-y-3 shadow-xs">
+                        <div className="flex items-center justify-between border-b border-blue-200/80 pb-2">
+                            <div className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                                <DollarSign className="h-4 w-4 text-blue-700" />
+                                TABLA DE PRECIOS Y PLANES (ENGANCHE 40% FIJO)
+                            </div>
+                            <span className="text-[11px] font-semibold text-blue-800 bg-blue-100/80 px-2 py-0.5 rounded-full flex items-center gap-1">
+                                <ShieldCheck className="h-3 w-3 text-blue-700" />
+                                Enganche 40% Fijo
+                            </span>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            <div className="grid gap-1.5 bg-white p-3 rounded-lg border border-blue-100 shadow-sm">
+                        {/* Fila 1: Costo y Contado */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Precio Compra / Costo */}
+                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
                                 <Label htmlFor="edit-precioCompra" className="text-xs font-bold text-gray-700">
-                                    Precio Compra / Contado ($)
+                                    Precio Compra / Costo ($)
                                 </Label>
                                 <div className="relative">
                                     <span className="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
@@ -186,34 +237,109 @@ export function EditarProductoModal({
                                         type="number"
                                         step="0.01"
                                         min="0"
-                                        required
                                         value={formData.precioCompra}
                                         onChange={handleChange}
-                                        className="pl-7 text-base font-bold text-gray-900"
+                                        className="pl-7 text-base font-bold text-gray-800"
                                     />
                                 </div>
-                                <span className="text-[11px] text-gray-500">Costo o precio base de contado</span>
+                                <span className="text-[10px] text-gray-500">Costo de adquisición base</span>
                             </div>
 
-                            <div className="grid gap-1.5 bg-white p-3 rounded-lg border border-emerald-200 shadow-sm">
-                                <Label htmlFor="edit-precioVenta" className="text-xs font-bold text-emerald-800">
-                                    Precio Venta / Crédito ($)
+                            {/* Precio Contado */}
+                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-blue-200 shadow-xs">
+                                <Label htmlFor="edit-precioContado" className="text-xs font-bold text-blue-900">
+                                    Precio Contado ($)
                                 </Label>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-emerald-600 font-bold">$</span>
+                                    <span className="absolute left-3 top-2.5 text-blue-500 font-bold">$</span>
                                     <Input
-                                        id="edit-precioVenta"
-                                        name="precioVenta"
+                                        id="edit-precioContado"
+                                        name="precioContado"
                                         type="number"
                                         step="0.01"
                                         min="0"
                                         required
-                                        value={formData.precioVenta}
+                                        value={formData.precioContado}
                                         onChange={handleChange}
-                                        className="pl-7 text-base font-black text-emerald-700"
+                                        className="pl-7 text-base font-black text-blue-900"
                                     />
                                 </div>
-                                <span className="text-[11px] text-emerald-600 font-medium">Precio de lista para el cliente</span>
+                                <span className="text-[10px] text-blue-700 font-medium">Pago en 1 sola exhibición</span>
+                            </div>
+                        </div>
+
+                        {/* Fila 2: 4 Meses y 12 Meses (con Enganche 40% calculado) */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Precio 4 Meses */}
+                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-purple-200 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="edit-precio4Meses" className="text-xs font-bold text-purple-900">
+                                        Precio 4 Meses ($)
+                                    </Label>
+                                    <span className="text-[10px] text-purple-700 bg-purple-50 px-1.5 py-0.2 rounded font-semibold">
+                                        Crédito Corto
+                                    </span>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-purple-600 font-bold">$</span>
+                                    <Input
+                                        id="edit-precio4Meses"
+                                        name="precio4Meses"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        value={formData.precio4Meses}
+                                        onChange={handleChange}
+                                        placeholder="0.00"
+                                        className="pl-7 text-base font-bold text-purple-900"
+                                    />
+                                </div>
+                                <div className="mt-1 bg-purple-50/80 border border-purple-100 rounded-md p-1.5 text-[11px] space-y-0.5">
+                                    <div className="flex justify-between items-center text-purple-950 font-bold">
+                                        <span>Enganche (40% fijo):</span>
+                                        <span>{formatCurrency(enganche4M)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-gray-500 text-[10px]">
+                                        <span>Saldo a 4 meses:</span>
+                                        <span>{formatCurrency(saldo4M)}</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Precio 12 Meses */}
+                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-emerald-300 shadow-xs">
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="edit-precio12Meses" className="text-xs font-bold text-emerald-900">
+                                        Precio 12 Meses ($)
+                                    </Label>
+                                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-semibold">
+                                        Precio Lista Crédito
+                                    </span>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-3 top-2.5 text-emerald-600 font-bold">$</span>
+                                    <Input
+                                        id="edit-precio12Meses"
+                                        name="precio12Meses"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        required
+                                        value={formData.precio12Meses}
+                                        onChange={handleChange}
+                                        className="pl-7 text-base font-black text-emerald-800"
+                                    />
+                                </div>
+                                <div className="mt-1 bg-emerald-50/80 border border-emerald-100 rounded-md p-1.5 text-[11px] space-y-0.5">
+                                    <div className="flex justify-between items-center text-emerald-950 font-bold">
+                                        <span>Enganche (40% fijo):</span>
+                                        <span>{formatCurrency(enganche12M)}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-gray-500 text-[10px]">
+                                        <span>Saldo a 12 meses:</span>
+                                        <span>{formatCurrency(saldo12M)}</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -271,17 +397,22 @@ export function EditarProductoModal({
                         </div>
                     </div>
 
-                    {/* Descripción */}
+                    {/* Descripción en MAYÚSCULAS */}
                     <div className="grid gap-1.5">
-                        <Label htmlFor="edit-descripcion" className="text-xs font-semibold text-gray-700">Descripción / Detalles</Label>
+                        <div className="flex justify-between items-center">
+                            <Label htmlFor="edit-descripcion" className="text-xs font-semibold text-gray-700">
+                                Descripción / Detalles (MAYÚSCULAS)
+                            </Label>
+                            <span className="text-[10px] text-gray-400 uppercase font-semibold">Solo Mayúsculas</span>
+                        </div>
                         <Textarea
                             id="edit-descripcion"
                             name="descripcion"
                             rows={2}
                             value={formData.descripcion}
                             onChange={handleChange}
-                            placeholder="Marca, modelo, características..."
-                            className="text-xs"
+                            placeholder="MARCA, MODELO, CARACTERÍSTICAS..."
+                            className="text-xs uppercase font-medium tracking-wide"
                         />
                     </div>
 
