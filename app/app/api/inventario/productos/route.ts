@@ -177,10 +177,6 @@ export async function GET(request: NextRequest) {
                 stockBajo: stockTotal <= (producto.stockMinimo || 0)
             };
         });
-                stockPorSucursal,
-                stockBajo: stockTotal <= (producto.stockMinimo || 0)
-            };
-        });
 
         // Categorías únicas
         const categoriasDB = await prisma.producto.findMany({
