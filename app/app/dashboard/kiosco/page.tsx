@@ -46,7 +46,16 @@ import {
 } from 'lucide-react';
 import { formatCurrency, getDayName, cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, SUCURSALES_SISTEMA, SUCURSAL_SAN_LUCAS, calcularPlanCredito } from '@/lib/catalogo-kiosco';
+import {
+  CATALOGO_PRODUCTOS_INICIAL,
+  CatalogoItem,
+  SUCURSALES_SISTEMA,
+  SUCURSAL_SAN_LUCAS,
+  calcularPlanCredito,
+  calcularPreciosPlazosProducto,
+  calcularTotalesPlazosCarrito,
+  DesglosePlazoItem
+} from '@/lib/catalogo-kiosco';
 import { RemisionPagarePrint } from '@/components/ventas/RemisionPagarePrint';
 import { SignaturePadModal } from '@/components/ventas/SignaturePadModal';
 import { DigitalizadorModal } from '@/components/boveda/digitalizador-modal';
@@ -78,6 +87,7 @@ export default function KioscoVentasPage() {
 
   // Configuración de la Venta / Crédito
   const [tipoVenta, setTipoVenta] = useState<'contado' | 'credito'>('credito');
+  const [modalidadPlazo, setModalidadPlazo] = useState<'contado' | '4meses' | '6meses' | '12meses' | 'otro'>('6meses');
   const [nombreCliente, setNombreCliente] = useState('');
   const [telefonoCliente, setTelefonoCliente] = useState('');
   const [direccionCliente, setDireccionCliente] = useState('');
@@ -299,7 +309,20 @@ export default function KioscoVentasPage() {
       return;
     }
 
-    const precio = tipoVenta === 'contado' ? item.precioContado : item.precioVenta;
+    const pContado = item.precioContado || item.precioVenta;
+    const pVenta = item.precioVenta || item.precioContado;
+    const desglose = calcularPreciosPlazosProducto(pContado, pVenta);
+
+    let precio = pVenta;
+    if (modalidadPlazo === 'contado' || tipoVenta === 'contado') {
+      precio = desglose.contado.precio;
+    } else if (modalidadPlazo === '4meses') {
+      precio = desglose.cuatroMeses.precio;
+    } else if (modalidadPlazo === '6meses') {
+      precio = desglose.seisMeses.precio;
+    } else if (modalidadPlazo === '12meses') {
+      precio = desglose.doceMeses.precio;
+    }
 
     if (existenteIndex >= 0) {
       const nuevoCarrito = [...carrito];
@@ -316,7 +339,10 @@ export default function KioscoVentasPage() {
           categoria: item.categoria,
           precioUnitario: precio,
           cantidad: 1,
-          importe: precio
+          importe: precio,
+          precioContado: pContado,
+          precioVenta: pVenta,
+          plazoSeleccionado: modalidadPlazo
         }
       ]);
     }
@@ -338,7 +364,10 @@ export default function KioscoVentasPage() {
         categoria: 'Personalizado',
         precioUnitario: precio,
         cantidad: 1,
-        importe: precio
+        importe: precio,
+        precioContado: precio,
+        precioVenta: Math.round(precio * 1.12),
+        plazoSeleccionado: modalidadPlazo
       }
     ]);
     setCustomProduct({ concepto: '', precio: '' });
@@ -445,7 +474,98 @@ export default function KioscoVentasPage() {
 
   // Cálculos del Carrito y Financiamiento
   const totalBruto = carrito.reduce((sum, item) => sum + item.importe, 0);
-  const planCredito = calcularPlanCredito(totalBruto, enganche, periodicidad, plazoSemanas);
+
+  // Esquema comparativo de plazos (Contado, 4 Meses, 6 Meses, 12 Meses) para el pedido completo
+  const totalesPlazos = React.useMemo(() => {
+    return calcularTotalesPlazosCarrito(carrito);
+  }, [carrito]);
+
+  // Enganche del 40% recomendado para el total actual
+  const enganche40Recomendado = Math.round(totalBruto * 0.40);
+  const porcentajeEngancheActual = totalBruto > 0 ? Math.round((enganche / totalBruto) * 100) : 0;
+
+  const numeroPagosEfectivo = periodicidad === 'mensual'
+    ? Math.max(1, Math.round(plazoSemanas / 4.3))
+    : periodicidad === 'quincenal'
+      ? Math.max(1, Math.round(plazoSemanas / 2))
+      : plazoSemanas;
+
+  const planCredito = calcularPlanCredito(totalBruto, enganche, periodicidad, numeroPagosEfectivo);
+
+  // Función para aplicar una modalidad de plazo a todo el pedido
+  const aplicarModalidadPlazo = (modalidad: 'contado' | '4meses' | '6meses' | '12meses') => {
+    setModalidadPlazo(modalidad);
+
+    const nuevoCarrito = carrito.map(item => {
+      const pContado = item.precioContado && item.precioContado > 0 ? item.precioContado : item.precioUnitario;
+      const pVenta = item.precioVenta && item.precioVenta > 0 ? item.precioVenta : item.precioUnitario;
+      const desglose = calcularPreciosPlazosProducto(pContado, pVenta);
+
+      let nuevoPrecio = item.precioUnitario;
+      if (modalidad === 'contado') nuevoPrecio = desglose.contado.precio;
+      else if (modalidad === '4meses') nuevoPrecio = desglose.cuatroMeses.precio;
+      else if (modalidad === '6meses') nuevoPrecio = desglose.seisMeses.precio;
+      else if (modalidad === '12meses') nuevoPrecio = desglose.doceMeses.precio;
+
+      return {
+        ...item,
+        precioUnitario: nuevoPrecio,
+        importe: item.cantidad * nuevoPrecio,
+        plazoSeleccionado: modalidad
+      };
+    });
+
+    setCarrito(nuevoCarrito);
+    const nuevoTotal = nuevoCarrito.reduce((s, i) => s + i.importe, 0);
+
+    if (modalidad === 'contado') {
+      setTipoVenta('contado');
+      setEnganche(0);
+      toast.success('Modalidad de Contado seleccionada');
+    } else {
+      setTipoVenta('credito');
+      const semanas = modalidad === '4meses' ? 17 : modalidad === '6meses' ? 26 : 52;
+      setPlazoSemanas(semanas);
+      const enganche40 = Math.round(nuevoTotal * 0.40);
+      setEnganche(enganche40);
+      const nombrePlazo = modalidad === '4meses' ? '4 Meses (17 semanas)' : modalidad === '6meses' ? '6 Meses (26 semanas)' : '12 Meses (52 semanas)';
+      toast.success(`Plan ${nombrePlazo} seleccionado con 40% de enganche (${formatCurrency(enganche40)})`);
+    }
+  };
+
+  // Función para cambiar la modalidad de precio de un artículo individual en la remisión
+  const aplicarModalidadItem = (index: number, modalidad: 'contado' | '4meses' | '6meses' | '12meses') => {
+    const nuevo = [...carrito];
+    const item = nuevo[index];
+    const pContado = item.precioContado && item.precioContado > 0 ? item.precioContado : item.precioUnitario;
+    const pVenta = item.precioVenta && item.precioVenta > 0 ? item.precioVenta : item.precioUnitario;
+    const desglose = calcularPreciosPlazosProducto(pContado, pVenta);
+
+    let nuevoPrecio = item.precioUnitario;
+    if (modalidad === 'contado') nuevoPrecio = desglose.contado.precio;
+    else if (modalidad === '4meses') nuevoPrecio = desglose.cuatroMeses.precio;
+    else if (modalidad === '6meses') nuevoPrecio = desglose.seisMeses.precio;
+    else if (modalidad === '12meses') nuevoPrecio = desglose.doceMeses.precio;
+
+    item.precioUnitario = nuevoPrecio;
+    item.importe = item.cantidad * nuevoPrecio;
+    item.plazoSeleccionado = modalidad;
+    setCarrito(nuevo);
+    toast.success(`Precio de "${item.concepto}" actualizado a ${modalidad === 'contado' ? 'Contado' : modalidad}`);
+  };
+
+  // Función para aplicar porcentaje de enganche rápido (ej. 40%)
+  const aplicarEnganchePorcentaje = (porcentaje: number) => {
+    const monto = Math.round(totalBruto * (porcentaje / 100));
+    setEnganche(monto);
+    if (porcentaje === 40) {
+      toast.success(`Enganche del 40% aplicado: ${formatCurrency(monto)}`);
+    } else if (porcentaje === 0) {
+      toast.info('Enganche en $0');
+    } else {
+      toast.success(`Enganche del ${porcentaje}% aplicado: ${formatCurrency(monto)}`);
+    }
+  };
 
   // Categorías disponibles
   const categorias = [
@@ -635,6 +755,7 @@ export default function KioscoVentasPage() {
       setClienteIdExistente('');
       setFirmaCliente('');
       setEnganche(0);
+      setModalidadPlazo('6meses');
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || 'Error al procesar la venta');
@@ -1032,62 +1153,138 @@ export default function KioscoVentasPage() {
                       </CardHeader>
                       <CardContent className="p-4 space-y-3">
                         <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
-                          {carrito.map((item, idx) => (
-                            <div
-                              key={idx}
-                              className="flex items-center justify-between p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs gap-3"
-                            >
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-gray-900 text-sm truncate">
-                                  {item.concepto}
-                                </p>
-                                <div className="flex items-center gap-2 text-gray-500 mt-1">
-                                  <span>Precio Unitario:</span>
-                                  <input
-                                    type="number"
-                                    value={item.precioUnitario}
-                                    onChange={e => modificarPrecio(idx, parseFloat(e.target.value))}
-                                    className="w-24 px-2 py-0.5 border rounded text-right font-bold text-gray-900 bg-white"
-                                  />
+                          {carrito.map((item, idx) => {
+                            const pContado = item.precioContado && item.precioContado > 0 ? item.precioContado : item.precioUnitario;
+                            const pVenta = item.precioVenta && item.precioVenta > 0 ? item.precioVenta : item.precioUnitario;
+                            const desgloseItem = calcularPreciosPlazosProducto(pContado, pVenta);
+                            const eng40Item = Math.round(item.precioUnitario * 0.40);
+
+                            return (
+                              <div
+                                key={idx}
+                                className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-2 hover:border-blue-300 transition-all shadow-xs"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-bold text-gray-900 text-sm truncate">
+                                      {item.concepto}
+                                    </p>
+                                    <div className="flex items-center gap-2 text-gray-500 mt-1">
+                                      <span>Precio Unitario:</span>
+                                      <input
+                                        type="number"
+                                        value={item.precioUnitario}
+                                        onChange={e => modificarPrecio(idx, parseFloat(e.target.value))}
+                                        className="w-24 px-2 py-0.5 border rounded text-right font-bold text-gray-900 bg-white"
+                                      />
+                                    </div>
+                                  </div>
+
+                                  {/* Control de cantidad */}
+                                  <div className="flex items-center gap-1.5 bg-white border rounded-lg p-1">
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => modificarCantidad(idx, -1)}
+                                      className="h-6 w-6 p-0 rounded hover:bg-slate-100"
+                                    >
+                                      <Minus className="h-3 w-3" />
+                                    </Button>
+                                    <span className="font-black w-7 text-center text-sm">
+                                      {item.cantidad}
+                                    </span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => modificarCantidad(idx, 1)}
+                                      className="h-6 w-6 p-0 rounded hover:bg-slate-100"
+                                    >
+                                      <Plus className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+
+                                  <div className="text-right min-w-[80px]">
+                                    <div className="font-black text-gray-950 text-sm">
+                                      {formatCurrency(item.importe)}
+                                    </div>
+                                    <button
+                                      onClick={() => eliminarDelCarrito(idx)}
+                                      className="text-rose-500 hover:text-rose-700 text-[11px] font-semibold mt-0.5"
+                                    >
+                                      Eliminar
+                                    </button>
+                                  </div>
+                                </div>
+
+                                {/* Referencias de precios por plazo de este producto (Contado, 4 Meses, 6 Meses, 12 Meses y Enganche 40%) */}
+                                <div className="pt-2 border-t border-slate-200/80">
+                                  <div className="text-[10px] font-bold text-gray-500 uppercase flex items-center justify-between mb-1">
+                                    <span>Precios del producto por plazo:</span>
+                                    <span className="text-emerald-700 font-extrabold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                      40% Eng: {formatCurrency(eng40Item)}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-4 gap-1 text-[10px]">
+                                    <button
+                                      type="button"
+                                      onClick={() => aplicarModalidadItem(idx, 'contado')}
+                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
+                                        item.precioUnitario === desgloseItem.contado.precio
+                                          ? 'bg-emerald-600 text-white font-bold border-emerald-600 shadow-2xs'
+                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-emerald-50'
+                                      }`}
+                                      title="Precio de Contado"
+                                    >
+                                      <div className="font-semibold text-[9px] opacity-90">Contado</div>
+                                      <div className="font-black">{formatCurrency(desgloseItem.contado.precio)}</div>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => aplicarModalidadItem(idx, '4meses')}
+                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
+                                        item.precioUnitario === desgloseItem.cuatroMeses.precio
+                                          ? 'bg-blue-600 text-white font-bold border-blue-600 shadow-2xs'
+                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50'
+                                      }`}
+                                      title="Precio a 4 Meses (17 semanas)"
+                                    >
+                                      <div className="font-semibold text-[9px] opacity-90">4 Meses</div>
+                                      <div className="font-black">{formatCurrency(desgloseItem.cuatroMeses.precio)}</div>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => aplicarModalidadItem(idx, '6meses')}
+                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
+                                        item.precioUnitario === desgloseItem.seisMeses.precio
+                                          ? 'bg-indigo-600 text-white font-bold border-indigo-600 shadow-2xs'
+                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-indigo-50'
+                                      }`}
+                                      title="Precio a 6 Meses (26 semanas)"
+                                    >
+                                      <div className="font-semibold text-[9px] opacity-90">6 Meses</div>
+                                      <div className="font-black">{formatCurrency(desgloseItem.seisMeses.precio)}</div>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => aplicarModalidadItem(idx, '12meses')}
+                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
+                                        item.precioUnitario === desgloseItem.doceMeses.precio
+                                          ? 'bg-purple-600 text-white font-bold border-purple-600 shadow-2xs'
+                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-purple-50'
+                                      }`}
+                                      title="Precio a 12 Meses (52 semanas)"
+                                    >
+                                      <div className="font-semibold text-[9px] opacity-90">12 Meses</div>
+                                      <div className="font-black">{formatCurrency(desgloseItem.doceMeses.precio)}</div>
+                                    </button>
+                                  </div>
                                 </div>
                               </div>
-
-                              {/* Control de cantidad */}
-                              <div className="flex items-center gap-1.5 bg-white border rounded-lg p-1">
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => modificarCantidad(idx, -1)}
-                                  className="h-6 w-6 p-0 rounded hover:bg-slate-100"
-                                >
-                                  <Minus className="h-3 w-3" />
-                                </Button>
-                                <span className="font-black w-7 text-center text-sm">
-                                  {item.cantidad}
-                                </span>
-                                <Button
-                                  size="sm"
-                                  variant="ghost"
-                                  onClick={() => modificarCantidad(idx, 1)}
-                                  className="h-6 w-6 p-0 rounded hover:bg-slate-100"
-                                >
-                                  <Plus className="h-3 w-3" />
-                                </Button>
-                              </div>
-
-                              <div className="text-right min-w-[80px]">
-                                <div className="font-black text-gray-950 text-sm">
-                                  {formatCurrency(item.importe)}
-                                </div>
-                                <button
-                                  onClick={() => eliminarDelCarrito(idx)}
-                                  className="text-rose-500 hover:text-rose-700 text-[11px] font-semibold mt-0.5"
-                                >
-                                  Eliminar
-                                </button>
-                              </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
 
                         {/* Banner de Total */}
@@ -1135,32 +1332,138 @@ export default function KioscoVentasPage() {
                           </Select>
                         </div>
 
-                        {/* Selector Contado vs Crédito */}
-                        <div className="grid grid-cols-2 gap-2 mt-2 bg-slate-200/70 p-1 rounded-lg">
-                          <button
-                            type="button"
-                            onClick={() => setTipoVenta('credito')}
-                            className={`py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                              tipoVenta === 'credito'
-                                ? 'bg-blue-800 text-white shadow'
-                                : 'text-gray-700 hover:text-gray-950'
-                            }`}
-                          >
-                            <CreditCard className="h-3.5 w-3.5" />
-                            Levantamiento Crédito
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setTipoVenta('contado')}
-                            className={`py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
-                              tipoVenta === 'contado'
-                                ? 'bg-emerald-700 text-white shadow'
-                                : 'text-gray-700 hover:text-gray-950'
-                            }`}
-                          >
-                            <DollarSign className="h-3.5 w-3.5" />
-                            Venta de Contado
-                          </button>
+                        {/* Selector y Comparador de Plazos y Precios (Contado, 4 Meses, 6 Meses, 12 Meses) */}
+                        <div className="mt-2.5 space-y-1.5">
+                          <div className="flex justify-between items-center text-[11px] font-bold text-gray-700">
+                            <span className="flex items-center gap-1 text-blue-950">
+                              <Sparkles className="h-3.5 w-3.5 text-blue-700" />
+                              Planes de Pago y Precios Disponibles:
+                            </span>
+                            <span className="text-[10px] text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded font-extrabold border border-emerald-200">
+                              Enganche Sugerido: 40%
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+                            {/* 1. CONTADO */}
+                            <button
+                              type="button"
+                              onClick={() => aplicarModalidadPlazo('contado')}
+                              className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
+                                tipoVenta === 'contado' || modalidadPlazo === 'contado'
+                                  ? 'bg-emerald-700 text-white border-emerald-800 shadow-md ring-2 ring-emerald-400'
+                                  : 'bg-white hover:bg-emerald-50/70 border-slate-200 text-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-[11px] uppercase tracking-wide">
+                                  Contado
+                                </span>
+                                <DollarSign className="h-3.5 w-3.5 opacity-80" />
+                              </div>
+                              <div className="mt-1">
+                                <div className="text-xs font-black">
+                                  {formatCurrency(totalesPlazos.contado.precio)}
+                                </div>
+                                <div className="text-[9px] opacity-80 font-medium">
+                                  1 pago • Sin plazos
+                                </div>
+                              </div>
+                            </button>
+
+                            {/* 2. 4 MESES (17 sem) */}
+                            <button
+                              type="button"
+                              onClick={() => aplicarModalidadPlazo('4meses')}
+                              className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
+                                tipoVenta === 'credito' && (modalidadPlazo === '4meses' || plazoSemanas === 17 || plazoSemanas === 16)
+                                  ? 'bg-blue-800 text-white border-blue-900 shadow-md ring-2 ring-blue-400'
+                                  : 'bg-white hover:bg-blue-50/70 border-slate-200 text-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-[11px] uppercase tracking-wide">
+                                  4 Meses
+                                </span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-black/20 font-bold">
+                                  17 sem
+                                </span>
+                              </div>
+                              <div className="mt-1">
+                                <div className="text-xs font-black">
+                                  {formatCurrency(totalesPlazos.cuatroMeses.precio)}
+                                </div>
+                                <div className="text-[9px] opacity-90 font-medium">
+                                  40% Eng: {formatCurrency(totalesPlazos.cuatroMeses.enganche40)}
+                                </div>
+                                <div className="text-[9px] font-bold text-amber-300">
+                                  {formatCurrency(totalesPlazos.cuatroMeses.cuotaSemanal)}/sem
+                                </div>
+                              </div>
+                            </button>
+
+                            {/* 3. 6 MESES (26 sem - Estándar) */}
+                            <button
+                              type="button"
+                              onClick={() => aplicarModalidadPlazo('6meses')}
+                              className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
+                                tipoVenta === 'credito' && (modalidadPlazo === '6meses' || plazoSemanas === 26)
+                                  ? 'bg-blue-900 text-white border-blue-950 shadow-md ring-2 ring-blue-400'
+                                  : 'bg-white hover:bg-blue-50/70 border-slate-200 text-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-[11px] uppercase tracking-wide">
+                                  6 Meses
+                                </span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-black/20 font-bold">
+                                  26 sem
+                                </span>
+                              </div>
+                              <div className="mt-1">
+                                <div className="text-xs font-black">
+                                  {formatCurrency(totalesPlazos.seisMeses.precio)}
+                                </div>
+                                <div className="text-[9px] opacity-90 font-medium">
+                                  40% Eng: {formatCurrency(totalesPlazos.seisMeses.enganche40)}
+                                </div>
+                                <div className="text-[9px] font-bold text-amber-300">
+                                  {formatCurrency(totalesPlazos.seisMeses.cuotaSemanal)}/sem
+                                </div>
+                              </div>
+                            </button>
+
+                            {/* 4. 12 MESES (52 sem - 1 Año) */}
+                            <button
+                              type="button"
+                              onClick={() => aplicarModalidadPlazo('12meses')}
+                              className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
+                                tipoVenta === 'credito' && (modalidadPlazo === '12meses' || plazoSemanas === 52)
+                                  ? 'bg-purple-900 text-white border-purple-950 shadow-md ring-2 ring-purple-400'
+                                  : 'bg-white hover:bg-purple-50/70 border-slate-200 text-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-[11px] uppercase tracking-wide">
+                                  12 Meses
+                                </span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-black/20 font-bold">
+                                  52 sem
+                                </span>
+                              </div>
+                              <div className="mt-1">
+                                <div className="text-xs font-black">
+                                  {formatCurrency(totalesPlazos.doceMeses.precio)}
+                                </div>
+                                <div className="text-[9px] opacity-90 font-medium">
+                                  40% Eng: {formatCurrency(totalesPlazos.doceMeses.enganche40)}
+                                </div>
+                                <div className="text-[9px] font-bold text-amber-300">
+                                  {formatCurrency(totalesPlazos.doceMeses.cuotaSemanal)}/sem
+                                </div>
+                              </div>
+                            </button>
+                          </div>
                         </div>
                       </CardHeader>
 
@@ -1276,43 +1579,119 @@ export default function KioscoVentasPage() {
 
                   {/* PARÁMETROS DE CRÉDITO Y PAGARÉ */}
                   {tipoVenta === 'credito' && (
-                    <div className="border-t pt-3 space-y-3 bg-blue-50/40 p-3 rounded-xl border border-blue-100">
-                      <div className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
-                        <Calendar className="h-3.5 w-3.5 text-blue-700" />
-                        Condiciones de Crédito y Cobranza
+                    <div className="border-t pt-3 space-y-3 bg-blue-50/40 p-3.5 rounded-xl border border-blue-200/80 shadow-xs">
+                      <div className="flex items-center justify-between">
+                        <div className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                          <Calendar className="h-3.5 w-3.5 text-blue-700" />
+                          Condiciones de Crédito y Cobranza
+                        </div>
+                        <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-800 border-blue-300 font-extrabold uppercase">
+                          {modalidadPlazo === '4meses' ? 'Plan 4 Meses' : modalidadPlazo === '12meses' ? 'Plan 12 Meses' : 'Plan 6 Meses'}
+                        </Badge>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <div className="flex items-center justify-between mb-0.5">
-                            <Label className="text-[11px] text-gray-600 font-semibold">Enganche Inicial ($)</Label>
-                            <button
-                              type="button"
-                              onClick={() => setEnganche(Math.round(totalBruto * 0.40))}
-                              className="text-[10px] text-blue-700 hover:text-blue-900 font-bold underline"
-                              title="Calcular 40% fijo"
-                            >
-                              40% Fijo
-                            </button>
-                          </div>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={enganche || ''}
-                            placeholder={`$${Math.round(totalBruto * 0.40)} (40% fijo)`}
-                            onChange={e => setEnganche(Math.round(parseFloat(e.target.value) || 0))}
-                            className="h-8 text-xs font-bold text-green-700"
-                          />
+                      {/* BLOQUE DESTACADO DE ENGANCHE 40% */}
+                      <div className="bg-white p-2.5 rounded-lg border border-blue-200 space-y-2 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <Label className="text-xs font-bold text-gray-900 flex items-center gap-1">
+                            <DollarSign className="h-3.5 w-3.5 text-emerald-600" />
+                            Enganche Inicial
+                          </Label>
+                          <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded ${
+                            enganche === enganche40Recomendado
+                              ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                              : 'bg-slate-100 text-slate-700'
+                          }`}>
+                            {enganche === enganche40Recomendado ? '✓ 40% EXACTO' : `${porcentajeEngancheActual}% del total`}
+                          </span>
                         </div>
 
+                        {/* Botón Principal: Aplicar 40% de Enganche */}
+                        <Button
+                          type="button"
+                          onClick={() => aplicarEnganchePorcentaje(40)}
+                          className={`w-full h-8 text-xs font-bold flex items-center justify-between px-3 rounded-lg transition-all ${
+                            enganche === enganche40Recomendado
+                              ? 'bg-emerald-700 hover:bg-emerald-800 text-white shadow ring-2 ring-emerald-400'
+                              : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300'
+                          }`}
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                            {enganche === enganche40Recomendado ? '40% Enganche Aplicado:' : '⭐ Aplicar Enganche Recomendado 40%:'}
+                          </span>
+                          <span className="font-black text-sm">{formatCurrency(enganche40Recomendado)}</span>
+                        </Button>
+
+                        {/* Pills de Enganche Rápido */}
+                        <div className="grid grid-cols-4 gap-1 text-[10px]">
+                          <button
+                            type="button"
+                            onClick={() => aplicarEnganchePorcentaje(40)}
+                            className={`py-1 rounded border font-bold text-center transition-all ${
+                              enganche === enganche40Recomendado
+                                ? 'bg-emerald-600 text-white border-emerald-600'
+                                : 'bg-slate-50 hover:bg-emerald-50 text-slate-700 border-slate-200'
+                            }`}
+                          >
+                            40% Sugerido
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarEnganchePorcentaje(30)}
+                            className="py-1 rounded border font-semibold text-center bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 transition-all"
+                          >
+                            30% ({formatCurrency(Math.round(totalBruto * 0.3))})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarEnganchePorcentaje(20)}
+                            className="py-1 rounded border font-semibold text-center bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200 transition-all"
+                          >
+                            20% ({formatCurrency(Math.round(totalBruto * 0.2))})
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => aplicarEnganchePorcentaje(0)}
+                            className="py-1 rounded border font-semibold text-center bg-slate-50 hover:bg-rose-50 text-slate-700 border-slate-200 transition-all"
+                          >
+                            $0 (Sin eng.)
+                          </button>
+                        </div>
+
+                        {/* Input Numérico Manual */}
+                        <div className="flex items-center gap-2 pt-1 border-t border-slate-100">
+                          <span className="text-[11px] text-gray-500 font-medium">Monto Personalizado:</span>
+                          <div className="relative flex-1">
+                            <span className="absolute left-2.5 top-1.5 text-xs font-bold text-gray-400">$</span>
+                            <Input
+                              type="number"
+                              min="0"
+                              step="1"
+                              value={enganche || ''}
+                              placeholder="0"
+                              onChange={e => setEnganche(Math.round(parseFloat(e.target.value) || 0))}
+                              className="h-8 pl-6 text-xs font-black text-green-700 bg-white"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Desglose explicativo */}
+                        <div className="flex justify-between text-[10.5px] text-gray-600 bg-slate-50 p-1.5 rounded border border-slate-100">
+                          <span>Enganche Cubierto: <strong className="text-emerald-800">{formatCurrency(planCredito.enganche)}</strong></span>
+                          <span>Saldo Restante: <strong className="text-blue-900">{formatCurrency(planCredito.saldoFinanciado)}</strong></span>
+                        </div>
+                      </div>
+
+                      {/* SELECTORES DE PERIODICIDAD Y PLAZO */}
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <Label className="text-[11px] text-gray-600 font-semibold">Periodicidad</Label>
+                          <Label className="text-[11px] text-gray-600 font-semibold">Periodicidad de Abono</Label>
                           <Select
                             value={periodicidad}
                             onValueChange={(val: any) => setPeriodicidad(val)}
                           >
-                            <SelectTrigger className="h-8 text-xs">
+                            <SelectTrigger className="h-8 text-xs bg-white font-medium">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1322,36 +1701,43 @@ export default function KioscoVentasPage() {
                             </SelectContent>
                           </Select>
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <Label className="text-[11px] text-gray-600 font-semibold">Plazo (Semanas)</Label>
+                          <Label className="text-[11px] text-gray-600 font-semibold">Plazo del Financiamiento</Label>
                           <Select
                             value={plazoSemanas.toString()}
-                            onValueChange={val => setPlazoSemanas(parseInt(val))}
+                            onValueChange={val => {
+                              const s = parseInt(val);
+                              setPlazoSemanas(s);
+                              if (s === 17 || s === 16) setModalidadPlazo('4meses');
+                              else if (s === 26) setModalidadPlazo('6meses');
+                              else if (s === 52) setModalidadPlazo('12meses');
+                              else setModalidadPlazo('otro');
+                            }}
                           >
-                            <SelectTrigger className="h-8 text-xs">
+                            <SelectTrigger className="h-8 text-xs bg-white font-medium">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="4">4 semanas (1 mes)</SelectItem>
                               <SelectItem value="13">13 semanas (3 meses)</SelectItem>
                               <SelectItem value="17">17 semanas (4 meses)</SelectItem>
-                              <SelectItem value="26">26 semanas (6 meses)</SelectItem>
+                              <SelectItem value="26">26 semanas (6 meses - Estándar)</SelectItem>
                               <SelectItem value="39">39 semanas (9 meses)</SelectItem>
                               <SelectItem value="52">52 semanas (12 meses / 1 año)</SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
+                      </div>
 
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <Label className="text-[11px] text-gray-600 font-semibold">Día de Cobro</Label>
+                          <Label className="text-[11px] text-gray-600 font-semibold">Día de Cobro en Ruta</Label>
                           <Select
                             value={diaPago}
                             onValueChange={setDiaPago}
                           >
-                            <SelectTrigger className="h-8 text-xs">
+                            <SelectTrigger className="h-8 text-xs bg-white font-medium">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -1365,38 +1751,53 @@ export default function KioscoVentasPage() {
                             </SelectContent>
                           </Select>
                         </div>
+
+                        {/* Cobrador Asignado */}
+                        <div>
+                          <Label className="text-[11px] text-gray-600 font-semibold">Cobrador Asignado</Label>
+                          <Select
+                            value={cobradorAsignadoId}
+                            onValueChange={setCobradorAsignadoId}
+                          >
+                            <SelectTrigger className="h-8 text-xs bg-white font-medium">
+                              <SelectValue placeholder="Seleccione cobrador" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="sin-asignar">Sin asignar por el momento</SelectItem>
+                              {cobradores.map(cob => (
+                                <SelectItem key={cob.id} value={cob.id}>
+                                  {cob.name} {cob.codigoGestor ? `(${cob.codigoGestor})` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
 
-                      {/* Cobrador Asignado */}
-                      <div>
-                        <Label className="text-[11px] text-gray-600 font-semibold">Cobrador / Gestor Asignado</Label>
-                        <Select
-                          value={cobradorAsignadoId}
-                          onValueChange={setCobradorAsignadoId}
-                        >
-                          <SelectTrigger className="h-8 text-xs">
-                            <SelectValue placeholder="Seleccione un cobrador" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="sin-asignar">Sin asignar por el momento</SelectItem>
-                            {cobradores.map(cob => (
-                              <SelectItem key={cob.id} value={cob.id}>
-                                {cob.name} {cob.codigoGestor ? `(${cob.codigoGestor})` : ''}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {/* Resumen del cálculo del crédito */}
-                      <div className="bg-white p-2.5 rounded-lg border border-blue-200 text-xs space-y-1">
-                        <div className="flex justify-between text-gray-600">
-                          <span>Saldo a Financiar:</span>
+                      {/* Resumen del cálculo del crédito para mostrar al cliente */}
+                      <div className="bg-white p-3 rounded-lg border-2 border-blue-300 text-xs space-y-1.5 shadow-xs">
+                        <div className="flex justify-between items-center text-gray-600 border-b pb-1">
+                          <span>Total Venta:</span>
+                          <span className="font-bold text-gray-900">{formatCurrency(totalBruto)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-emerald-700">
+                          <span>Enganche Pagado:</span>
+                          <span className="font-extrabold">{formatCurrency(planCredito.enganche)} ({porcentajeEngancheActual}%)</span>
+                        </div>
+                        <div className="flex justify-between items-center text-gray-700">
+                          <span>Saldo Restante a Financiar:</span>
                           <span className="font-bold text-gray-900">{formatCurrency(planCredito.saldoFinanciado)}</span>
                         </div>
-                        <div className="flex justify-between text-blue-900 font-bold">
-                          <span>Abono {periodicidad}:</span>
-                          <span className="text-base font-black text-blue-900">{formatCurrency(planCredito.montoCuota)}</span>
+                        <div className="flex justify-between items-center text-blue-900 pt-1 border-t">
+                          <span className="font-bold text-xs uppercase tracking-tight">
+                            Abono {periodicidad}:
+                          </span>
+                          <span className="text-lg font-black text-blue-950">
+                            {formatCurrency(planCredito.montoCuota)}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-500 text-right">
+                          {planCredito.numeroPagos} pagos {periodicidad}es de {formatCurrency(planCredito.montoCuota)}
                         </div>
                       </div>
 
@@ -1428,6 +1829,28 @@ export default function KioscoVentasPage() {
                             Capturar Firma del Cliente en Pantalla
                           </Button>
                         )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* RESUMEN PARA VENTA DE CONTADO */}
+                  {tipoVenta === 'contado' && (
+                    <div className="border-t pt-3 space-y-2 bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200 shadow-xs">
+                      <div className="text-xs font-bold text-emerald-950 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <DollarSign className="h-4 w-4 text-emerald-700" />
+                          Venta Directa de Contado
+                        </span>
+                        <Badge className="bg-emerald-700 text-white font-extrabold text-[10px]">
+                          100% Liquidado
+                        </Badge>
+                      </div>
+                      <p className="text-[11px] text-gray-600">
+                        Esta venta se liquida en 1 sola exhibición al momento de la entrega o compra en mostrador, sin generar pagaré a plazos.
+                      </p>
+                      <div className="bg-white p-2.5 rounded-lg border border-emerald-200 flex justify-between items-center shadow-2xs">
+                        <span className="text-xs font-bold text-emerald-950">Total a Cobrar de Contado:</span>
+                        <span className="text-xl font-black text-emerald-800">{formatCurrency(totalBruto)}</span>
                       </div>
                     </div>
                   )}

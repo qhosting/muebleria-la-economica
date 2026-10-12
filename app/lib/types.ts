@@ -196,4 +196,8 @@ export interface CartItem {
   precioUnitario: number;
   cantidad: number;
   importe: number;
+  precioContado?: number;
+  precioVenta?: number;
+  plazoSeleccionado?: 'contado' | '4meses' | '6meses' | '12meses' | 'otro';
 }
+

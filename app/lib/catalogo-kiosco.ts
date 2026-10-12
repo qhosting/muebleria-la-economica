@@ -1038,3 +1038,162 @@ export function calcularPlanCredito(
     totalCredito: engancheEfectivo + (cuota * numeroPagos)
   };
 }
+
+// =========================================================================
+// SISTEMA DE PRECIOS POR PLAZO Y ENGANCHE 40% (Contado, 4 Meses, 6 Meses, 12 Meses)
+// =========================================================================
+
+export interface DesglosePlazoItem {
+  plazoKey: 'contado' | '4meses' | '6meses' | '12meses';
+  nombre: string;
+  subtitulo: string;
+  meses: number;
+  semanas: number;
+  precio: number;
+  enganche40: number;
+  saldoFinanciado: number;
+  cuotaSemanal: number;
+  cuotaQuincenal: number;
+  cuotaMensual: number;
+}
+
+export interface EsquemaPreciosProducto {
+  contado: DesglosePlazoItem;
+  cuatroMeses: DesglosePlazoItem;
+  seisMeses: DesglosePlazoItem;
+  doceMeses: DesglosePlazoItem;
+  lista: DesglosePlazoItem[];
+}
+
+/**
+ * Calcula los precios de un producto a Contado, 4 Meses, 6 Meses y 12 Meses
+ * junto con el 40% de enganche requerido y sus cuotas semanales, quincenales y mensuales.
+ */
+export function calcularPreciosPlazosProducto(
+  precioContado: number,
+  precioVenta?: number
+): EsquemaPreciosProducto {
+  const pContado = Math.max(0, Math.round(precioContado || 0));
+  // Si no se especifica precio de lista a 6 meses, se asume aprox 12% sobre contado
+  const p6Meses = Math.max(pContado, Math.round(precioVenta || pContado * 1.12));
+  const diferencia = Math.max(0, p6Meses - pContado);
+
+  // 4 Meses: proporción lineal (4/6 de la diferencia)
+  const p4Meses = Math.round(pContado + diferencia * (4 / 6));
+
+  // 12 Meses: proyección al doble de plazo (26 sem -> 52 sem)
+  const p12Meses = Math.round(pContado + diferencia * 2);
+
+  const generarPlazo = (
+    plazoKey: 'contado' | '4meses' | '6meses' | '12meses',
+    nombre: string,
+    subtitulo: string,
+    meses: number,
+    semanas: number,
+    precio: number
+  ): DesglosePlazoItem => {
+    const enganche40 = Math.round(precio * 0.40);
+    const saldoFinanciado = plazoKey === 'contado' ? 0 : Math.max(0, precio - enganche40);
+
+    const quincenas = meses > 0 ? meses * 2 : 0;
+
+    return {
+      plazoKey,
+      nombre,
+      subtitulo,
+      meses,
+      semanas,
+      precio,
+      enganche40,
+      saldoFinanciado,
+      cuotaSemanal: semanas > 0 ? Math.ceil(saldoFinanciado / semanas) : 0,
+      cuotaQuincenal: quincenas > 0 ? Math.ceil(saldoFinanciado / quincenas) : 0,
+      cuotaMensual: meses > 0 ? Math.ceil(saldoFinanciado / meses) : 0
+    };
+  };
+
+  const contado = generarPlazo('contado', 'Contado', 'Pago directo en 1 exhibición', 0, 0, pContado);
+  const cuatroMeses = generarPlazo('4meses', '4 Meses', '17 Semanas • 40% Enganche', 4, 17, p4Meses);
+  const seisMeses = generarPlazo('6meses', '6 Meses', '26 Semanas • Estándar', 6, 26, p6Meses);
+  const doceMeses = generarPlazo('12meses', '12 Meses', '52 Semanas • 1 Año', 12, 52, p12Meses);
+
+  return {
+    contado,
+    cuatroMeses,
+    seisMeses,
+    doceMeses,
+    lista: [contado, cuatroMeses, seisMeses, doceMeses]
+  };
+}
+
+/**
+ * Calcula los totales consolidados de un pedido/carrito para cada plazo (Contado, 4m, 6m, 12m)
+ * con el 40% de enganche respectivo y sus cuotas correspondientes.
+ */
+export function calcularTotalesPlazosCarrito(
+  items: Array<{
+    cantidad: number;
+    precioUnitario: number;
+    precioContado?: number;
+    precioVenta?: number;
+  }>
+): EsquemaPreciosProducto {
+  let totalContado = 0;
+  let total4Meses = 0;
+  let total6Meses = 0;
+  let total12Meses = 0;
+
+  for (const item of items) {
+    const cant = item.cantidad || 1;
+    const baseContado = item.precioContado && item.precioContado > 0 ? item.precioContado : item.precioUnitario;
+    const baseVenta = item.precioVenta && item.precioVenta > 0 ? item.precioVenta : item.precioUnitario;
+
+    const desglose = calcularPreciosPlazosProducto(baseContado, baseVenta);
+
+    totalContado += desglose.contado.precio * cant;
+    total4Meses += desglose.cuatroMeses.precio * cant;
+    total6Meses += desglose.seisMeses.precio * cant;
+    total12Meses += desglose.doceMeses.precio * cant;
+  }
+
+  const generarPlazo = (
+    plazoKey: 'contado' | '4meses' | '6meses' | '12meses',
+    nombre: string,
+    subtitulo: string,
+    meses: number,
+    semanas: number,
+    precio: number
+  ): DesglosePlazoItem => {
+    const enganche40 = Math.round(precio * 0.40);
+    const saldoFinanciado = plazoKey === 'contado' ? 0 : Math.max(0, precio - enganche40);
+    const quincenas = meses > 0 ? meses * 2 : 0;
+
+    return {
+      plazoKey,
+      nombre,
+      subtitulo,
+      meses,
+      semanas,
+      precio,
+      enganche40,
+      saldoFinanciado,
+      cuotaSemanal: semanas > 0 ? Math.ceil(saldoFinanciado / semanas) : 0,
+      cuotaQuincenal: quincenas > 0 ? Math.ceil(saldoFinanciado / quincenas) : 0,
+      cuotaMensual: meses > 0 ? Math.ceil(saldoFinanciado / meses) : 0
+    };
+  };
+
+  const contado = generarPlazo('contado', 'Contado', '1 pago • Sin financiamiento', 0, 0, totalContado);
+  const cuatroMeses = generarPlazo('4meses', '4 Meses', '17 Semanas • 40% Enganche', 4, 17, total4Meses);
+  const seisMeses = generarPlazo('6meses', '6 Meses', '26 Semanas • Estándar', 6, 26, total6Meses);
+  const doceMeses = generarPlazo('12meses', '12 Meses', '52 Semanas • 1 Año', 12, 52, total12Meses);
+
+  return {
+    contado,
+    cuatroMeses,
+    seisMeses,
+    doceMeses,
+    lista: [contado, cuatroMeses, seisMeses, doceMeses]
+  };
+}
+
