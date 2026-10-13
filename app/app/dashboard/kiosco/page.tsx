@@ -52,6 +52,10 @@ import {
   SUCURSALES_SISTEMA,
   SUCURSAL_SAN_LUCAS,
   calcularPlanCredito,
+  ModalidadPrecio,
+  obtenerPreciosProducto,
+  obtenerPrecioPorModalidad,
+  obtenerPlazoSemanasSugerido,
   calcularPreciosPlazosProducto,
   calcularTotalesPlazosCarrito,
   DesglosePlazoItem
@@ -85,7 +89,8 @@ export default function KioscoVentasPage() {
   // Carrito de compra
   const [carrito, setCarrito] = useState<CartItem[]>([]);
 
-  // Configuración de la Venta / Crédito
+  // Configuración de la Venta / Precios (Contado, 1 Mes, 4 Meses, 12 Meses)
+  const [modalidadPrecio, setModalidadPrecio] = useState<ModalidadPrecio>('12meses');
   const [tipoVenta, setTipoVenta] = useState<'contado' | 'credito'>('credito');
   const [modalidadPlazo, setModalidadPlazo] = useState<'contado' | '4meses' | '6meses' | '12meses' | 'otro'>('6meses');
   const [nombreCliente, setNombreCliente] = useState('');
@@ -298,10 +303,71 @@ export default function KioscoVentasPage() {
     return item.stockSugerido ? Math.min(3, item.stockSugerido) : 2;
   };
 
-  // Agregar producto del catálogo al carrito
-  const agregarAlCarrito = (item: CatalogoItem) => {
+  // Cambiar modalidad de precios global para la remisión
+  const cambiarModalidadPrecio = (nuevaModalidad: ModalidadPrecio) => {
+    setModalidadPrecio(nuevaModalidad);
+    if (nuevaModalidad === 'contado') {
+      setTipoVenta('contado');
+      setEnganche(0);
+      setPlazoSemanas(0);
+    } else {
+      setTipoVenta('credito');
+      const semanas = obtenerPlazoSemanasSugerido(nuevaModalidad);
+      if (semanas > 0) setPlazoSemanas(semanas);
+    }
+
+    // Actualizar precios de los artículos que ya están en el carrito al nuevo esquema seleccionado
+    if (carrito.length > 0) {
+      setCarrito(prev => prev.map(item => {
+        const prod = catalogoCombinado.find(p => p.id === item.productoId || p.codigo === item.codigo || p.nombre === item.concepto);
+        if (prod) {
+          const nuevoPrecio = obtenerPrecioPorModalidad(prod, nuevaModalidad);
+          return {
+            ...item,
+            precioUnitario: nuevoPrecio,
+            importe: item.cantidad * nuevoPrecio,
+            modalidadPrecio: nuevaModalidad
+          };
+        }
+        return item;
+      }));
+      toast.info(`Precios del pedido actualizados a: ${
+        nuevaModalidad === 'contado' ? 'Contado' :
+        nuevaModalidad === '1mes' ? '1 Mes (4 semanas)' :
+        nuevaModalidad === '4meses' ? '4 Meses (17 semanas)' : '12 Meses (52 semanas)'
+      }`);
+    }
+  };
+
+  // Cambiar modalidad de precio para un artículo específico del carrito
+  const cambiarModalidadItemCarrito = (index: number, nuevaModalidad: ModalidadPrecio) => {
+    const item = carrito[index];
+    if (!item) return;
+    const prod = catalogoCombinado.find(p => p.id === item.productoId || p.codigo === item.codigo || p.nombre === item.concepto);
+    if (prod) {
+      const nuevoPrecio = obtenerPrecioPorModalidad(prod, nuevaModalidad);
+      const nuevoCarrito = [...carrito];
+      nuevoCarrito[index] = {
+        ...item,
+        precioUnitario: nuevoPrecio,
+        importe: item.cantidad * nuevoPrecio,
+        modalidadPrecio: nuevaModalidad
+      };
+      setCarrito(nuevoCarrito);
+      const label = nuevaModalidad === 'contado' ? 'Contado' : nuevaModalidad === '1mes' ? '1 Mes' : nuevaModalidad === '4meses' ? '4 Meses' : '12 Meses';
+      toast.success(`${item.concepto}: actualizado a precio ${label}`);
+    }
+  };
+
+  // Agregar producto del catálogo al carrito con modalidad especificada o la activa
+  const agregarAlCarrito = (item: CatalogoItem, modalidadEspecifica?: ModalidadPrecio) => {
     const stockDisp = obtenerStockSucursal(item);
-    const existenteIndex = carrito.findIndex(c => c.concepto === item.nombre);
+    const modUso = modalidadEspecifica || modalidadPrecio;
+    const precio = obtenerPrecioPorModalidad(item, modUso);
+
+    const existenteIndex = carrito.findIndex(
+      c => (c.productoId === item.id || c.codigo === item.codigo || c.concepto === item.nombre) && (c.modalidadPrecio === modUso || !c.modalidadPrecio)
+    );
     const cantActual = existenteIndex >= 0 ? carrito[existenteIndex].cantidad : 0;
 
     if (cantActual >= stockDisp) {
@@ -311,23 +377,14 @@ export default function KioscoVentasPage() {
 
     const pContado = item.precioContado || item.precioVenta;
     const pVenta = item.precioVenta || item.precioContado;
-    const desglose = calcularPreciosPlazosProducto(pContado, pVenta);
-
-    let precio = pVenta;
-    if (modalidadPlazo === 'contado' || tipoVenta === 'contado') {
-      precio = desglose.contado.precio;
-    } else if (modalidadPlazo === '4meses') {
-      precio = desglose.cuatroMeses.precio;
-    } else if (modalidadPlazo === '6meses') {
-      precio = desglose.seisMeses.precio;
-    } else if (modalidadPlazo === '12meses') {
-      precio = desglose.doceMeses.precio;
-    }
 
     if (existenteIndex >= 0) {
       const nuevoCarrito = [...carrito];
       nuevoCarrito[existenteIndex].cantidad += 1;
-      nuevoCarrito[existenteIndex].importe = nuevoCarrito[existenteIndex].cantidad * nuevoCarrito[existenteIndex].precioUnitario;
+      nuevoCarrito[existenteIndex].precioUnitario = precio;
+      nuevoCarrito[existenteIndex].importe = nuevoCarrito[existenteIndex].cantidad * precio;
+      nuevoCarrito[existenteIndex].modalidadPrecio = modUso;
+      nuevoCarrito[existenteIndex].plazoSeleccionado = modUso;
       setCarrito(nuevoCarrito);
     } else {
       setCarrito([
@@ -342,11 +399,13 @@ export default function KioscoVentasPage() {
           importe: precio,
           precioContado: pContado,
           precioVenta: pVenta,
-          plazoSeleccionado: modalidadPlazo
+          modalidadPrecio: modUso,
+          plazoSeleccionado: modUso
         }
       ]);
     }
-    toast.success(`Agregado: ${item.nombre}`);
+    const labelMod = modUso === 'contado' ? 'Contado' : modUso === '1mes' ? '1 Mes' : modUso === '4meses' ? '4 Meses' : '12 Meses';
+    toast.success(`Agregado (${labelMod}): ${item.nombre}`);
   };
 
   // Agregar artículo personalizado
@@ -590,20 +649,30 @@ export default function KioscoVentasPage() {
         const prodDB = mapaDB.get(item.codigo?.toUpperCase());
         if (prodDB) {
           mapaDB.delete(item.codigo?.toUpperCase());
+          const preciosDB = obtenerPreciosProducto(prodDB);
           return {
             ...item,
             id: prodDB.id || item.id,
             nombre: prodDB.nombre || item.nombre,
-            precioVenta: prodDB.precioVenta || item.precioVenta,
-            precioContado: prodDB.precioCompra || item.precioContado,
+            precioContado: preciosDB.contado,
+            precio1Mes: preciosDB.unMes,
+            precio4Meses: preciosDB.cuatroMeses,
+            precio12Meses: preciosDB.doceMeses,
+            precioVenta: preciosDB.doceMeses,
             categoria: (prodDB.categoria || item.categoria) as any,
             descripcion: prodDB.descripcion || item.descripcion,
             stockTotal: prodDB.stockTotal,
             stockPorSucursal: prodDB.stockPorSucursal || []
           };
         }
+        const preciosItem = obtenerPreciosProducto(item);
         return {
           ...item,
+          precioContado: preciosItem.contado,
+          precio1Mes: preciosItem.unMes,
+          precio4Meses: preciosItem.cuatroMeses,
+          precio12Meses: preciosItem.doceMeses,
+          precioVenta: preciosItem.doceMeses,
           stockTotal: item.stockSugerido || 5,
           stockPorSucursal: SUCURSALES_SISTEMA.map(s => ({
             sucursalId: s.id,
@@ -614,32 +683,46 @@ export default function KioscoVentasPage() {
       });
 
       // Agregar cualquier producto nuevo creado en BD que no esté en el catálogo inicial
-      const nuevosDeBD: CatalogoItem[] = Array.from(mapaDB.values()).map((p: any) => ({
-        id: p.id,
-        codigo: p.codigo,
-        nombre: p.nombre,
-        categoria: (p.categoria || 'Cocinas y Muebles') as any,
-        marca: 'General',
-        precioContado: p.precioCompra || p.precioVenta,
-        precioVenta: p.precioVenta,
-        descripcion: p.descripcion || '',
-        stockTotal: p.stockTotal || 0,
-        stockPorSucursal: p.stockPorSucursal || []
-      }));
+      const nuevosDeBD: CatalogoItem[] = Array.from(mapaDB.values()).map((p: any) => {
+        const preciosP = obtenerPreciosProducto(p);
+        return {
+          id: p.id,
+          codigo: p.codigo,
+          nombre: p.nombre,
+          categoria: (p.categoria || 'Cocinas y Muebles') as any,
+          marca: 'General',
+          precioContado: preciosP.contado,
+          precio1Mes: preciosP.unMes,
+          precio4Meses: preciosP.cuatroMeses,
+          precio12Meses: preciosP.doceMeses,
+          precioVenta: preciosP.doceMeses,
+          descripcion: p.descripcion || '',
+          stockTotal: p.stockTotal || 0,
+          stockPorSucursal: p.stockPorSucursal || []
+        };
+      });
 
       return [...catalogoActualizado, ...nuevosDeBD];
     }
     
     // Si aún no carga productosDB, asumir catálogo inicial con existencia en todas las sucursales
-    return CATALOGO_PRODUCTOS_INICIAL.map(item => ({
-      ...item,
-      stockTotal: item.stockSugerido || 5,
-      stockPorSucursal: SUCURSALES_SISTEMA.map(s => ({
-        sucursalId: s.id,
-        sucursalNombre: s.nombre,
-        cantidad: s.nombre.includes('SAN LUCAS') ? (item.stockSugerido || 5) : 3
-      }))
-    }));
+    return CATALOGO_PRODUCTOS_INICIAL.map(item => {
+      const preciosItem = obtenerPreciosProducto(item);
+      return {
+        ...item,
+        precioContado: preciosItem.contado,
+        precio1Mes: preciosItem.unMes,
+        precio4Meses: preciosItem.cuatroMeses,
+        precio12Meses: preciosItem.doceMeses,
+        precioVenta: preciosItem.doceMeses,
+        stockTotal: item.stockSugerido || 5,
+        stockPorSucursal: SUCURSALES_SISTEMA.map(s => ({
+          sucursalId: s.id,
+          sucursalNombre: s.nombre,
+          cantidad: s.nombre.includes('SAN LUCAS') ? (item.stockSugerido || 5) : 3
+        }))
+      };
+    });
   }, [productosDB]);
 
   // Filtrado de catálogo: SOLO mostrar productos con existencia disponible en la sucursal activa
@@ -971,6 +1054,41 @@ export default function KioscoVentasPage() {
                 </CardHeader>
 
                 <CardContent className="space-y-4 pt-0">
+                  {/* Selector interactivo de los 4 precios: Contado, 1 Mes, 4 Meses, 12 Meses */}
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between bg-gradient-to-r from-slate-100 via-blue-50/50 to-emerald-50/40 p-2.5 rounded-xl border border-slate-200/90 gap-2">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-gray-800">
+                      <DollarSign className="h-4 w-4 text-blue-700" />
+                      <span>Seleccionar Modalidad de Precios:</span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 w-full sm:w-auto">
+                      {[
+                        { id: 'contado', label: 'Contado', sub: '1 pago' },
+                        { id: '1mes', label: '1 Mes', sub: '4 sem' },
+                        { id: '4meses', label: '4 Meses', sub: '17 sem' },
+                        { id: '12meses', label: '12 Meses', sub: '52 sem' },
+                      ].map(m => (
+                        <Button
+                          key={m.id}
+                          size="sm"
+                          type="button"
+                          variant="outline"
+                          onClick={() => cambiarModalidadPrecio(m.id as ModalidadPrecio)}
+                          className={`h-8 px-3 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1 ${
+                            modalidadPrecio === m.id
+                              ? m.id === 'contado' ? 'bg-blue-800 text-white shadow ring-2 ring-blue-400 border-blue-800' :
+                                m.id === '1mes' ? 'bg-amber-600 text-white shadow ring-2 ring-amber-300 border-amber-600' :
+                                m.id === '4meses' ? 'bg-purple-700 text-white shadow ring-2 ring-purple-300 border-purple-700' :
+                                'bg-emerald-700 text-white shadow ring-2 ring-emerald-300 border-emerald-700'
+                              : 'bg-white text-gray-700 hover:bg-slate-100 border-slate-300'
+                          }`}
+                        >
+                          <span>{m.label}</span>
+                          <span className="text-[10px] font-normal opacity-75">({m.sub})</span>
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Pills de Categorías con scroll horizontal */}
                   <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
                     {categorias.map(cat => (
@@ -1051,32 +1169,111 @@ export default function KioscoVentasPage() {
                               </p>
                             </div>
 
-                            <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-2.5">
-                              <div className="flex items-baseline justify-between">
-                                <div>
-                                  <div className="text-[10px] text-gray-400 font-medium">
-                                    {tipoVenta === 'credito' ? 'Precio Crédito' : 'Precio Contado'}
+                            <div className="mt-3 pt-2.5 border-t border-slate-100 space-y-2">
+                              {/* Selector / Tabla interactiva de los 4 precios: Contado, 1 Mes, 4 Meses, 12 Meses */}
+                              <div className="grid grid-cols-2 gap-1.5 bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-[11px]">
+                                {/* Contado */}
+                                <button
+                                  type="button"
+                                  onClick={() => agregarAlCarrito(prod, 'contado')}
+                                  className={`text-left p-1.5 rounded transition-all border ${
+                                    modalidadPrecio === 'contado'
+                                      ? 'bg-blue-50 border-blue-500 ring-1 ring-blue-300 shadow-xs'
+                                      : 'bg-white hover:bg-slate-100 border-slate-200'
+                                  }`}
+                                  title="Click para agregar con precio de Contado"
+                                >
+                                  <div className="text-[10px] text-blue-900 font-bold flex items-center justify-between">
+                                    <span>Contado</span>
+                                    {modalidadPrecio === 'contado' && <CheckCircle className="h-2.5 w-2.5 text-blue-700" />}
                                   </div>
-                                  <div className="text-base font-black text-gray-950">
-                                    {formatCurrency(tipoVenta === 'credito' ? prod.precioVenta : prod.precioContado)}
+                                  <div className="font-black text-xs text-blue-950 mt-0.5">
+                                    {formatCurrency(prod.precioContado)}
                                   </div>
-                                </div>
-                                {tipoVenta === 'credito' && (
-                                  <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">
-                                    {formatCurrency(Math.ceil((prod.precioVenta - (prod.precioVenta * 0.1)) / 16))}/sem
-                                  </span>
-                                )}
+                                  <div className="text-[9px] text-slate-500 font-medium">1 pago</div>
+                                </button>
+
+                                {/* 1 Mes */}
+                                <button
+                                  type="button"
+                                  onClick={() => agregarAlCarrito(prod, '1mes')}
+                                  className={`text-left p-1.5 rounded transition-all border ${
+                                    modalidadPrecio === '1mes'
+                                      ? 'bg-amber-50 border-amber-500 ring-1 ring-amber-300 shadow-xs'
+                                      : 'bg-white hover:bg-slate-100 border-slate-200'
+                                  }`}
+                                  title="Click para agregar con precio 1 Mes"
+                                >
+                                  <div className="text-[10px] text-amber-900 font-bold flex items-center justify-between">
+                                    <span>1 Mes</span>
+                                    {modalidadPrecio === '1mes' && <CheckCircle className="h-2.5 w-2.5 text-amber-700" />}
+                                  </div>
+                                  <div className="font-bold text-xs text-amber-950 mt-0.5">
+                                    {formatCurrency(prod.precio1Mes)}
+                                  </div>
+                                  <div className="text-[9px] text-amber-700 font-medium">
+                                    {formatCurrency(Math.ceil(((prod.precio1Mes || 0) * 0.60) / 4))}/sem
+                                  </div>
+                                </button>
+
+                                {/* 4 Meses */}
+                                <button
+                                  type="button"
+                                  onClick={() => agregarAlCarrito(prod, '4meses')}
+                                  className={`text-left p-1.5 rounded transition-all border ${
+                                    modalidadPrecio === '4meses'
+                                      ? 'bg-purple-50 border-purple-500 ring-1 ring-purple-300 shadow-xs'
+                                      : 'bg-white hover:bg-slate-100 border-slate-200'
+                                  }`}
+                                  title="Click para agregar con precio 4 Meses"
+                                >
+                                  <div className="text-[10px] text-purple-900 font-bold flex items-center justify-between">
+                                    <span>4 Meses</span>
+                                    {modalidadPrecio === '4meses' && <CheckCircle className="h-2.5 w-2.5 text-purple-700" />}
+                                  </div>
+                                  <div className="font-bold text-xs text-purple-950 mt-0.5">
+                                    {formatCurrency(prod.precio4Meses)}
+                                  </div>
+                                  <div className="text-[9px] text-purple-700 font-medium">
+                                    {formatCurrency(Math.ceil(((prod.precio4Meses || 0) * 0.60) / 17))}/sem
+                                  </div>
+                                </button>
+
+                                {/* 12 Meses */}
+                                <button
+                                  type="button"
+                                  onClick={() => agregarAlCarrito(prod, '12meses')}
+                                  className={`text-left p-1.5 rounded transition-all border ${
+                                    modalidadPrecio === '12meses'
+                                      ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-300 shadow-xs'
+                                      : 'bg-white hover:bg-slate-100 border-slate-200'
+                                  }`}
+                                  title="Click para agregar con precio 12 Meses"
+                                >
+                                  <div className="text-[10px] text-emerald-900 font-bold flex items-center justify-between">
+                                    <span>12 Meses</span>
+                                    {modalidadPrecio === '12meses' && <CheckCircle className="h-2.5 w-2.5 text-emerald-700" />}
+                                  </div>
+                                  <div className="font-black text-xs text-emerald-950 mt-0.5">
+                                    {formatCurrency(prod.precio12Meses || prod.precioVenta)}
+                                  </div>
+                                  <div className="text-[9px] text-emerald-700 font-medium">
+                                    {formatCurrency(Math.ceil(((prod.precio12Meses || prod.precioVenta || 0) * 0.60) / 52))}/sem
+                                  </div>
+                                </button>
                               </div>
 
                               {/* Botones de acción solicitados */}
                               <div className="space-y-1.5 pt-0.5">
                                 <Button
                                   size="sm"
-                                  onClick={() => agregarAlCarrito(prod)}
+                                  onClick={() => agregarAlCarrito(prod, modalidadPrecio)}
                                   className="w-full bg-blue-800 hover:bg-blue-900 text-white font-bold h-9 text-xs transition-colors gap-1.5 shadow-sm"
                                 >
                                   <Plus className="h-4 w-4" />
-                                  {cantEnCarrito > 0 ? `Agregar más (${cantEnCarrito} en remisión)` : 'Agregar a la Remisión'}
+                                  {cantEnCarrito > 0
+                                    ? `Agregar más (${cantEnCarrito} en remisión)`
+                                    : `Agregar (${modalidadPrecio === 'contado' ? 'Contado' : modalidadPrecio === '1mes' ? '1 Mes' : modalidadPrecio === '4meses' ? '4 Meses' : '12 Meses'})`}
                                 </Button>
 
                                 <Button
@@ -1154,9 +1351,11 @@ export default function KioscoVentasPage() {
                       <CardContent className="p-4 space-y-3">
                         <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
                           {carrito.map((item, idx) => {
-                            const pContado = item.precioContado && item.precioContado > 0 ? item.precioContado : item.precioUnitario;
-                            const pVenta = item.precioVenta && item.precioVenta > 0 ? item.precioVenta : item.precioUnitario;
-                            const desgloseItem = calcularPreciosPlazosProducto(pContado, pVenta);
+                            const prod = catalogoCombinado.find(p => p.id === item.productoId || p.codigo === item.codigo || p.nombre === item.concepto);
+                            const pContado = prod ? obtenerPrecioPorModalidad(prod, 'contado') : (item.precioContado || item.precioUnitario);
+                            const p1Mes = prod ? obtenerPrecioPorModalidad(prod, '1mes') : Math.round(pContado * 1.05);
+                            const p4Meses = prod ? obtenerPrecioPorModalidad(prod, '4meses') : Math.round(pContado * 1.15);
+                            const p12Meses = prod ? obtenerPrecioPorModalidad(prod, '12meses') : (item.precioVenta || Math.round(pContado * 1.25));
                             const eng40Item = Math.round(item.precioUnitario * 0.40);
 
                             return (
@@ -1169,14 +1368,29 @@ export default function KioscoVentasPage() {
                                     <p className="font-bold text-gray-900 text-sm truncate">
                                       {item.concepto}
                                     </p>
-                                    <div className="flex items-center gap-2 text-gray-500 mt-1">
-                                      <span>Precio Unitario:</span>
-                                      <input
-                                        type="number"
-                                        value={item.precioUnitario}
-                                        onChange={e => modificarPrecio(idx, parseFloat(e.target.value))}
-                                        className="w-24 px-2 py-0.5 border rounded text-right font-bold text-gray-900 bg-white"
-                                      />
+                                    <div className="flex items-center gap-2 text-gray-500 mt-1 flex-wrap">
+                                      <div className="flex items-center gap-1">
+                                        <span className="text-[11px] font-semibold text-gray-600">Modalidad:</span>
+                                        <select
+                                          value={item.modalidadPrecio || modalidadPrecio}
+                                          onChange={e => cambiarModalidadItemCarrito(idx, e.target.value as ModalidadPrecio)}
+                                          className="text-[11px] font-bold border rounded px-1.5 py-0.5 bg-white text-gray-900 cursor-pointer shadow-xs"
+                                        >
+                                          <option value="contado">Contado</option>
+                                          <option value="1mes">1 Mes</option>
+                                          <option value="4meses">4 Meses</option>
+                                          <option value="12meses">12 Meses</option>
+                                        </select>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <span>Precio Unitario:</span>
+                                        <input
+                                          type="number"
+                                          value={item.precioUnitario}
+                                          onChange={e => modificarPrecio(idx, parseFloat(e.target.value))}
+                                          className="w-24 px-2 py-0.5 border rounded text-right font-bold text-gray-900 bg-white"
+                                        />
+                                      </div>
                                     </div>
                                   </div>
 
@@ -1216,7 +1430,7 @@ export default function KioscoVentasPage() {
                                   </div>
                                 </div>
 
-                                {/* Referencias de precios por plazo de este producto (Contado, 4 Meses, 6 Meses, 12 Meses y Enganche 40%) */}
+                                {/* Referencias de precios por plazo de este producto (Contado, 1 Mes, 4 Meses, 12 Meses y Enganche 40%) */}
                                 <div className="pt-2 border-t border-slate-200/80">
                                   <div className="text-[10px] font-bold text-gray-500 uppercase flex items-center justify-between mb-1">
                                     <span>Precios del producto por plazo:</span>
@@ -1227,58 +1441,58 @@ export default function KioscoVentasPage() {
                                   <div className="grid grid-cols-4 gap-1 text-[10px]">
                                     <button
                                       type="button"
-                                      onClick={() => aplicarModalidadItem(idx, 'contado')}
+                                      onClick={() => cambiarModalidadItemCarrito(idx, 'contado')}
                                       className={`px-1.5 py-1 rounded border text-center transition-all ${
-                                        item.precioUnitario === desgloseItem.contado.precio
+                                        (item.modalidadPrecio || modalidadPrecio) === 'contado'
                                           ? 'bg-emerald-600 text-white font-bold border-emerald-600 shadow-2xs'
                                           : 'bg-white text-gray-700 border-gray-200 hover:bg-emerald-50'
                                       }`}
                                       title="Precio de Contado"
                                     >
                                       <div className="font-semibold text-[9px] opacity-90">Contado</div>
-                                      <div className="font-black">{formatCurrency(desgloseItem.contado.precio)}</div>
+                                      <div className="font-black">{formatCurrency(pContado)}</div>
                                     </button>
 
                                     <button
                                       type="button"
-                                      onClick={() => aplicarModalidadItem(idx, '4meses')}
+                                      onClick={() => cambiarModalidadItemCarrito(idx, '1mes')}
                                       className={`px-1.5 py-1 rounded border text-center transition-all ${
-                                        item.precioUnitario === desgloseItem.cuatroMeses.precio
+                                        (item.modalidadPrecio || modalidadPrecio) === '1mes'
+                                          ? 'bg-amber-600 text-white font-bold border-amber-600 shadow-2xs'
+                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-amber-50'
+                                      }`}
+                                      title="Precio a 1 Mes (4 semanas)"
+                                    >
+                                      <div className="font-semibold text-[9px] opacity-90">1 Mes</div>
+                                      <div className="font-black">{formatCurrency(p1Mes)}</div>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => cambiarModalidadItemCarrito(idx, '4meses')}
+                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
+                                        (item.modalidadPrecio || modalidadPrecio) === '4meses'
                                           ? 'bg-blue-600 text-white font-bold border-blue-600 shadow-2xs'
                                           : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50'
                                       }`}
                                       title="Precio a 4 Meses (17 semanas)"
                                     >
                                       <div className="font-semibold text-[9px] opacity-90">4 Meses</div>
-                                      <div className="font-black">{formatCurrency(desgloseItem.cuatroMeses.precio)}</div>
+                                      <div className="font-black">{formatCurrency(p4Meses)}</div>
                                     </button>
 
                                     <button
                                       type="button"
-                                      onClick={() => aplicarModalidadItem(idx, '6meses')}
+                                      onClick={() => cambiarModalidadItemCarrito(idx, '12meses')}
                                       className={`px-1.5 py-1 rounded border text-center transition-all ${
-                                        item.precioUnitario === desgloseItem.seisMeses.precio
-                                          ? 'bg-indigo-600 text-white font-bold border-indigo-600 shadow-2xs'
-                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-indigo-50'
-                                      }`}
-                                      title="Precio a 6 Meses (26 semanas)"
-                                    >
-                                      <div className="font-semibold text-[9px] opacity-90">6 Meses</div>
-                                      <div className="font-black">{formatCurrency(desgloseItem.seisMeses.precio)}</div>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => aplicarModalidadItem(idx, '12meses')}
-                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
-                                        item.precioUnitario === desgloseItem.doceMeses.precio
+                                        (item.modalidadPrecio || modalidadPrecio) === '12meses'
                                           ? 'bg-purple-600 text-white font-bold border-purple-600 shadow-2xs'
                                           : 'bg-white text-gray-700 border-gray-200 hover:bg-purple-50'
                                       }`}
                                       title="Precio a 12 Meses (52 semanas)"
                                     >
                                       <div className="font-semibold text-[9px] opacity-90">12 Meses</div>
-                                      <div className="font-black">{formatCurrency(desgloseItem.doceMeses.precio)}</div>
+                                      <div className="font-black">{formatCurrency(p12Meses)}</div>
                                     </button>
                                   </div>
                                 </div>
@@ -1332,7 +1546,7 @@ export default function KioscoVentasPage() {
                           </Select>
                         </div>
 
-                        {/* Selector y Comparador de Plazos y Precios (Contado, 4 Meses, 6 Meses, 12 Meses) */}
+{/* Selector y Comparador de Plazos y Precios (Contado, 1 Mes, 4 Meses, 12 Meses) */}
                         <div className="mt-2.5 space-y-1.5">
                           <div className="flex justify-between items-center text-[11px] font-bold text-gray-700">
                             <span className="flex items-center gap-1 text-blue-950">
@@ -1348,9 +1562,9 @@ export default function KioscoVentasPage() {
                             {/* 1. CONTADO */}
                             <button
                               type="button"
-                              onClick={() => aplicarModalidadPlazo('contado')}
+                              onClick={() => cambiarModalidadPrecio('contado')}
                               className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
-                                tipoVenta === 'contado' || modalidadPlazo === 'contado'
+                                tipoVenta === 'contado' || modalidadPrecio === 'contado'
                                   ? 'bg-emerald-700 text-white border-emerald-800 shadow-md ring-2 ring-emerald-400'
                                   : 'bg-white hover:bg-emerald-50/70 border-slate-200 text-slate-800'
                               }`}
@@ -1371,12 +1585,43 @@ export default function KioscoVentasPage() {
                               </div>
                             </button>
 
-                            {/* 2. 4 MESES (17 sem) */}
+                            {/* 2. 1 MES (4 sem) */}
                             <button
                               type="button"
-                              onClick={() => aplicarModalidadPlazo('4meses')}
+                              onClick={() => cambiarModalidadPrecio('1mes')}
                               className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
-                                tipoVenta === 'credito' && (modalidadPlazo === '4meses' || plazoSemanas === 17 || plazoSemanas === 16)
+                                tipoVenta === 'credito' && (modalidadPrecio === '1mes' || plazoSemanas === 4)
+                                  ? 'bg-amber-700 text-white border-amber-800 shadow-md ring-2 ring-amber-400'
+                                  : 'bg-white hover:bg-amber-50/70 border-slate-200 text-slate-800'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span className="font-extrabold text-[11px] uppercase tracking-wide">
+                                  1 Mes
+                                </span>
+                                <span className="text-[9px] px-1 py-0.2 rounded bg-black/20 font-bold">
+                                  4 sem
+                                </span>
+                              </div>
+                              <div className="mt-1">
+                                <div className="text-xs font-black">
+                                  {formatCurrency(totalesPlazos.unMes.precio)}
+                                </div>
+                                <div className="text-[9px] opacity-90 font-medium">
+                                  40% Eng: {formatCurrency(totalesPlazos.unMes.enganche40)}
+                                </div>
+                                <div className="text-[9px] font-bold text-amber-200">
+                                  {formatCurrency(totalesPlazos.unMes.cuotaSemanal)}/sem
+                                </div>
+                              </div>
+                            </button>
+
+                            {/* 3. 4 MESES (17 sem) */}
+                            <button
+                              type="button"
+                              onClick={() => cambiarModalidadPrecio('4meses')}
+                              className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
+                                tipoVenta === 'credito' && (modalidadPrecio === '4meses' || plazoSemanas === 17 || plazoSemanas === 16)
                                   ? 'bg-blue-800 text-white border-blue-900 shadow-md ring-2 ring-blue-400'
                                   : 'bg-white hover:bg-blue-50/70 border-slate-200 text-slate-800'
                               }`}
@@ -1402,43 +1647,12 @@ export default function KioscoVentasPage() {
                               </div>
                             </button>
 
-                            {/* 3. 6 MESES (26 sem - Estándar) */}
-                            <button
-                              type="button"
-                              onClick={() => aplicarModalidadPlazo('6meses')}
-                              className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
-                                tipoVenta === 'credito' && (modalidadPlazo === '6meses' || plazoSemanas === 26)
-                                  ? 'bg-blue-900 text-white border-blue-950 shadow-md ring-2 ring-blue-400'
-                                  : 'bg-white hover:bg-blue-50/70 border-slate-200 text-slate-800'
-                              }`}
-                            >
-                              <div className="flex items-center justify-between">
-                                <span className="font-extrabold text-[11px] uppercase tracking-wide">
-                                  6 Meses
-                                </span>
-                                <span className="text-[9px] px-1 py-0.2 rounded bg-black/20 font-bold">
-                                  26 sem
-                                </span>
-                              </div>
-                              <div className="mt-1">
-                                <div className="text-xs font-black">
-                                  {formatCurrency(totalesPlazos.seisMeses.precio)}
-                                </div>
-                                <div className="text-[9px] opacity-90 font-medium">
-                                  40% Eng: {formatCurrency(totalesPlazos.seisMeses.enganche40)}
-                                </div>
-                                <div className="text-[9px] font-bold text-amber-300">
-                                  {formatCurrency(totalesPlazos.seisMeses.cuotaSemanal)}/sem
-                                </div>
-                              </div>
-                            </button>
-
                             {/* 4. 12 MESES (52 sem - 1 Año) */}
                             <button
                               type="button"
-                              onClick={() => aplicarModalidadPlazo('12meses')}
+                              onClick={() => cambiarModalidadPrecio('12meses')}
                               className={`p-2 rounded-lg border text-left transition-all flex flex-col justify-between ${
-                                tipoVenta === 'credito' && (modalidadPlazo === '12meses' || plazoSemanas === 52)
+                                tipoVenta === 'credito' && (modalidadPrecio === '12meses' || plazoSemanas === 52)
                                   ? 'bg-purple-900 text-white border-purple-950 shadow-md ring-2 ring-purple-400'
                                   : 'bg-white hover:bg-purple-50/70 border-slate-200 text-slate-800'
                               }`}
@@ -2090,13 +2304,23 @@ export default function KioscoVentasPage() {
                   <p className="text-xs text-gray-500">
                     {productoSeleccionadoExistencias.descripcion || `Marca ${productoSeleccionadoExistencias.marca}`}
                   </p>
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-200/80 text-xs">
-                    <span className="text-gray-600">
-                      Precio Contado: <strong className="text-gray-900 text-sm">{formatCurrency(productoSeleccionadoExistencias.precioContado)}</strong>
-                    </span>
-                    <span className="text-gray-600">
-                      Precio Crédito: <strong className="text-emerald-700 text-sm">{formatCurrency(productoSeleccionadoExistencias.precioVenta)}</strong>
-                    </span>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 border-t border-slate-200/80 text-xs">
+                    <div className="bg-blue-50/70 p-2 rounded border border-blue-200">
+                      <div className="text-[10px] text-blue-900 font-bold">Contado</div>
+                      <div className="text-sm font-black text-blue-950">{formatCurrency(productoSeleccionadoExistencias.precioContado)}</div>
+                    </div>
+                    <div className="bg-amber-50/70 p-2 rounded border border-amber-200">
+                      <div className="text-[10px] text-amber-900 font-bold">1 Mes</div>
+                      <div className="text-sm font-bold text-amber-950">{formatCurrency(productoSeleccionadoExistencias.precio1Mes)}</div>
+                    </div>
+                    <div className="bg-purple-50/70 p-2 rounded border border-purple-200">
+                      <div className="text-[10px] text-purple-900 font-bold">4 Meses</div>
+                      <div className="text-sm font-bold text-purple-950">{formatCurrency(productoSeleccionadoExistencias.precio4Meses)}</div>
+                    </div>
+                    <div className="bg-emerald-50/70 p-2 rounded border border-emerald-200">
+                      <div className="text-[10px] text-emerald-900 font-bold">12 Meses</div>
+                      <div className="text-sm font-black text-emerald-950">{formatCurrency(productoSeleccionadoExistencias.precio12Meses || productoSeleccionadoExistencias.precioVenta)}</div>
+                    </div>
                   </div>
                 </div>
 

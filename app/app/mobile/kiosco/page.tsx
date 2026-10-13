@@ -47,7 +47,16 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
-import { CATALOGO_PRODUCTOS_INICIAL, CatalogoItem, calcularPlanCredito, SUCURSALES_SISTEMA } from '@/lib/catalogo-kiosco';
+import {
+  CATALOGO_PRODUCTOS_INICIAL,
+  CatalogoItem,
+  calcularPlanCredito,
+  SUCURSALES_SISTEMA,
+  ModalidadPrecio,
+  obtenerPreciosProducto,
+  obtenerPrecioPorModalidad,
+  obtenerPlazoSemanasSugerido
+} from '@/lib/catalogo-kiosco';
 import { SignaturePadModal } from '@/components/ventas/SignaturePadModal';
 import { DigitalizadorModal } from '@/components/boveda/digitalizador-modal';
 import { RemisionPagarePrint } from '@/components/ventas/RemisionPagarePrint';
@@ -58,6 +67,7 @@ interface ItemCarrito {
   cantidad: number;
   precioUnitario: number;
   subtotal: number;
+  modalidadPrecio?: ModalidadPrecio;
 }
 
 export default function MobileKioscoPage() {
@@ -76,10 +86,11 @@ export default function MobileKioscoPage() {
   // Carrito de compras móvil
   const [carrito, setCarrito] = useState<ItemCarrito[]>([]);
 
-  // Configuración de Financiamiento / Venta
+  // Configuración de Precios y Financiamiento (Contado, 1 Mes, 4 Meses, 12 Meses)
+  const [modalidadPrecio, setModalidadPrecio] = useState<ModalidadPrecio>('12meses');
   const [tipoVenta, setTipoVenta] = useState<'credito' | 'contado'>('credito');
   const [enganche, setEnganche] = useState<number>(0);
-  const [plazoSemanas, setPlazoSemanas] = useState<number>(26); // 26 semanas estándar
+  const [plazoSemanas, setPlazoSemanas] = useState<number>(52); // 52 semanas estándar para 12 meses
   const [diaCobro, setDiaCobro] = useState<string>('1'); // Lunes
 
   // Datos del Cliente
@@ -272,8 +283,20 @@ export default function MobileKioscoPage() {
       const res = await fetch('/api/inventario/productos');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          setProductos(data);
+        const lista = Array.isArray(data) ? data : (data.productos || []);
+        if (Array.isArray(lista) && lista.length > 0) {
+          const mapeados = lista.map((p: any) => {
+            const precios = obtenerPreciosProducto(p);
+            return {
+              ...p,
+              precioContado: precios.contado,
+              precio1Mes: precios.unMes,
+              precio4Meses: precios.cuatroMeses,
+              precio12Meses: precios.doceMeses,
+              precioVenta: precios.doceMeses
+            };
+          });
+          setProductos(mapeados);
         }
       }
     } catch (e) {
@@ -313,26 +336,75 @@ export default function MobileKioscoPage() {
   const totalArticulos = carrito.reduce((sum, item) => sum + item.subtotal, 0);
   const planCredito = calcularPlanCredito(totalArticulos, enganche, 'semanal', plazoSemanas);
 
+  // Cambiar modalidad de precios para el pedido móvil
+  const cambiarModalidadPrecio = (nuevaMod: ModalidadPrecio) => {
+    setModalidadPrecio(nuevaMod);
+    if (nuevaMod === 'contado') {
+      setTipoVenta('contado');
+      setEnganche(0);
+      setPlazoSemanas(0);
+    } else {
+      setTipoVenta('credito');
+      const semanas = obtenerPlazoSemanasSugerido(nuevaMod);
+      if (semanas > 0) setPlazoSemanas(semanas);
+    }
+
+    if (carrito.length > 0) {
+      setCarrito(prev => prev.map(item => {
+        const nuevoPrecio = obtenerPrecioPorModalidad(item.producto, nuevaMod);
+        return {
+          ...item,
+          precioUnitario: nuevoPrecio,
+          subtotal: item.cantidad * nuevoPrecio,
+          modalidadPrecio: nuevaMod
+        };
+      }));
+      const nombreMod = nuevaMod === 'contado' ? 'Contado' : nuevaMod === '1mes' ? '1 Mes (4 sem)' : nuevaMod === '4meses' ? '4 Meses (17 sem)' : '12 Meses (52 sem)';
+      toast.info(`Precios del pedido actualizados a: ${nombreMod}`);
+    }
+  };
+
+  const cambiarModalidadItemCarrito = (codigo: string, nuevaMod: ModalidadPrecio) => {
+    setCarrito(prev => prev.map(item => {
+      if (item.producto.codigo === codigo || item.producto.id === codigo) {
+        const nuevoPrecio = obtenerPrecioPorModalidad(item.producto, nuevaMod);
+        return {
+          ...item,
+          precioUnitario: nuevoPrecio,
+          subtotal: item.cantidad * nuevoPrecio,
+          modalidadPrecio: nuevaMod
+        };
+      }
+      return item;
+    }));
+  };
+
   // Manejo de Carrito
-  const agregarAlCarrito = (prod: CatalogoItem) => {
+  const agregarAlCarrito = (prod: CatalogoItem, modalidadEspecifica?: ModalidadPrecio) => {
+    const modUso = modalidadEspecifica || modalidadPrecio;
+    const precioUnitario = obtenerPrecioPorModalidad(prod, modUso);
+
     setCarrito(prev => {
-      const idx = prev.findIndex(item => item.producto.id === prod.id || item.producto.codigo === prod.codigo);
+      const idx = prev.findIndex(item => (item.producto.id === prod.id || item.producto.codigo === prod.codigo) && (item.modalidadPrecio === modUso || !item.modalidadPrecio));
       if (idx >= 0) {
         const clon = [...prev];
         clon[idx].cantidad += 1;
-        clon[idx].subtotal = clon[idx].cantidad * clon[idx].precioUnitario;
+        clon[idx].precioUnitario = precioUnitario;
+        clon[idx].subtotal = clon[idx].cantidad * precioUnitario;
+        clon[idx].modalidadPrecio = modUso;
         return clon;
       } else {
-        const precioUnitario = tipoVenta === 'contado' ? (prod.precioContado || prod.precioVenta) : prod.precioVenta;
         return [...prev, {
           producto: prod,
           cantidad: 1,
           precioUnitario,
-          subtotal: precioUnitario
+          subtotal: precioUnitario,
+          modalidadPrecio: modUso
         }];
       }
     });
-    toast.success(`Agregado: ${prod.nombre}`);
+    const label = modUso === 'contado' ? 'Contado' : modUso === '1mes' ? '1 Mes' : modUso === '4meses' ? '4 Meses' : '12 Meses';
+    toast.success(`Agregado (${label}): ${prod.nombre}`);
   };
 
   const modificarCantidad = (codigo: string, delta: number) => {
@@ -652,6 +724,39 @@ export default function MobileKioscoPage() {
             ))}
           </div>
 
+          {/* Selector de Modalidad de Precios: Contado, 1 Mes, 4 Meses, 12 Meses */}
+          <div className="bg-slate-900 border border-slate-800 p-2.5 rounded-xl">
+            <div className="flex items-center justify-between text-[11px] font-bold text-slate-300 mb-1.5 px-0.5">
+              <span>Modalidad de Precios:</span>
+              <span className="text-amber-400 font-semibold text-[10px]">
+                {modalidadPrecio === 'contado' ? 'Contado (1 pago)' : modalidadPrecio === '1mes' ? '1 Mes (4 sem)' : modalidadPrecio === '4meses' ? '4 Meses (17 sem)' : '12 Meses (52 sem)'}
+              </span>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 text-xs font-bold">
+              {[
+                { id: 'contado', label: 'Contado' },
+                { id: '1mes', label: '1 Mes' },
+                { id: '4meses', label: '4 Meses' },
+                { id: '12meses', label: '12 Meses' },
+              ].map(m => (
+                <button
+                  key={m.id}
+                  onClick={() => cambiarModalidadPrecio(m.id as ModalidadPrecio)}
+                  className={`py-1.5 px-1 rounded-lg text-center transition-all border font-bold ${
+                    modalidadPrecio === m.id
+                      ? m.id === 'contado' ? 'bg-blue-600 text-white border-blue-400 shadow' :
+                        m.id === '1mes' ? 'bg-amber-600 text-white border-amber-400 shadow' :
+                        m.id === '4meses' ? 'bg-purple-600 text-white border-purple-400 shadow' :
+                        'bg-emerald-600 text-white border-emerald-400 shadow'
+                      : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  <div className="text-[11px]">{m.label}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Lista de productos */}
           {loadingProductos ? (
             <div className="py-12 text-center text-slate-400">
@@ -667,9 +772,8 @@ export default function MobileKioscoPage() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               {productosFiltrados.map((prod) => {
-                // Cálculo rápido a 26 semanas sin enganche
-                const cuotaEstimada = Math.ceil(prod.precioVenta / 26);
                 const stockEnSucursal = obtenerStockSucursal(prod);
+                const precios = obtenerPreciosProducto(prod);
                 
                 // Otras sucursales que tengan stock
                 const otrasConStock = sucursales.filter(s => {
@@ -712,37 +816,104 @@ export default function MobileKioscoPage() {
                         </div>
                       </div>
 
-                      {/* Precios y Cuota en letras grandes */}
-                      <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800/80 flex items-center justify-between">
-                        <div>
-                          <div className="text-[10px] text-slate-400 uppercase font-bold">Desde</div>
-                          <div className="text-lg font-black text-emerald-400">
-                            ${cuotaEstimada} <span className="text-[11px] font-normal text-slate-400">/sem</span>
+                      {/* Selector de los 4 precios: Contado, 1 Mes, 4 Meses, 12 Meses */}
+                      <div className="grid grid-cols-2 gap-1.5 p-2 rounded-lg bg-slate-950 border border-slate-800">
+                        {/* Contado */}
+                        <button
+                          type="button"
+                          onClick={() => agregarAlCarrito(prod, 'contado')}
+                          className={`text-left p-1.5 rounded transition-all border ${
+                            modalidadPrecio === 'contado'
+                              ? 'bg-blue-950/80 border-blue-500 text-white ring-1 ring-blue-400'
+                              : 'bg-slate-900 border-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <div className="text-[10px] text-blue-400 font-bold flex justify-between items-center">
+                            <span>Contado</span>
+                            {modalidadPrecio === 'contado' && <CheckCircle className="w-2.5 h-2.5 text-blue-400" />}
                           </div>
-                        </div>
+                          <div className="font-bold text-xs font-mono mt-0.5">
+                            ${precios.contado.toLocaleString()}
+                          </div>
+                          <div className="text-[9px] text-slate-400">1 pago</div>
+                        </button>
 
-                        <div className="text-right">
-                          <div className="text-[10px] text-slate-400">Total Crédito</div>
-                          <div className="text-sm font-bold text-white font-mono">
-                            ${prod.precioVenta.toLocaleString()}
+                        {/* 1 Mes */}
+                        <button
+                          type="button"
+                          onClick={() => agregarAlCarrito(prod, '1mes')}
+                          className={`text-left p-1.5 rounded transition-all border ${
+                            modalidadPrecio === '1mes'
+                              ? 'bg-amber-950/80 border-amber-500 text-white ring-1 ring-amber-400'
+                              : 'bg-slate-900 border-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <div className="text-[10px] text-amber-400 font-bold flex justify-between items-center">
+                            <span>1 Mes</span>
+                            {modalidadPrecio === '1mes' && <CheckCircle className="w-2.5 h-2.5 text-amber-400" />}
                           </div>
-                          {prod.precioContado && prod.precioContado < prod.precioVenta && (
-                            <div className="text-[10px] text-slate-400">
-                              Contado: ${prod.precioContado.toLocaleString()}
-                            </div>
-                          )}
-                        </div>
+                          <div className="font-bold text-xs font-mono mt-0.5">
+                            ${precios.unMes.toLocaleString()}
+                          </div>
+                          <div className="text-[9px] text-amber-300/80">
+                            ${Math.ceil((precios.unMes * 0.60) / 4)}/sem
+                          </div>
+                        </button>
+
+                        {/* 4 Meses */}
+                        <button
+                          type="button"
+                          onClick={() => agregarAlCarrito(prod, '4meses')}
+                          className={`text-left p-1.5 rounded transition-all border ${
+                            modalidadPrecio === '4meses'
+                              ? 'bg-purple-950/80 border-purple-500 text-white ring-1 ring-purple-400'
+                              : 'bg-slate-900 border-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <div className="text-[10px] text-purple-400 font-bold flex justify-between items-center">
+                            <span>4 Meses</span>
+                            {modalidadPrecio === '4meses' && <CheckCircle className="w-2.5 h-2.5 text-purple-400" />}
+                          </div>
+                          <div className="font-bold text-xs font-mono mt-0.5">
+                            ${precios.cuatroMeses.toLocaleString()}
+                          </div>
+                          <div className="text-[9px] text-purple-300/80">
+                            ${Math.ceil((precios.cuatroMeses * 0.60) / 17)}/sem
+                          </div>
+                        </button>
+
+                        {/* 12 Meses */}
+                        <button
+                          type="button"
+                          onClick={() => agregarAlCarrito(prod, '12meses')}
+                          className={`text-left p-1.5 rounded transition-all border ${
+                            modalidadPrecio === '12meses'
+                              ? 'bg-emerald-950/80 border-emerald-500 text-white ring-1 ring-emerald-400'
+                              : 'bg-slate-900 border-slate-800 text-slate-300'
+                          }`}
+                        >
+                          <div className="text-[10px] text-emerald-400 font-bold flex justify-between items-center">
+                            <span>12 Meses</span>
+                            {modalidadPrecio === '12meses' && <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />}
+                          </div>
+                          <div className="font-bold text-xs font-mono mt-0.5">
+                            ${precios.doceMeses.toLocaleString()}
+                          </div>
+                          <div className="text-[9px] text-emerald-300/80">
+                            ${Math.ceil((precios.doceMeses * 0.60) / 52)}/sem
+                          </div>
+                        </button>
                       </div>
 
                       {/* Botones de acción */}
                       <div className="space-y-1.5 pt-1">
                         <Button
                           size="sm"
-                          onClick={() => agregarAlCarrito(prod)}
+                          onClick={() => agregarAlCarrito(prod, modalidadPrecio)}
                           className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold h-9 text-xs transition-colors gap-1.5 shadow-sm"
                         >
                           <Plus className="w-4 h-4" />
-                          Agregar al Pedido
+                          Agregar ({modalidadPrecio === 'contado' ? 'Contado' : modalidadPrecio === '1mes' ? '1 Mes' : modalidadPrecio === '4meses' ? '4 Meses' : '12 Meses'})
                         </Button>
 
                         <Button
@@ -883,7 +1054,19 @@ export default function MobileKioscoPage() {
                     >
                       <div className="max-w-[55%]">
                         <p className="font-bold text-white text-xs truncate">{item.producto.nombre}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">${item.precioUnitario} c/u</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <select
+                            value={item.modalidadPrecio || modalidadPrecio}
+                            onChange={(e) => cambiarModalidadItemCarrito(item.producto.codigo, e.target.value as ModalidadPrecio)}
+                            className="bg-slate-900 border border-slate-700 text-[10px] text-amber-400 rounded px-1 py-0.5 font-bold"
+                          >
+                            <option value="contado">Contado</option>
+                            <option value="1mes">1 Mes</option>
+                            <option value="4meses">4 Meses</option>
+                            <option value="12meses">12 Meses</option>
+                          </select>
+                          <span className="text-[10px] text-slate-400 font-mono">${item.precioUnitario}</span>
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-2">
@@ -918,30 +1101,41 @@ export default function MobileKioscoPage() {
           {carrito.length > 0 && (
             <Card className="bg-slate-900 border-slate-800">
               <CardContent className="p-4 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
-                    <Calculator className="w-4 h-4 text-emerald-400" />
-                    Simulador de Crédito en Campo
-                  </h3>
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-bold text-white text-sm flex items-center gap-1.5">
+                      <Calculator className="w-4 h-4 text-emerald-400" />
+                      Plan y Simulador de Venta
+                    </h3>
+                    <span className="text-[10px] text-slate-400">
+                      Total: <strong className="text-white">${totalArticulos.toLocaleString()}</strong>
+                    </span>
+                  </div>
                   
-                  {/* Selector Contado / Crédito */}
-                  <div className="flex bg-slate-950 p-0.5 rounded-lg border border-slate-800 text-xs font-bold">
-                    <button
-                      onClick={() => setTipoVenta('credito')}
-                      className={`px-2.5 py-1 rounded-md transition-all ${
-                        tipoVenta === 'credito' ? 'bg-emerald-600 text-white' : 'text-slate-400'
-                      }`}
-                    >
-                      Crédito
-                    </button>
-                    <button
-                      onClick={() => setTipoVenta('contado')}
-                      className={`px-2.5 py-1 rounded-md transition-all ${
-                        tipoVenta === 'contado' ? 'bg-blue-600 text-white' : 'text-slate-400'
-                      }`}
-                    >
-                      Contado
-                    </button>
+                  {/* Selector de los 4 Planes: Contado, 1 Mes, 4 Meses, 12 Meses */}
+                  <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-lg border border-slate-800 text-xs font-bold">
+                    {[
+                      { id: 'contado', label: 'Contado' },
+                      { id: '1mes', label: '1 Mes' },
+                      { id: '4meses', label: '4 Meses' },
+                      { id: '12meses', label: '12 Meses' },
+                    ].map(m => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => cambiarModalidadPrecio(m.id as ModalidadPrecio)}
+                        className={`py-1.5 rounded-md transition-all text-center ${
+                          modalidadPrecio === m.id
+                            ? m.id === 'contado' ? 'bg-blue-600 text-white' :
+                              m.id === '1mes' ? 'bg-amber-600 text-white' :
+                              m.id === '4meses' ? 'bg-purple-600 text-white' :
+                              'bg-emerald-600 text-white'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        {m.label}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
@@ -1374,14 +1568,29 @@ export default function MobileKioscoPage() {
                 <h4 className="font-bold text-white text-sm leading-tight">
                   {productoSeleccionadoExistencias.nombre}
                 </h4>
-                <div className="flex items-center justify-between pt-1 text-xs">
-                  <span className="text-slate-400">
-                    Contado: <strong className="text-white">${productoSeleccionadoExistencias.precioContado.toLocaleString()}</strong>
-                  </span>
-                  <span className="text-slate-400">
-                    Crédito: <strong className="text-emerald-400">${productoSeleccionadoExistencias.precioVenta.toLocaleString()}</strong>
-                  </span>
-                </div>
+                {(() => {
+                  const p4 = obtenerPreciosProducto(productoSeleccionadoExistencias);
+                  return (
+                    <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-800 text-[11px]">
+                      <div className="bg-slate-900 p-1.5 rounded border border-blue-900/60">
+                        <span className="text-[10px] text-blue-400 font-bold block">Contado</span>
+                        <strong className="text-white">${p4.contado.toLocaleString()}</strong>
+                      </div>
+                      <div className="bg-slate-900 p-1.5 rounded border border-amber-900/60">
+                        <span className="text-[10px] text-amber-400 font-bold block">1 Mes</span>
+                        <strong className="text-white">${p4.unMes.toLocaleString()}</strong>
+                      </div>
+                      <div className="bg-slate-900 p-1.5 rounded border border-purple-900/60">
+                        <span className="text-[10px] text-purple-400 font-bold block">4 Meses</span>
+                        <strong className="text-white">${p4.cuatroMeses.toLocaleString()}</strong>
+                      </div>
+                      <div className="bg-slate-900 p-1.5 rounded border border-emerald-900/60">
+                        <span className="text-[10px] text-emerald-400 font-bold block">12 Meses</span>
+                        <strong className="text-emerald-400">${p4.doceMeses.toLocaleString()}</strong>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Tu Sucursal Actual */}

@@ -912,12 +912,74 @@ const PRODUCTOS_LIBRETA_BASE: CatalogoItem[] = [
   }
 ];
 
-// Catálogo enriquecido con asignación oficial a Sucursal SAN LUCAS 3ER CUARTEL
-export const CATALOGO_PRODUCTOS_INICIAL: CatalogoItem[] = PRODUCTOS_LIBRETA_BASE.map(item => ({
-  ...item,
-  sucursal: SUCURSAL_SAN_LUCAS.nombre,
-  sucursalNombre: SUCURSAL_SAN_LUCAS.nombre
-}));
+export type ModalidadPrecio = 'contado' | '1mes' | '4meses' | '12meses';
+
+export interface PreciosModalidad {
+  contado: number;
+  unMes: number;
+  cuatroMeses: number;
+  doceMeses: number;
+}
+
+export function obtenerPreciosProducto(item: CatalogoItem | any): PreciosModalidad {
+  const contado = item.precioContado != null && Number(item.precioContado) > 0
+    ? Math.round(Number(item.precioContado))
+    : Math.round(Number(item.precioCompra || item.precioVenta || 0));
+
+  const doceMeses = item.precio12Meses != null && Number(item.precio12Meses) > 0
+    ? Math.round(Number(item.precio12Meses))
+    : Math.round(Number(item.precioVenta || contado));
+
+  const unMes = item.precio1Mes != null && Number(item.precio1Mes) > 0
+    ? Math.round(Number(item.precio1Mes))
+    : Math.round(contado * 1.05);
+
+  const cuatroMeses = item.precio4Meses != null && Number(item.precio4Meses) > 0
+    ? Math.round(Number(item.precio4Meses))
+    : Math.round(contado * 1.15);
+
+  return {
+    contado,
+    unMes,
+    cuatroMeses,
+    doceMeses
+  };
+}
+
+export function obtenerPrecioPorModalidad(item: CatalogoItem | any, modalidad: ModalidadPrecio): number {
+  const precios = obtenerPreciosProducto(item);
+  switch (modalidad) {
+    case 'contado': return precios.contado;
+    case '1mes': return precios.unMes;
+    case '4meses': return precios.cuatroMeses;
+    case '12meses': return precios.doceMeses;
+    default: return precios.doceMeses;
+  }
+}
+
+export function obtenerPlazoSemanasSugerido(modalidad: ModalidadPrecio): number {
+  switch (modalidad) {
+    case '1mes': return 4;
+    case '4meses': return 17;
+    case '12meses': return 52;
+    default: return 0;
+  }
+}
+
+// Catálogo enriquecido con asignación oficial a Sucursal SAN LUCAS 3ER CUARTEL y las 4 modalidades de precio
+export const CATALOGO_PRODUCTOS_INICIAL: CatalogoItem[] = PRODUCTOS_LIBRETA_BASE.map(item => {
+  const p = obtenerPreciosProducto(item);
+  return {
+    ...item,
+    precioContado: p.contado,
+    precio1Mes: p.unMes,
+    precio4Meses: p.cuatroMeses,
+    precio12Meses: p.doceMeses,
+    precioVenta: p.doceMeses,
+    sucursal: SUCURSAL_SAN_LUCAS.nombre,
+    sucursalNombre: SUCURSAL_SAN_LUCAS.nombre
+  };
+});
 
 // Conversión de importes numéricos a texto formal mexicano (ej: "CUATRO MIL QUINIENTOS PESOS 00/100 M.N.")
 export function numeroALetras(monto: number | string | null | undefined): string {
@@ -1044,7 +1106,7 @@ export function calcularPlanCredito(
 // =========================================================================
 
 export interface DesglosePlazoItem {
-  plazoKey: 'contado' | '4meses' | '6meses' | '12meses';
+  plazoKey: 'contado' | '1mes' | '4meses' | '6meses' | '12meses';
   nombre: string;
   subtitulo: string;
   meses: number;
@@ -1059,14 +1121,15 @@ export interface DesglosePlazoItem {
 
 export interface EsquemaPreciosProducto {
   contado: DesglosePlazoItem;
+  unMes: DesglosePlazoItem;
   cuatroMeses: DesglosePlazoItem;
-  seisMeses: DesglosePlazoItem;
+  seisMeses?: DesglosePlazoItem;
   doceMeses: DesglosePlazoItem;
   lista: DesglosePlazoItem[];
 }
 
 /**
- * Calcula los precios de un producto a Contado, 4 Meses, 6 Meses y 12 Meses
+ * Calcula los precios de un producto a Contado, 1 Mes, 4 Meses y 12 Meses
  * junto con el 40% de enganche requerido y sus cuotas semanales, quincenales y mensuales.
  */
 export function calcularPreciosPlazosProducto(
@@ -1074,18 +1137,17 @@ export function calcularPreciosPlazosProducto(
   precioVenta?: number
 ): EsquemaPreciosProducto {
   const pContado = Math.max(0, Math.round(precioContado || 0));
-  // Si no se especifica precio de lista a 6 meses, se asume aprox 12% sobre contado
-  const p6Meses = Math.max(pContado, Math.round(precioVenta || pContado * 1.12));
-  const diferencia = Math.max(0, p6Meses - pContado);
-
-  // 4 Meses: proporción lineal (4/6 de la diferencia)
-  const p4Meses = Math.round(pContado + diferencia * (4 / 6));
-
-  // 12 Meses: proyección al doble de plazo (26 sem -> 52 sem)
-  const p12Meses = Math.round(pContado + diferencia * 2);
+  // 12 Meses (precio de venta / lista máxima)
+  const p12Meses = Math.max(pContado, Math.round(precioVenta || pContado * 1.25));
+  // 1 Mes: aprox 5% sobre contado
+  const p1Mes = Math.round(pContado * 1.05);
+  // 4 Meses: aprox 15% sobre contado
+  const p4Meses = Math.round(pContado * 1.15);
+  // 6 Meses (opcional compatibilidad)
+  const p6Meses = Math.round(pContado * 1.18);
 
   const generarPlazo = (
-    plazoKey: 'contado' | '4meses' | '6meses' | '12meses',
+    plazoKey: 'contado' | '1mes' | '4meses' | '6meses' | '12meses',
     nombre: string,
     subtitulo: string,
     meses: number,
@@ -1113,21 +1175,23 @@ export function calcularPreciosPlazosProducto(
   };
 
   const contado = generarPlazo('contado', 'Contado', 'Pago directo en 1 exhibición', 0, 0, pContado);
+  const unMes = generarPlazo('1mes', '1 Mes', '4 Semanas • 40% Enganche', 1, 4, p1Mes);
   const cuatroMeses = generarPlazo('4meses', '4 Meses', '17 Semanas • 40% Enganche', 4, 17, p4Meses);
   const seisMeses = generarPlazo('6meses', '6 Meses', '26 Semanas • Estándar', 6, 26, p6Meses);
   const doceMeses = generarPlazo('12meses', '12 Meses', '52 Semanas • 1 Año', 12, 52, p12Meses);
 
   return {
     contado,
+    unMes,
     cuatroMeses,
     seisMeses,
     doceMeses,
-    lista: [contado, cuatroMeses, seisMeses, doceMeses]
+    lista: [contado, unMes, cuatroMeses, doceMeses]
   };
 }
 
 /**
- * Calcula los totales consolidados de un pedido/carrito para cada plazo (Contado, 4m, 6m, 12m)
+ * Calcula los totales consolidados de un pedido/carrito para cada plazo (Contado, 1 Mes, 4 Meses, 12 Meses)
  * con el 40% de enganche respectivo y sus cuotas correspondientes.
  */
 export function calcularTotalesPlazosCarrito(
@@ -1139,6 +1203,7 @@ export function calcularTotalesPlazosCarrito(
   }>
 ): EsquemaPreciosProducto {
   let totalContado = 0;
+  let total1Mes = 0;
   let total4Meses = 0;
   let total6Meses = 0;
   let total12Meses = 0;
@@ -1151,13 +1216,14 @@ export function calcularTotalesPlazosCarrito(
     const desglose = calcularPreciosPlazosProducto(baseContado, baseVenta);
 
     totalContado += desglose.contado.precio * cant;
+    total1Mes += desglose.unMes.precio * cant;
     total4Meses += desglose.cuatroMeses.precio * cant;
-    total6Meses += desglose.seisMeses.precio * cant;
+    total6Meses += (desglose.seisMeses?.precio || 0) * cant;
     total12Meses += desglose.doceMeses.precio * cant;
   }
 
   const generarPlazo = (
-    plazoKey: 'contado' | '4meses' | '6meses' | '12meses',
+    plazoKey: 'contado' | '1mes' | '4meses' | '6meses' | '12meses',
     nombre: string,
     subtitulo: string,
     meses: number,
@@ -1184,16 +1250,18 @@ export function calcularTotalesPlazosCarrito(
   };
 
   const contado = generarPlazo('contado', 'Contado', '1 pago • Sin financiamiento', 0, 0, totalContado);
+  const unMes = generarPlazo('1mes', '1 Mes', '4 Semanas • 40% Enganche', 1, 4, total1Mes);
   const cuatroMeses = generarPlazo('4meses', '4 Meses', '17 Semanas • 40% Enganche', 4, 17, total4Meses);
   const seisMeses = generarPlazo('6meses', '6 Meses', '26 Semanas • Estándar', 6, 26, total6Meses);
   const doceMeses = generarPlazo('12meses', '12 Meses', '52 Semanas • 1 Año', 12, 52, total12Meses);
 
   return {
     contado,
+    unMes,
     cuatroMeses,
     seisMeses,
     doceMeses,
-    lista: [contado, cuatroMeses, seisMeses, doceMeses]
+    lista: [contado, unMes, cuatroMeses, doceMeses]
   };
 }
 
