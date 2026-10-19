@@ -198,8 +198,8 @@ export interface CartItem {
   importe: number;
   precioContado?: number;
   precioVenta?: number;
-  modalidadPrecio?: 'contado' | '1mes' | '4meses' | '12meses';
-  plazoSeleccionado?: 'contado' | '1mes' | '4meses' | '12meses' | 'otro';
+  modalidadPrecio?: 'contado' | '1mes' | '4meses' | '6meses' | '12meses';
+  plazoSeleccionado?: 'contado' | '1mes' | '4meses' | '6meses' | '12meses' | 'otro';
 }
 
 

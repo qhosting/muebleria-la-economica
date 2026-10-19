@@ -912,7 +912,7 @@ const PRODUCTOS_LIBRETA_BASE: CatalogoItem[] = [
   }
 ];
 
-export type ModalidadPrecio = 'contado' | '1mes' | '4meses' | '12meses';
+export type ModalidadPrecio = 'contado' | '1mes' | '4meses' | '6meses' | '12meses';
 
 export interface PreciosModalidad {
   contado: number;
@@ -952,6 +952,7 @@ export function obtenerPrecioPorModalidad(item: CatalogoItem | any, modalidad: M
     case 'contado': return precios.contado;
     case '1mes': return precios.unMes;
     case '4meses': return precios.cuatroMeses;
+    case '6meses': return Math.round(precios.contado * 1.18);
     case '12meses': return precios.doceMeses;
     default: return precios.doceMeses;
   }
@@ -961,6 +962,7 @@ export function obtenerPlazoSemanasSugerido(modalidad: ModalidadPrecio): number 
   switch (modalidad) {
     case '1mes': return 4;
     case '4meses': return 17;
+    case '6meses': return 26;
     case '12meses': return 52;
     default: return 0;
   }
@@ -1123,7 +1125,7 @@ export interface EsquemaPreciosProducto {
   contado: DesglosePlazoItem;
   unMes: DesglosePlazoItem;
   cuatroMeses: DesglosePlazoItem;
-  seisMeses?: DesglosePlazoItem;
+  seisMeses: DesglosePlazoItem;
   doceMeses: DesglosePlazoItem;
   lista: DesglosePlazoItem[];
 }

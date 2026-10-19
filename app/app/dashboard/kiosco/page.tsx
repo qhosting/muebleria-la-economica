@@ -92,7 +92,7 @@ export default function KioscoVentasPage() {
   // Configuración de la Venta / Precios (Contado, 1 Mes, 4 Meses, 12 Meses)
   const [modalidadPrecio, setModalidadPrecio] = useState<ModalidadPrecio>('12meses');
   const [tipoVenta, setTipoVenta] = useState<'contado' | 'credito'>('credito');
-  const [modalidadPlazo, setModalidadPlazo] = useState<'contado' | '4meses' | '6meses' | '12meses' | 'otro'>('6meses');
+  const [modalidadPlazo, setModalidadPlazo] = useState<'contado' | '1mes' | '4meses' | '6meses' | '12meses' | 'otro'>('12meses');
   const [nombreCliente, setNombreCliente] = useState('');
   const [telefonoCliente, setTelefonoCliente] = useState('');
   const [direccionCliente, setDireccionCliente] = useState('');
@@ -306,6 +306,7 @@ export default function KioscoVentasPage() {
   // Cambiar modalidad de precios global para la remisión
   const cambiarModalidadPrecio = (nuevaModalidad: ModalidadPrecio) => {
     setModalidadPrecio(nuevaModalidad);
+    setModalidadPlazo(nuevaModalidad);
     if (nuevaModalidad === 'contado') {
       setTipoVenta('contado');
       setEnganche(0);
@@ -426,6 +427,7 @@ export default function KioscoVentasPage() {
         importe: precio,
         precioContado: precio,
         precioVenta: Math.round(precio * 1.12),
+        modalidadPrecio: modalidadPrecio,
         plazoSeleccionado: modalidadPlazo
       }
     ]);
@@ -552,16 +554,17 @@ export default function KioscoVentasPage() {
   const planCredito = calcularPlanCredito(totalBruto, enganche, periodicidad, numeroPagosEfectivo);
 
   // Función para aplicar una modalidad de plazo a todo el pedido
-  const aplicarModalidadPlazo = (modalidad: 'contado' | '4meses' | '6meses' | '12meses') => {
+  const aplicarModalidadPlazo = (modalidad: 'contado' | '1mes' | '4meses' | '6meses' | '12meses') => {
     setModalidadPlazo(modalidad);
 
-    const nuevoCarrito = carrito.map(item => {
+    const nuevoCarrito: CartItem[] = carrito.map(item => {
       const pContado = item.precioContado && item.precioContado > 0 ? item.precioContado : item.precioUnitario;
       const pVenta = item.precioVenta && item.precioVenta > 0 ? item.precioVenta : item.precioUnitario;
       const desglose = calcularPreciosPlazosProducto(pContado, pVenta);
 
       let nuevoPrecio = item.precioUnitario;
       if (modalidad === 'contado') nuevoPrecio = desglose.contado.precio;
+      else if (modalidad === '1mes') nuevoPrecio = desglose.unMes.precio;
       else if (modalidad === '4meses') nuevoPrecio = desglose.cuatroMeses.precio;
       else if (modalidad === '6meses') nuevoPrecio = desglose.seisMeses.precio;
       else if (modalidad === '12meses') nuevoPrecio = desglose.doceMeses.precio;
@@ -570,6 +573,7 @@ export default function KioscoVentasPage() {
         ...item,
         precioUnitario: nuevoPrecio,
         importe: item.cantidad * nuevoPrecio,
+        modalidadPrecio: modalidad,
         plazoSeleccionado: modalidad
       };
     });
@@ -583,17 +587,17 @@ export default function KioscoVentasPage() {
       toast.success('Modalidad de Contado seleccionada');
     } else {
       setTipoVenta('credito');
-      const semanas = modalidad === '4meses' ? 17 : modalidad === '6meses' ? 26 : 52;
+      const semanas = modalidad === '1mes' ? 4 : modalidad === '4meses' ? 17 : modalidad === '6meses' ? 26 : 52;
       setPlazoSemanas(semanas);
       const enganche40 = Math.round(nuevoTotal * 0.40);
       setEnganche(enganche40);
-      const nombrePlazo = modalidad === '4meses' ? '4 Meses (17 semanas)' : modalidad === '6meses' ? '6 Meses (26 semanas)' : '12 Meses (52 semanas)';
+      const nombrePlazo = modalidad === '1mes' ? '1 Mes (4 semanas)' : modalidad === '4meses' ? '4 Meses (17 semanas)' : modalidad === '6meses' ? '6 Meses (26 semanas)' : '12 Meses (52 semanas)';
       toast.success(`Plan ${nombrePlazo} seleccionado con 40% de enganche (${formatCurrency(enganche40)})`);
     }
   };
 
   // Función para cambiar la modalidad de precio de un artículo individual en la remisión
-  const aplicarModalidadItem = (index: number, modalidad: 'contado' | '4meses' | '6meses' | '12meses') => {
+  const aplicarModalidadItem = (index: number, modalidad: 'contado' | '1mes' | '4meses' | '6meses' | '12meses') => {
     const nuevo = [...carrito];
     const item = nuevo[index];
     const pContado = item.precioContado && item.precioContado > 0 ? item.precioContado : item.precioUnitario;
@@ -602,12 +606,14 @@ export default function KioscoVentasPage() {
 
     let nuevoPrecio = item.precioUnitario;
     if (modalidad === 'contado') nuevoPrecio = desglose.contado.precio;
+    else if (modalidad === '1mes') nuevoPrecio = desglose.unMes.precio;
     else if (modalidad === '4meses') nuevoPrecio = desglose.cuatroMeses.precio;
     else if (modalidad === '6meses') nuevoPrecio = desglose.seisMeses.precio;
     else if (modalidad === '12meses') nuevoPrecio = desglose.doceMeses.precio;
 
     item.precioUnitario = nuevoPrecio;
     item.importe = item.cantidad * nuevoPrecio;
+    item.modalidadPrecio = modalidad;
     item.plazoSeleccionado = modalidad;
     setCarrito(nuevo);
     toast.success(`Precio de "${item.concepto}" actualizado a ${modalidad === 'contado' ? 'Contado' : modalidad}`);
@@ -838,7 +844,7 @@ export default function KioscoVentasPage() {
       setClienteIdExistente('');
       setFirmaCliente('');
       setEnganche(0);
-      setModalidadPlazo('6meses');
+      setModalidadPlazo('12meses');
     } catch (error: any) {
       console.error(error);
       toast.error(error.message || 'Error al procesar la venta');
@@ -1800,7 +1806,7 @@ export default function KioscoVentasPage() {
                           Condiciones de Crédito y Cobranza
                         </div>
                         <Badge variant="outline" className="text-[10px] bg-blue-100 text-blue-800 border-blue-300 font-extrabold uppercase">
-                          {modalidadPlazo === '4meses' ? 'Plan 4 Meses' : modalidadPlazo === '12meses' ? 'Plan 12 Meses' : 'Plan 6 Meses'}
+                          {modalidadPlazo === '1mes' ? 'Plan 1 Mes' : modalidadPlazo === '4meses' ? 'Plan 4 Meses' : modalidadPlazo === '12meses' ? 'Plan 12 Meses' : modalidadPlazo === 'contado' ? 'Contado' : 'Plan 6 Meses'}
                         </Badge>
                       </div>
 
@@ -1923,7 +1929,8 @@ export default function KioscoVentasPage() {
                             onValueChange={val => {
                               const s = parseInt(val);
                               setPlazoSemanas(s);
-                              if (s === 17 || s === 16) setModalidadPlazo('4meses');
+                              if (s === 4) setModalidadPlazo('1mes');
+                              else if (s === 17 || s === 16) setModalidadPlazo('4meses');
                               else if (s === 26) setModalidadPlazo('6meses');
                               else if (s === 52) setModalidadPlazo('12meses');
                               else setModalidadPlazo('otro');
