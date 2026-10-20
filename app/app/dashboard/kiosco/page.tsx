@@ -687,10 +687,10 @@ export default function KioscoVentasPage() {
   // Combinar catálogo inicial con productos registrados / actualizados en BD
   const catalogoCombinado = React.useMemo(() => {
     if (productosDB && productosDB.length > 0) {
-      const mapaDB = new Map(productosDB.map((p: any) => [p.codigo?.toUpperCase(), p]));
+      const mapaDB = new Map<string, any>(productosDB.map((p: any) => [p.codigo?.toUpperCase(), p]));
       
       const catalogoActualizado = CATALOGO_PRODUCTOS_INICIAL.map(item => {
-        const prodDB = mapaDB.get(item.codigo?.toUpperCase());
+        const prodDB: any = mapaDB.get(item.codigo?.toUpperCase());
         if (prodDB) {
           mapaDB.delete(item.codigo?.toUpperCase());
           const preciosDB = obtenerPreciosProducto(prodDB);
