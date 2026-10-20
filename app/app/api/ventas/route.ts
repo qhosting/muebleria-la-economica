@@ -111,13 +111,27 @@ export async function POST(request: NextRequest) {
       articulos = []
     } = body;
 
-    // Resolver sucursal activa: si no viene especificada, asignar por defecto SAN LUCAS 3ER CUARTEL
-    let activeSucursalId = sucursalId;
+    const userId = (session.user as any)?.id;
+    const userRole = (session.user as any)?.role;
+    const userSucursalId = (session.user as any)?.sucursalId;
+
+    // Autoasignación de vendedor
+    const finalVendedorId = vendedorId || (userId || null);
+    const finalVendedorNombre = (vendedor && vendedor !== 'TIENDA') ? vendedor : (session.user?.name || 'TIENDA');
+
+    // Resolver sucursal activa: si no viene especificada, asignar la del usuario o por defecto SAN LUCAS 3ER CUARTEL
+    let activeSucursalId = sucursalId || userSucursalId;
     if (!activeSucursalId) {
       const sucursalSanLucas = await prisma.sucursal.findFirst({
         where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
       });
       activeSucursalId = sucursalSanLucas?.id || null;
+    }
+
+    // Auto-asignación de cobrador: si no viene o es 'sin-asignar', asignar al usuario vendedor
+    let finalCobradorId = cobradorAsignadoId && cobradorAsignadoId !== 'sin-asignar' ? cobradorAsignadoId : null;
+    if (!finalCobradorId && (userRole === 'vendedor' || userRole === 'cobrador') && userId) {
+      finalCobradorId = userId;
     }
 
     if (!nombreCliente || !articulos || articulos.length === 0) {
@@ -153,14 +167,14 @@ export async function POST(request: NextRequest) {
           data: {
             codigoCliente: nuevoCodigoCliente,
             fechaVenta: new Date(),
-            nombreCompleto: nombreCliente.trim(),
+            nombreCompleto: nombreCliente.trim().toUpperCase(),
             telefono: telefonoCliente || null,
-            vendedor,
-            cobradorAsignadoId: cobradorAsignadoId && cobradorAsignadoId !== 'sin-asignar' ? cobradorAsignadoId : null,
+            vendedor: finalVendedorNombre,
+            cobradorAsignadoId: finalCobradorId,
             sucursalId: activeSucursalId || null,
             statusCuenta: 'activo',
-            direccionCompleta: `${direccionCliente}${ciudadCliente ? ', ' + ciudadCliente : ''}`.trim(),
-            descripcionProducto: descripcionConceptos.substring(0, 250),
+            direccionCompleta: `${direccionCliente}${ciudadCliente ? ', ' + ciudadCliente : ''}`.trim().toUpperCase(),
+            descripcionProducto: descripcionConceptos.substring(0, 250).toUpperCase(),
             diaPago: diaPago ? diaPago.toString() : '1',
             montoPago: montoCuota > 0 ? Number(montoCuota) : 100,
             periodicidad: (periodicidad as Periodicidad) || 'semanal',
@@ -217,8 +231,8 @@ export async function POST(request: NextRequest) {
         ciudadCliente: (ciudadCliente || 'Aculco, Edo. de Méx.').trim(),
         telefonoCliente: telefonoCliente.trim(),
         sucursalId: activeSucursalId || null,
-        vendedorId: vendedorId || null,
-        vendedor: vendedor || 'TIENDA',
+        vendedorId: finalVendedorId,
+        vendedor: finalVendedorNombre,
         subtotal: Number(subtotal),
         descuento: Number(descuento || 0),
         total: Number(total),
@@ -232,15 +246,20 @@ export async function POST(request: NextRequest) {
         firmaCliente: firmaCliente || null,
         observaciones: observaciones || null,
         detalles: {
-          create: articulos.map((item: any) => ({
-            productoId: item.productoId && !item.productoId.startsWith('est-') && !item.productoId.startsWith('lav-') && !item.productoId.startsWith('col-') && !item.productoId.startsWith('rop-') && !item.productoId.startsWith('sal-') && !item.productoId.startsWith('bas-') && !item.productoId.startsWith('tv-') && !item.productoId.startsWith('mue-') && !item.productoId.startsWith('aud-') && !item.productoId.startsWith('elc-') && !item.productoId.startsWith('lic-') && !item.productoId.startsWith('caf-') && !item.productoId.startsWith('pla-') && !item.productoId.startsWith('bat-')
-              ? item.productoId
-              : null,
-            cantidad: Number(item.cantidad || 1),
-            concepto: item.concepto,
-            precioUnitario: Number(item.precioUnitario),
-            importe: Number(item.importe)
-          }))
+          create: articulos.map((item: any) => {
+            const cant = Number(item.cantidad || 1);
+            const pUnit = Number(item.precioUnitario !== undefined && item.precioUnitario !== null ? item.precioUnitario : (Number(item.importe || 0) / cant));
+            const imp = Number(item.importe !== undefined && item.importe !== null ? item.importe : (pUnit * cant));
+            return {
+              productoId: item.productoId && !item.productoId.startsWith('est-') && !item.productoId.startsWith('lav-') && !item.productoId.startsWith('col-') && !item.productoId.startsWith('rop-') && !item.productoId.startsWith('sal-') && !item.productoId.startsWith('bas-') && !item.productoId.startsWith('tv-') && !item.productoId.startsWith('mue-') && !item.productoId.startsWith('aud-') && !item.productoId.startsWith('elc-') && !item.productoId.startsWith('lic-') && !item.productoId.startsWith('caf-') && !item.productoId.startsWith('pla-') && !item.productoId.startsWith('bat-')
+                ? item.productoId
+                : null,
+              cantidad: cant,
+              concepto: item.concepto,
+              precioUnitario: pUnit,
+              importe: imp
+            };
+          })
         }
       },
       include: {

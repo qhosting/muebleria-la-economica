@@ -125,6 +125,13 @@ export default function KioscoVentasPage() {
   const [tabPrincipal, setTabPrincipal] = useState<'catalogo' | 'pedido' | 'historial'>('catalogo');
   const [historialVentas, setHistorialVentas] = useState<any[]>([]);
 
+  // Filtro de existencias (En Esta Sucursal vs Globales)
+  const [filtroExistencias, setFiltroExistencias] = useState<'sucursal' | 'global'>('sucursal');
+
+  // Estado para eliminar venta (Solo Admin)
+  const [ventaAEliminar, setVentaAEliminar] = useState<any | null>(null);
+  const [eliminandoVenta, setEliminandoVenta] = useState(false);
+
   // Modal de Existencias y Traslado
   const [modalExistenciasOpen, setModalExistenciasOpen] = useState(false);
   const [productoSeleccionadoExistencias, setProductoSeleccionadoExistencias] = useState<CatalogoItem | null>(null);
@@ -149,14 +156,18 @@ export default function KioscoVentasPage() {
     }
   }, [userSucursalId, userSucursalNombre, sucursales]);
 
-  // Si el usuario logueado es vendedor o usuario de sucursal, auto-asignarlo como vendedor
+  // Si el usuario logueado es vendedor o usuario de sucursal, auto-asignarlo como vendedor y cobrador
   useEffect(() => {
     if (session?.user) {
       const currentUserId = (session.user as any)?.id;
       const currentUserName = session.user.name;
+      const currentRole = (session.user as any)?.role;
       if (currentUserId && currentUserName) {
         setVendedorSeleccionadoId(currentUserId);
         setVendedorNombre(currentUserName);
+        if (currentRole === 'vendedor' || currentRole === 'cobrador') {
+          setCobradorAsignadoId(currentUserId);
+        }
       }
     }
   }, [session]);
@@ -456,6 +467,33 @@ export default function KioscoVentasPage() {
     nuevo[index].precioUnitario = nuevoPrecio;
     nuevo[index].importe = nuevo[index].cantidad * nuevoPrecio;
     setCarrito(nuevo);
+    if (tipoVenta === 'credito') {
+      const nuevoTotal = nuevo.reduce((s, i) => s + i.importe, 0);
+      setEnganche(Math.round(nuevoTotal * 0.40));
+    }
+  };
+
+  const handleConfirmarEliminarVenta = async () => {
+    if (!ventaAEliminar) return;
+    try {
+      setEliminandoVenta(true);
+      const res = await fetch(`/api/ventas/${ventaAEliminar.id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al eliminar la venta');
+      }
+      toast.success(data.message || 'Remisión eliminada y existencias reintegradas exitosamente');
+      setVentaAEliminar(null);
+      await cargarHistorial();
+      await cargarProductos();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Error al eliminar la venta');
+    } finally {
+      setEliminandoVenta(false);
+    }
   };
 
   const eliminarDelCarrito = (index: number) => {
@@ -731,12 +769,14 @@ export default function KioscoVentasPage() {
     });
   }, [productosDB]);
 
-  // Filtrado de catálogo: SOLO mostrar productos con existencia disponible en la sucursal activa
+  // Filtrado de catálogo: según selector de existencias (En Esta Sucursal vs Globales)
   const catalogoFiltrado = catalogoCombinado.filter(item => {
-    // 1. Filtrar estrictamente por existencia en la sucursal seleccionada
-    const stockDisponible = obtenerStockSucursal(item);
-    if (stockDisponible <= 0) {
-      return false; // NO MOSTRAR si no hay existencia en esta sucursal
+    // 1. Si filtroExistencias === 'sucursal', filtrar por existencia en la sucursal activa
+    if (filtroExistencias === 'sucursal') {
+      const stockDisponible = obtenerStockSucursal(item);
+      if (stockDisponible <= 0) {
+        return false;
+      }
     }
 
     // 2. Filtro por categoría
@@ -1056,6 +1096,43 @@ export default function KioscoVentasPage() {
                       onChange={e => setBusqueda(e.target.value.toUpperCase())}
                       className="pl-9 h-10 bg-slate-50 border-slate-200 focus:bg-white text-sm uppercase placeholder:normal-case"
                     />
+                  </div>
+
+                  {/* Selector de Pestaña de Existencias: En Esta Sucursal vs Existencias Globales */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setFiltroExistencias('sucursal')}
+                        className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-bold ${
+                          filtroExistencias === 'sucursal'
+                            ? 'bg-blue-900 text-white shadow-xs'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        <Store className="h-3.5 w-3.5" />
+                        En Esta Sucursal ({sucursalActual?.nombre || 'Local'})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFiltroExistencias('global')}
+                        className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-bold ${
+                          filtroExistencias === 'global'
+                            ? 'bg-blue-900 text-white shadow-xs'
+                            : 'text-gray-600 hover:text-gray-900 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                        Existencias Globales (Todas las Bodegas/Tiendas)
+                      </button>
+                    </div>
+
+                    {filtroExistencias === 'global' && (
+                      <Badge variant="outline" className="text-[11px] text-blue-700 bg-blue-50 border-blue-200 font-semibold gap-1 py-1">
+                        <Boxes className="h-3.5 w-3.5" />
+                        Visualizando existencias consolidadas y traspasos entre sucursales
+                      </Badge>
+                    )}
                   </div>
                 </CardHeader>
 
@@ -2192,6 +2269,18 @@ export default function KioscoVentasPage() {
                                 <ShieldCheck className="h-3 w-3" />
                                 Bóveda
                               </Button>
+                              {esAdmin && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => setVentaAEliminar(v)}
+                                  className="gap-1 text-xs h-7 text-rose-600 hover:bg-rose-50 border-rose-200 hover:border-rose-400 font-semibold"
+                                  title="Eliminar remisión y restituir stock (Solo Administrador)"
+                                >
+                                  <Trash2 className="h-3 w-3" />
+                                  Eliminar
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2203,6 +2292,50 @@ export default function KioscoVentasPage() {
             </CardContent>
           </Card>
         )}
+
+        {/* MODAL DE CONFIRMACIÓN PARA ELIMINAR REMISIÓN (SOLO ADMINISTRADOR) */}
+        <Dialog open={!!ventaAEliminar} onOpenChange={(open) => !open && setVentaAEliminar(null)}>
+          <DialogContent className="max-w-md bg-white">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-rose-700 font-bold text-base">
+                <AlertTriangle className="h-5 w-5 text-rose-600" />
+                ¿Eliminar Remisión Nº {ventaAEliminar?.folio?.toString().padStart(4, '0')}?
+              </DialogTitle>
+              <DialogDescription className="text-xs text-gray-600 space-y-2 pt-2">
+                <p>
+                  Esta acción está <strong>permitida únicamente para administradores</strong> y aplicará los siguientes cambios:
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-gray-700">
+                  <li>Reintegrará el stock de los artículos a la sucursal de origen.</li>
+                  <li>Eliminará la remisión y el pagaré de la base de datos.</li>
+                  <li>Cancelará los recibos de enganche vinculados.</li>
+                  <li>Ajustará la cuenta del cliente ({ventaAEliminar?.nombreCliente}).</li>
+                </ul>
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="gap-2 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setVentaAEliminar(null)}
+                disabled={eliminandoVenta}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleConfirmarEliminarVenta}
+                disabled={eliminandoVenta}
+                className="bg-rose-700 hover:bg-rose-800 text-white text-xs gap-1.5 font-bold"
+              >
+                {eliminandoVenta ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+                Eliminar Venta Definitivamente
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* MODAL DE FIRMA DIGITAL TÁCTIL */}
         <SignaturePadModal

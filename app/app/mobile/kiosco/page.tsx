@@ -44,6 +44,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
@@ -112,10 +113,18 @@ export default function MobileKioscoPage() {
   const [guardandoVenta, setGuardandoVenta] = useState(false);
 
   // Sucursal del vendedor / contexto móvil
+  const esAdmin = (session?.user as any)?.role === 'admin';
   const userSucursalId = (session?.user as any)?.sucursalId || (session?.user as any)?.sucursal?.id;
   const userSucursalNombre = (session?.user as any)?.sucursal?.nombre;
   const [sucursales, setSucursales] = useState<any[]>(SUCURSALES_SISTEMA);
   const [sucursalSeleccionada, setSucursalSeleccionada] = useState<string>('');
+
+  // Filtro de existencias (En Esta Sucursal vs Global)
+  const [filtroExistencias, setFiltroExistencias] = useState<'sucursal' | 'global'>('sucursal');
+
+  // Estado para eliminar venta (Solo Admin)
+  const [ventaAEliminar, setVentaAEliminar] = useState<any | null>(null);
+  const [eliminandoVenta, setEliminandoVenta] = useState(false);
 
   // Modal de Existencias y Traslado
   const [modalExistenciasOpen, setModalExistenciasOpen] = useState(false);
@@ -127,6 +136,54 @@ export default function MobileKioscoPage() {
   // Historial de ventas del usuario
   const [misVentas, setMisVentas] = useState<any[]>([]);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
+
+  // Modificar precio unitario por artículo en el carrito móvil
+  const modificarPrecioItem = (codigo: string, nuevoPrecio: number) => {
+    if (isNaN(nuevoPrecio) || nuevoPrecio < 0) return;
+    setCarrito(prev =>
+      prev.map(item => {
+        if (item.producto.codigo === codigo) {
+          return {
+            ...item,
+            precioUnitario: nuevoPrecio,
+            subtotal: item.cantidad * nuevoPrecio
+          };
+        }
+        return item;
+      })
+    );
+    if (tipoVenta === 'credito') {
+      const nuevoTotal = carrito.reduce(
+        (sum, item) => sum + (item.producto.codigo === codigo ? item.cantidad * nuevoPrecio : item.subtotal),
+        0
+      );
+      setEnganche(Math.round(nuevoTotal * 0.40));
+    }
+  };
+
+  // Confirmar eliminación de venta en móvil (Solo Admin)
+  const handleConfirmarEliminarVenta = async () => {
+    if (!ventaAEliminar) return;
+    try {
+      setEliminandoVenta(true);
+      const res = await fetch(`/api/ventas/${ventaAEliminar.id}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Error al eliminar la venta');
+      }
+      toast.success(data.message || 'Venta eliminada y stock reintegrado correctamente');
+      setVentaAEliminar(null);
+      await cargarMisVentas();
+      await cargarProductos();
+    } catch (err: any) {
+      console.error(err);
+      toast.error(err.message || 'Error al eliminar la venta');
+    } finally {
+      setEliminandoVenta(false);
+    }
+  };
 
   const categorias = [
     'Todos',
@@ -321,8 +378,12 @@ export default function MobileKioscoPage() {
     }
   };
 
-  // Filtrado de productos
+  // Filtrado de productos (En Esta Sucursal vs Global)
   const productosFiltrados = productos.filter(p => {
+    if (filtroExistencias === 'sucursal') {
+      const stockDisponible = obtenerStockSucursal(p);
+      if (stockDisponible <= 0) return false;
+    }
     const coincideCat = categoriaActiva === 'Todos' || p.categoria === categoriaActiva;
     const query = busqueda.toLowerCase().trim();
     const coincideQuery = !query || 
@@ -707,6 +768,34 @@ export default function MobileKioscoPage() {
             )}
           </div>
 
+          {/* Selector de Existencias: En Esta Sucursal vs Todas las Sucursales */}
+          <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+            <button
+              type="button"
+              onClick={() => setFiltroExistencias('sucursal')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 ${
+                filtroExistencias === 'sucursal'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Store className="w-3.5 h-3.5" />
+              En Esta Sucursal
+            </button>
+            <button
+              type="button"
+              onClick={() => setFiltroExistencias('global')}
+              className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 ${
+                filtroExistencias === 'global'
+                  ? 'bg-amber-500 text-slate-950 shadow-xs'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5" />
+              Todas las Sucursales
+            </button>
+          </div>
+
           {/* Categorías deslizables */}
           <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
             {categorias.map(cat => (
@@ -1065,7 +1154,15 @@ export default function MobileKioscoPage() {
                             <option value="4meses">4 Meses</option>
                             <option value="12meses">12 Meses</option>
                           </select>
-                          <span className="text-[10px] text-slate-400 font-mono">${item.precioUnitario}</span>
+                          <div className="flex items-center gap-0.5 bg-slate-900 border border-slate-700 rounded px-1 py-0.5">
+                            <span className="text-[10px] text-slate-400 font-mono">$</span>
+                            <input
+                              type="number"
+                              value={item.precioUnitario}
+                              onChange={(e) => modificarPrecioItem(item.producto.codigo, parseFloat(e.target.value))}
+                              className="w-16 bg-transparent text-[10px] text-white font-mono font-bold text-right focus:outline-none"
+                            />
+                          </div>
                         </div>
                       </div>
 
@@ -1506,6 +1603,18 @@ export default function MobileKioscoPage() {
                       >
                         <Share2 className="w-3.5 h-3.5" />
                       </Button>
+
+                      {esAdmin && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setVentaAEliminar(v)}
+                          className="bg-slate-950 border-rose-900/60 hover:bg-rose-950/80 text-rose-400 font-semibold text-xs h-8 px-2.5"
+                          title="Eliminar remisión (Solo Administrador)"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -1514,6 +1623,50 @@ export default function MobileKioscoPage() {
           )}
         </div>
       )}
+
+      {/* Modal de Confirmación de Eliminación de Remisión (Solo Admin) */}
+      <Dialog open={!!ventaAEliminar} onOpenChange={(open) => !open && setVentaAEliminar(null)}>
+        <DialogContent className="max-w-md bg-slate-900 border-slate-800 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-rose-400 font-bold text-base">
+              <AlertTriangle className="h-5 w-5 text-rose-500" />
+              ¿Eliminar Remisión Nº {ventaAEliminar?.folio?.toString().padStart(4, '0')}?
+            </DialogTitle>
+            <DialogDescription className="text-xs text-slate-300 space-y-2 pt-2">
+              <p>
+                Esta acción está <strong className="text-amber-400">permitida únicamente para administradores</strong> y aplicará:
+              </p>
+              <ul className="list-disc pl-5 space-y-1 text-slate-400">
+                <li>Reintegrará el stock de los artículos a la sucursal correspondiente.</li>
+                <li>Eliminará la remisión y el pagaré del sistema.</li>
+                <li>Cancelará los recibos de enganche vinculados.</li>
+                <li>Ajustará la cuenta del cliente ({ventaAEliminar?.nombreCliente}).</li>
+              </ul>
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 pt-2 sm:justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setVentaAEliminar(null)}
+              disabled={eliminandoVenta}
+              className="bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-700 text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={handleConfirmarEliminarVenta}
+              disabled={eliminandoVenta}
+              className="bg-rose-700 hover:bg-rose-800 text-white text-xs gap-1.5 font-bold"
+            >
+              {eliminandoVenta ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5" />}
+              Eliminar Venta Definitivamente
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modal de Firma con el Dedo */}
       <SignaturePadModal

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +27,8 @@ export function EditarProductoModal({
     producto,
     sucursales = []
 }: EditarProductoModalProps) {
+    const { data: session } = useSession();
+    const esAdmin = (session?.user as any)?.role === 'admin';
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         id: '',
@@ -236,29 +239,31 @@ export function EditarProductoModal({
                             </span>
                         </div>
 
-                        {/* Fila 1: Costo y Contado */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            {/* Precio Compra / Costo */}
-                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
-                                <Label htmlFor="edit-precioCompra" className="text-xs font-bold text-gray-700">
-                                    Precio Compra / Costo ($)
-                                </Label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
-                                    <Input
-                                        id="edit-precioCompra"
-                                        name="precioCompra"
-                                        type="number"
-                                        step="1"
-                                        min="0"
-                                        placeholder="0"
-                                        value={formData.precioCompra}
-                                        onChange={handleChange}
-                                        className="pl-7 text-base font-bold text-gray-800"
-                                    />
+                        {/* Fila 1: Costo (Solo Admin) y Contado */}
+                        <div className={`grid grid-cols-1 ${esAdmin ? 'sm:grid-cols-2' : ''} gap-3`}>
+                            {/* Precio Compra / Costo (Solo visible para Admin) */}
+                            {esAdmin && (
+                                <div className="grid gap-1 bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
+                                    <Label htmlFor="edit-precioCompra" className="text-xs font-bold text-gray-700">
+                                        Precio Compra / Costo ($)
+                                    </Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-gray-400 font-bold">$</span>
+                                        <Input
+                                            id="edit-precioCompra"
+                                            name="precioCompra"
+                                            type="number"
+                                            step="1"
+                                            min="0"
+                                            placeholder="0"
+                                            value={formData.precioCompra}
+                                            onChange={handleChange}
+                                            className="pl-7 text-base font-bold text-gray-800"
+                                        />
+                                    </div>
+                                    <span className="text-[10px] text-gray-500">Costo de adquisición base (Solo Admin)</span>
                                 </div>
-                                <span className="text-[10px] text-gray-500">Costo de adquisición base</span>
-                            </div>
+                            )}
 
                             {/* Precio Contado */}
                             <div className="grid gap-1 bg-white p-3 rounded-lg border border-blue-200 shadow-xs">

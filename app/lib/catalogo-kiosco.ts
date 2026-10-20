@@ -42,6 +42,14 @@ export const SUCURSALES_SISTEMA: SucursalInfo[] = [
     ciudad: 'Amealco / Aculco, Qro.',
     telefono: '427 273 2216',
     esBodega: false
+  },
+  {
+    id: 'sucursal-hogar-y-estilo',
+    nombre: 'HOGAR Y ESTILO',
+    direccion: 'Av. Manuel Ávila Camacho Col. Centro',
+    ciudad: 'Aculco, Edo. de Méx.',
+    telefono: '427 273 2216',
+    esBodega: false
   }
 ];
 

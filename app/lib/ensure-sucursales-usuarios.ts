@@ -34,13 +34,19 @@ export const VENDEDORES_SUCURSAL_SISTEMA: VendedorSucursalConfig[] = [
     sucursalNombre: 'SAN ILDEFONSO',
     passwordDefecto: 'vendedor123',
   },
+  {
+    email: 'vendedor.hogaryestilo@economica.local',
+    name: 'Vendedor Hogar y Estilo',
+    sucursalNombre: 'HOGAR Y ESTILO',
+    passwordDefecto: 'vendedor123',
+  },
 ];
 
 let lastSyncTimestamp = 0;
 const SYNC_INTERVAL_MS = 60 * 1000; // Máximo una vez por minuto durante peticiones web normales
 
 /**
- * Asegura la existencia de las 4 sucursales oficiales, 1 usuario vendedor para cada sucursal
+ * Asegura la existencia de las 5 sucursales oficiales, 1 usuario vendedor para cada sucursal
  * y que cada sucursal cuente con existencias en su inventario para operar en el Kiosco.
  */
 export async function asegurarSucursalesYUsuarios(force: boolean = false) {

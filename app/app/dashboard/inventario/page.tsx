@@ -41,9 +41,11 @@ import { MovimientoModal } from '@/components/inventario/MovimientoModal';
 import { NuevoProductoModal } from '@/components/inventario/NuevoProductoModal';
 import { NuevaSucursalModal } from '@/components/inventario/NuevaSucursalModal';
 import { EditarProductoModal } from '@/components/inventario/EditarProductoModal';
+import { EditarSucursalModal } from '@/components/inventario/EditarSucursalModal';
 
 export default function InventarioPage() {
     const { data: session } = useSession();
+    const esAdmin = (session?.user as any)?.role === 'admin';
     const [productos, setProductos] = useState<any[]>([]);
     const [sucursales, setSucursales] = useState<any[]>([]);
     const [movimientos, setMovimientos] = useState<any[]>([]);
@@ -61,6 +63,8 @@ export default function InventarioPage() {
     const [isEditarOpen, setIsEditarOpen] = useState(false);
     const [productoAEditar, setProductoAEditar] = useState<any>(null);
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
+    const [isEditarSucursalOpen, setIsEditarSucursalOpen] = useState(false);
+    const [sucursalAEditar, setSucursalAEditar] = useState<any>(null);
 
     useEffect(() => {
         fetchData();
@@ -585,19 +589,41 @@ export default function InventarioPage() {
                     <TabsContent value="bodegas">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             {sucursales.map(sucursal => (
-                                <Card key={sucursal.id}>
+                                <Card key={sucursal.id} className="relative hover:shadow-md transition-shadow">
                                     <CardHeader className="pb-2">
-                                        <div className="flex justify-between items-center">
-                                            <CardTitle className="text-lg">{sucursal.nombre}</CardTitle>
-                                            <Badge variant={sucursal.esBodega ? "secondary" : "default"}>
-                                                {sucursal.esBodega ? "Bodega" : "Tienda"}
-                                            </Badge>
+                                        <div className="flex justify-between items-start gap-2">
+                                            <div>
+                                                <CardTitle className="text-lg font-bold text-gray-900">{sucursal.nombre}</CardTitle>
+                                                <Badge variant={sucursal.esBodega ? "secondary" : "default"} className="mt-1">
+                                                    {sucursal.esBodega ? "Bodega" : "Tienda"}
+                                                </Badge>
+                                            </div>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => {
+                                                    setSucursalAEditar(sucursal);
+                                                    setIsEditarSucursalOpen(true);
+                                                }}
+                                                className="h-8 gap-1.5 text-xs text-blue-700 hover:text-blue-900 border-blue-200 hover:bg-blue-50 font-semibold"
+                                                title="Editar datos de la sucursal"
+                                            >
+                                                <Pencil className="h-3.5 w-3.5 text-blue-600" />
+                                                Editar
+                                            </Button>
                                         </div>
-                                        <CardDescription>{sucursal.direccion || 'Sin dirección registrada'}</CardDescription>
+                                        <CardDescription className="text-xs mt-1">
+                                            {sucursal.direccion || 'Sin dirección registrada'}
+                                        </CardDescription>
                                     </CardHeader>
                                     <CardContent>
-                                        <div className="text-sm text-gray-600">
-                                            Teléfono: {sucursal.telefono || 'N/A'}
+                                        <div className="text-xs text-gray-600 flex items-center justify-between">
+                                            <span><strong>Teléfono:</strong> {sucursal.telefono || 'N/A'}</span>
+                                            {sucursal._count?.stocks !== undefined && (
+                                                <Badge variant="outline" className="text-[10px]">
+                                                    {sucursal._count.stocks} artículos en stock
+                                                </Badge>
+                                            )}
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -633,6 +659,13 @@ export default function InventarioPage() {
                     onSuccess={fetchData}
                     producto={productoAEditar}
                     sucursales={sucursales}
+                />
+
+                <EditarSucursalModal
+                    isOpen={isEditarSucursalOpen}
+                    onClose={() => setIsEditarSucursalOpen(false)}
+                    onSuccess={fetchData}
+                    sucursal={sucursalAEditar}
                 />
 
                 {/* Modal de confirmación para deshacer movimiento */}

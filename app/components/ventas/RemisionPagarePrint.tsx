@@ -305,13 +305,16 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             <div className="flex-1">
               <div className="flex items-center gap-2.5">
                 <h1 className="text-xl md:text-2xl font-black tracking-wide text-blue-900 uppercase font-serif">
-                  MUEBLERÍA LA ECONÓMICA
+                  {sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO')
+                    ? 'HOGAR Y ESTILO'
+                    : 'MUEBLERÍA LA ECONÓMICA'}
                 </h1>
                 <span className="bg-blue-900 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
                   ORIGINAL TIENDA
                 </span>
               </div>
               <p className="text-xs font-bold text-blue-800 uppercase tracking-tight mt-0.5">
+                {sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO') ? 'MUEBLERÍA LA ECONÓMICA • ' : ''}
                 SUCURSAL {sucursalActiva.nombre} • Tel. {sucursalActiva.telefono}
               </p>
               <p className="text-[10px] text-gray-600 mt-0.5">
@@ -354,9 +357,10 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             <table className="w-full text-xs relative z-10 border-collapse">
               <thead>
                 <tr className="bg-blue-900 text-white font-bold">
-                  <th className="py-1 px-3 text-center border-r border-blue-800 w-[12%]">CANT.</th>
-                  <th className="py-1 px-3 text-left border-r border-blue-800 w-[68%]">CONCEPTO</th>
-                  <th className="py-1 px-3 text-right w-[20%]">IMPORTE</th>
+                  <th className="py-1 px-3 text-center border-r border-blue-800 w-[10%]">CANT.</th>
+                  <th className="py-1 px-3 text-left border-r border-blue-800 w-[55%]">CONCEPTO</th>
+                  <th className="py-1 px-3 text-right border-r border-blue-800 w-[17%]">P. UNIT</th>
+                  <th className="py-1 px-3 text-right w-[18%]">IMPORTE</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-200">
@@ -367,6 +371,9 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                     </td>
                     <td className="py-1 px-3 font-medium text-gray-900 border-r border-blue-200 uppercase truncate">
                       {item ? item.concepto : ''}
+                    </td>
+                    <td className="py-1 px-3 text-right text-gray-700 font-semibold border-r border-blue-200">
+                      {item ? formatCurrency(item.precioUnitario || (item.importe / (item.cantidad || 1))) : ''}
                     </td>
                     <td className="py-1 px-3 text-right font-bold text-gray-900">
                       {item ? formatCurrency(item.importe) : ''}
@@ -417,14 +424,15 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             <p className="text-[10px] leading-relaxed text-gray-800 text-left my-1.5">
               DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DE <strong className="text-blue-950">MUEBLERÍA LA ECONÓMICA</strong> EN SU DOMICILIO EN {sucursalActiva.nombre}, LA CANTIDAD DE{' '}
               <strong className="text-gray-950">{formatCurrency(montoPagare, 2)} M.N. ({importeEnLetras})</strong> EL DÍA{' '}
-              <strong className="text-blue-950">{venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}</strong>. VALOR RECIBIDO A MI ENTERA SATISFACCIÓN. EN CASO DE MORA CAUSARÁ INTERÉS DEL <strong>{venta.interesMoratorioMensual || 10}%</strong> MENSUAL.
+              <strong className="text-blue-950">{venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}</strong>. VALOR RECIBIDO A MI ENTERA SATISFACCIÓN. EN CASO DE MORA O INCUMPLIMIENTO CAUSARÁ UN INTERÉS MORATORIO DEL <strong>{venta.interesMoratorioMensual || 10}%</strong> MENSUAL A PARTIR DEL SEGUNDO MES DE NO PAGO CONSECUTIVO.
             </p>
 
-            {venta.tipoVenta === 'credito' && (
-              <div className="text-[10px] text-blue-950 bg-blue-100/50 border border-blue-200 rounded px-2 py-1 flex flex-wrap justify-between gap-2 mt-1.5 font-medium">
-                <span>Enganche: <strong>{formatCurrency(venta.enganche || 0, 2)}</strong></span>
-                <span>Saldo Financiado: <strong>{formatCurrency(venta.saldoFinanciado || 0, 2)}</strong></span>
-                <span>Abono Semanal: <strong>{formatCurrency(venta.montoCuota || 0, 2)} ({venta.periodicidad || 'semanal'})</strong></span>
+            {(venta.tipoVenta === 'credito' || Number(venta.enganche || 0) > 0) && (
+              <div className="text-[10px] text-blue-950 bg-blue-100/60 border border-blue-300 rounded px-2.5 py-1.5 flex flex-wrap justify-between gap-2 mt-1.5 font-medium shadow-2xs">
+                <span>Total Venta: <strong>{formatCurrency(venta.total, 2)}</strong></span>
+                <span>Enganche Inicial: <strong className="text-blue-900 font-bold">{formatCurrency(venta.enganche || 0, 2)}</strong></span>
+                <span>Saldo Financiado (Pagaré): <strong className="text-amber-900 font-bold">{formatCurrency(venta.saldoFinanciado || (venta.total - (venta.enganche || 0)), 2)}</strong></span>
+                <span>Abono Acordado: <strong className="text-emerald-900 font-bold">{formatCurrency(venta.montoCuota || 0, 2)} ({venta.periodicidad || 'semanal'})</strong></span>
               </div>
             )}
 
@@ -473,13 +481,16 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             <div className="flex-1">
               <div className="flex items-center gap-2.5">
                 <h2 className="text-lg md:text-xl font-black tracking-wide text-slate-900 uppercase font-serif">
-                  MUEBLERÍA LA ECONÓMICA
+                  {sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO')
+                    ? 'HOGAR Y ESTILO'
+                    : 'MUEBLERÍA LA ECONÓMICA'}
                 </h2>
                 <span className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
                   COPIA CLIENTE
                 </span>
               </div>
               <p className="text-[10px] font-bold text-slate-700 uppercase mt-0.5">
+                {sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO') ? 'MUEBLERÍA LA ECONÓMICA • ' : ''}
                 COMPROBANTE DE COMPRA Y CONTRATO DE CRÉDITO • SUCURSAL {sucursalActiva.nombre}
               </p>
             </div>
@@ -528,7 +539,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
           <div className="text-[10px] bg-white border rounded-md px-2.5 py-1 mb-2 text-gray-800">
             <strong>Artículos amparados: </strong>
             {venta.detalles && venta.detalles.length > 0 ? (
-              venta.detalles.map((d, i) => `${d.cantidad}x ${d.concepto}`).join(' • ')
+              venta.detalles.map((d, i) => `${d.cantidad}x ${d.concepto}${d.precioUnitario ? ` ($${d.precioUnitario})` : ''}`).join(' • ')
             ) : (
               'Artículos detallados en remisión original'
             )}
@@ -547,7 +558,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                   <strong>1. PAGOS Y RECIBOS OFICIALES:</strong> El comprador se compromete a cubrir sus abonos puntualmente los días <strong>{venta.diaPago ? `DÍA ${venta.diaPago}` : 'pactados'}</strong> con el gestor de cobranza autorizado en su domicilio o en sucursal. <strong>Exija siempre su ticket/recibo impreso oficial</strong> como único comprobante válido de abono.
                 </p>
                 <p className="mb-1">
-                  <strong>2. GARANTÍA DE MUEBLES:</strong> Toda la mercancía cuenta con garantía contra defectos de fabricación. La garantía no aplica en averías por mal uso, negligencia, sobrepeso, humedad o agentes externos ajenos a la calidad del mueble.
+                  <strong>2. GARANTÍA DE MUEBLES:</strong> Toda la mercancía cuenta con 1 año de garantía a partir de la fecha de compra contra cualquier defecto de fabricación. La garantía no aplica en averías por mal uso, negligencia, sobrepeso, humedad o agentes externos ajenos a la calidad del mueble.
                 </p>
                 <p>
                   <strong>3. RESERVA DE DOMINIO:</strong> La propiedad formal de los artículos se transfiere en su totalidad al comprador al liquidar el 100% del saldo financiado.
@@ -559,7 +570,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                   <strong>4. DEVOLUCIÓN O CANCELACIÓN:</strong> En caso de cancelación voluntaria o devolución de la mercancía por causas ajenas a la mueblería, aplicará una penalización del <strong>20% del valor total</strong> por concepto de gastos administrativos, logística y depreciación del bien.
                 </p>
                 <p className="mb-1">
-                  <strong>5. MORA Y VENCIMIENTO:</strong> Todo pago no cubierto en el plazo estipulado causará el interés moratorio del <strong>{venta.interesMoratorioMensual || 10}% mensual</strong> pactado en el pagaré mercantil original.
+                  <strong>5. MORA Y VENCIMIENTO:</strong> Todo pago no cubierto en el plazo estipulado causará el interés moratorio del <strong>{venta.interesMoratorioMensual || 10}% mensual a partir del segundo mes consecutivo de no pago</strong>, pactado en el pagaré mercantil original.
                 </p>
                 <p>
                   <strong>6. ATENCIÓN Y ACLARACIONES:</strong> Para aclaraciones, soporte o reportes comuníquese al teléfono <strong>{sucursalActiva.telefono}</strong> o visítenos en <strong>{sucursalActiva.direccion}</strong>.

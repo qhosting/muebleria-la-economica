@@ -2,6 +2,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,6 +14,8 @@ import { DollarSign, ShieldCheck, PlusCircle } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
+    const { data: session } = useSession();
+    const esAdmin = (session?.user as any)?.role === 'admin';
     const [loading, setLoading] = useState(false);
     const [formData, setFormData] = useState({
         codigo: '',
@@ -48,8 +51,8 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
         e.preventDefault();
         setLoading(true);
 
-        const pCompra = Math.round(parseFloat(formData.precioCompra) || 0);
-        const pContado = Math.round(parseFloat(formData.precioContado) || pCompra);
+        const pContado = Math.round(parseFloat(formData.precioContado) || 0);
+        const pCompra = esAdmin ? Math.round(parseFloat(formData.precioCompra) || pContado) : pContado;
         const p1M = Math.round(parseFloat(formData.precio1Mes) || 0);
         const p4M = Math.round(parseFloat(formData.precio4Meses) || 0);
         const p12M = Math.round(parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0);
@@ -190,23 +193,25 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                             </span>
                         </div>
 
-                        {/* Fila 1: Costo y Contado */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
-                                <Label htmlFor="precioCompra" className="text-xs font-bold text-gray-700">Costo ($)</Label>
-                                <Input
-                                    id="precioCompra"
-                                    name="precioCompra"
-                                    type="number"
-                                    min="0"
-                                    step="1"
-                                    placeholder="0"
-                                    value={formData.precioCompra}
-                                    onChange={handleChange}
-                                    className="font-bold text-gray-800"
-                                />
-                                <span className="text-[10px] text-gray-500">Costo de compra</span>
-                            </div>
+                        {/* Fila 1: Costo (Solo Admin) y Contado */}
+                        <div className={`grid grid-cols-1 ${esAdmin ? 'sm:grid-cols-2' : ''} gap-3`}>
+                            {esAdmin && (
+                                <div className="grid gap-1 bg-white p-3 rounded-lg border border-slate-200 shadow-xs">
+                                    <Label htmlFor="precioCompra" className="text-xs font-bold text-gray-700">Costo ($)</Label>
+                                    <Input
+                                        id="precioCompra"
+                                        name="precioCompra"
+                                        type="number"
+                                        min="0"
+                                        step="1"
+                                        placeholder="0"
+                                        value={formData.precioCompra}
+                                        onChange={handleChange}
+                                        className="font-bold text-gray-800"
+                                    />
+                                    <span className="text-[10px] text-gray-500">Costo de compra (Solo Admin)</span>
+                                </div>
+                            )}
 
                             <div className="grid gap-1 bg-white p-3 rounded-lg border border-blue-200 shadow-xs">
                                 <Label htmlFor="precioContado" className="text-xs font-bold text-blue-900">Precio Contado ($)</Label>

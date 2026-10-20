@@ -116,14 +116,14 @@ const navigation: NavigationItem[] = [
     name: 'Inventario',
     href: '/dashboard/inventario',
     icon: Package,
-    roles: ['admin', 'gestor_cobranza'],
+    roles: ['admin', 'gestor_cobranza', 'vendedor'],
     section: 'Inventario y Finanzas',
   },
   {
     name: 'Reportes',
     href: '/dashboard/reportes',
     icon: BarChart3,
-    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza', 'vendedor'],
     section: 'Inventario y Finanzas',
   },
 
