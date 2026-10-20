@@ -22,6 +22,10 @@ const nextConfig = {
   // Capacitor requiere trailing slash en exportación estática
   trailingSlash: process.env.BUILD_TARGET === 'capacitor',
 
+  generateBuildId: async () => {
+    return process.env.SOURCE_COMMIT || process.env.COOLIFY_COMMIT_SHA || process.env.GIT_COMMIT || 'muebleria-release';
+  },
+
   images: { unoptimized: true },
 
   async headers() {
