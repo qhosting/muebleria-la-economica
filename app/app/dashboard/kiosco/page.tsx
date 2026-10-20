@@ -1434,13 +1434,6 @@ export default function KioscoVentasPage() {
                       <CardContent className="p-4 space-y-3">
                         <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
                           {carrito.map((item, idx) => {
-                            const prod = catalogoCombinado.find(p => p.id === item.productoId || p.codigo === item.codigo || p.nombre === item.concepto);
-                            const pContado = prod ? obtenerPrecioPorModalidad(prod, 'contado') : (item.precioContado || item.precioUnitario);
-                            const p1Mes = prod ? obtenerPrecioPorModalidad(prod, '1mes') : Math.round(pContado * 1.05);
-                            const p4Meses = prod ? obtenerPrecioPorModalidad(prod, '4meses') : Math.round(pContado * 1.15);
-                            const p12Meses = prod ? obtenerPrecioPorModalidad(prod, '12meses') : (item.precioVenta || Math.round(pContado * 1.25));
-                            const eng40Item = Math.round(item.precioUnitario * 0.40);
-
                             return (
                               <div
                                 key={idx}
@@ -1509,73 +1502,6 @@ export default function KioscoVentasPage() {
                                       className="text-rose-500 hover:text-rose-700 text-[11px] font-semibold mt-0.5"
                                     >
                                       Eliminar
-                                    </button>
-                                  </div>
-                                </div>
-
-                                {/* Referencias de precios por plazo de este producto (Contado, 1 Mes, 4 Meses, 12 Meses y Enganche 40%) */}
-                                <div className="pt-2 border-t border-slate-200/80">
-                                  <div className="text-[10px] font-bold text-gray-500 uppercase flex items-center justify-between mb-1">
-                                    <span>Precios del producto por plazo:</span>
-                                    <span className="text-emerald-700 font-extrabold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
-                                      40% Eng: {formatCurrency(eng40Item)}
-                                    </span>
-                                  </div>
-                                  <div className="grid grid-cols-4 gap-1 text-[10px]">
-                                    <button
-                                      type="button"
-                                      onClick={() => cambiarModalidadItemCarrito(idx, 'contado')}
-                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
-                                        (item.modalidadPrecio || modalidadPrecio) === 'contado'
-                                          ? 'bg-emerald-600 text-white font-bold border-emerald-600 shadow-2xs'
-                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-emerald-50'
-                                      }`}
-                                      title="Precio de Contado"
-                                    >
-                                      <div className="font-semibold text-[9px] opacity-90">Contado</div>
-                                      <div className="font-black">{formatCurrency(pContado)}</div>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => cambiarModalidadItemCarrito(idx, '1mes')}
-                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
-                                        (item.modalidadPrecio || modalidadPrecio) === '1mes'
-                                          ? 'bg-amber-600 text-white font-bold border-amber-600 shadow-2xs'
-                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-amber-50'
-                                      }`}
-                                      title="Precio a 1 Mes (4 semanas)"
-                                    >
-                                      <div className="font-semibold text-[9px] opacity-90">1 Mes</div>
-                                      <div className="font-black">{formatCurrency(p1Mes)}</div>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => cambiarModalidadItemCarrito(idx, '4meses')}
-                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
-                                        (item.modalidadPrecio || modalidadPrecio) === '4meses'
-                                          ? 'bg-blue-600 text-white font-bold border-blue-600 shadow-2xs'
-                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-blue-50'
-                                      }`}
-                                      title="Precio a 4 Meses (17 semanas)"
-                                    >
-                                      <div className="font-semibold text-[9px] opacity-90">4 Meses</div>
-                                      <div className="font-black">{formatCurrency(p4Meses)}</div>
-                                    </button>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => cambiarModalidadItemCarrito(idx, '12meses')}
-                                      className={`px-1.5 py-1 rounded border text-center transition-all ${
-                                        (item.modalidadPrecio || modalidadPrecio) === '12meses'
-                                          ? 'bg-purple-600 text-white font-bold border-purple-600 shadow-2xs'
-                                          : 'bg-white text-gray-700 border-gray-200 hover:bg-purple-50'
-                                      }`}
-                                      title="Precio a 12 Meses (52 semanas)"
-                                    >
-                                      <div className="font-semibold text-[9px] opacity-90">12 Meses</div>
-                                      <div className="font-black">{formatCurrency(p12Meses)}</div>
                                     </button>
                                   </div>
                                 </div>
