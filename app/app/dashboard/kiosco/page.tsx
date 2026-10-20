@@ -487,7 +487,7 @@ export default function KioscoVentasPage() {
       toast.success(data.message || 'Remisión eliminada y existencias reintegradas exitosamente');
       setVentaAEliminar(null);
       await cargarHistorial();
-      await cargarProductos();
+      await cargarDatosIniciales();
     } catch (err: any) {
       console.error(err);
       toast.error(err.message || 'Error al eliminar la venta');

@@ -186,7 +186,8 @@ export async function DELETE(
         }
       } else {
         // Restar el saldo de esta venta al cliente
-        const montoRestar = Number(venta.saldoFinanciado > 0 ? venta.saldoFinanciado : venta.total);
+        const saldoFinanciadoNum = Number(venta.saldoFinanciado || 0);
+        const montoRestar = saldoFinanciadoNum > 0 ? saldoFinanciadoNum : Number(venta.total || 0);
         await prisma.cliente.update({
           where: { id: venta.clienteId },
           data: {
