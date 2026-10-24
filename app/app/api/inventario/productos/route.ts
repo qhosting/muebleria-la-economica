@@ -109,24 +109,8 @@ export async function GET(request: NextRequest) {
         const activosParam = searchParams.get('activos') ?? searchParams.get('activo');
         const activos = activosParam !== 'false';
 
-        // Auto-asegurar sucursales y limpiar histórico / stock secundario en BD
+        // Auto-asegurar sucursales y usuarios en BD si hiciera falta
         await asegurarSucursalesYUsuarios();
-
-        // Obtener la sucursal matriz San Lucas 3er Cuartel
-        const matrizSanLucas = await prisma.sucursal.findFirst({
-            where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
-        });
-
-        // Eliminar activamente cualquier stock que no sea de San Lucas 3er Cuartel
-        if (matrizSanLucas) {
-            try {
-                await prisma.stock.deleteMany({
-                    where: { sucursalId: { not: matrizSanLucas.id } }
-                });
-            } catch (delErr) {
-                console.warn('Aviso limpiando stock no matriz:', delErr);
-            }
-        }
 
         const where: any = {};
 
@@ -146,12 +130,11 @@ export async function GET(request: NextRequest) {
             where.isActive = true;
         }
 
-        // Consultar productos asegurando que los stocks vinculados sean ÚNICAMENTE de San Lucas 3er Cuartel
+        // Consultar productos con todo su stock y distribución real en cada sucursal
         const productos = await prisma.producto.findMany({
             where,
             include: {
                 stocks: {
-                    where: matrizSanLucas ? { sucursalId: matrizSanLucas.id } : undefined,
                     include: {
                         sucursal: {
                             select: { id: true, nombre: true, esBodega: true }
@@ -167,15 +150,13 @@ export async function GET(request: NextRequest) {
             const stocksList = producto.stocks || [];
             const stockTotal = stocksList.reduce((sum: number, s: any) => sum + (s.cantidad || 0), 0);
             
-            // La distribución refleja exclusivamente San Lucas 3er Cuartel
-            const stockPorSucursal = stocksList
-                .filter((s: any) => !matrizSanLucas || s.sucursalId === matrizSanLucas.id)
-                .map((s: any) => ({
-                    sucursalId: s.sucursal?.id || s.sucursalId || matrizSanLucas?.id || '',
-                    sucursalNombre: s.sucursal?.nombre || 'SAN LUCAS 3ER CUARTEL',
-                    esBodega: s.sucursal?.esBodega || false,
-                    cantidad: s.cantidad || 0
-                }));
+            // Distribución real en todas las sucursales donde el producto tenga inventario
+            const stockPorSucursal = stocksList.map((s: any) => ({
+                sucursalId: s.sucursal?.id || s.sucursalId || '',
+                sucursalNombre: s.sucursal?.nombre || 'SUCURSAL',
+                esBodega: s.sucursal?.esBodega || false,
+                cantidad: s.cantidad || 0
+            }));
 
             const pCompra = producto.precioCompra ? Math.round(parseFloat(producto.precioCompra.toString())) : 0;
             const pVenta = producto.precioVenta ? Math.round(parseFloat(producto.precioVenta.toString())) : 0;
@@ -441,7 +422,8 @@ export async function PUT(request: NextRequest) {
             unidadMedida,
             stockMinimo,
             stockTotal,
-            sucursalId
+            sucursalId,
+            sucursalIdOriginal
         } = body;
 
         if (!id) {
@@ -472,46 +454,80 @@ export async function PUT(request: NextRequest) {
             data: updateData
         });
 
-        // Actualizar stock si fue especificado
+        // Actualizar stock en la sucursal elegida
         if (stockTotal !== undefined && stockTotal !== null && stockTotal !== '') {
             const cant = Math.max(0, parseInt(stockTotal) || 0);
 
+            let targetSucursal = null;
             if (sucursalId && sucursalId !== 'todas') {
+                targetSucursal = await prisma.sucursal.findFirst({
+                    where: {
+                        OR: [
+                            { id: sucursalId },
+                            { nombre: { contains: sucursalId.replace(/^sucursal-/, '').replace(/-/g, ' '), mode: 'insensitive' } },
+                            { nombre: { equals: sucursalId, mode: 'insensitive' } }
+                        ]
+                    }
+                });
+            }
+
+            if (!targetSucursal) {
+                targetSucursal = await prisma.sucursal.findFirst({
+                    where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
+                }) || await prisma.sucursal.findFirst({ where: { isActive: true } });
+            }
+
+            if (targetSucursal) {
                 await prisma.stock.upsert({
                     where: {
                         productoId_sucursalId: {
                             productoId: id,
-                            sucursalId
+                            sucursalId: targetSucursal.id
                         }
                     },
                     update: { cantidad: cant },
                     create: {
                         productoId: id,
-                        sucursalId,
+                        sucursalId: targetSucursal.id,
                         cantidad: cant
                     }
                 });
-            } else {
-                // Si es general, actualizar la sucursal matriz SAN LUCAS
-                const matriz = await prisma.sucursal.findFirst({
-                    where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
-                }) || await prisma.sucursal.findFirst();
 
-                if (matriz) {
-                    await prisma.stock.upsert({
+                // Si se cambió de sucursal (sucursalIdOriginal difiere de la sucursal elegida)
+                if (sucursalIdOriginal && sucursalIdOriginal !== 'todas' && sucursalIdOriginal !== targetSucursal.id) {
+                    const origSuc = await prisma.sucursal.findFirst({
                         where: {
-                            productoId_sucursalId: {
-                                productoId: id,
-                                sucursalId: matriz.id
-                            }
-                        },
-                        update: { cantidad: cant },
-                        create: {
-                            productoId: id,
-                            sucursalId: matriz.id,
-                            cantidad: cant
+                            OR: [
+                                { id: sucursalIdOriginal },
+                                { nombre: { contains: sucursalIdOriginal.replace(/^sucursal-/, '').replace(/-/g, ' '), mode: 'insensitive' } },
+                                { nombre: { equals: sucursalIdOriginal, mode: 'insensitive' } }
+                            ]
                         }
                     });
+
+                    if (origSuc && origSuc.id !== targetSucursal.id) {
+                        // Limpiar stock de la sucursal anterior
+                        await prisma.stock.deleteMany({
+                            where: {
+                                productoId: id,
+                                sucursalId: origSuc.id
+                            }
+                        });
+
+                        // Registrar traslado en el historial
+                        await prisma.movimientoInventario.create({
+                            data: {
+                                productoId: id,
+                                tipoMovimiento: 'traspaso',
+                                cantidad: cant,
+                                sucursalOrigenId: origSuc.id,
+                                sucursalDestinoId: targetSucursal.id,
+                                motivo: `Reubicación de sucursal desde edición de inventario (${origSuc.nombre} ➔ ${targetSucursal.nombre})`,
+                                referencia: 'EDICION-SUCURSAL',
+                                usuarioId: (session?.user as any)?.id || null
+                            }
+                        });
+                    }
                 }
             }
         }

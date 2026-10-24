@@ -150,47 +150,24 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
       });
     }
 
-    // 3. Limpiar existencias de productos en sucursales secundarias y registros históricos
-    // SOLO SAN LUCAS 3ER CUARTEL debe conservar inventario.
+    // 3. Asegurar existencias de productos iniciales sin sobreescribir las sucursales elegidas por el usuario
     if (matrizSanLucas) {
-      // Eliminar stock de cualquier sucursal que NO sea San Lucas 3er Cuartel
-      const eliminados = await prisma.stock.deleteMany({
+      // Solo para productos nuevos que NO tengan stock en NINGUNA sucursal, asignar stock por defecto en la matriz
+      const productosSinStock = await prisma.producto.findMany({
         where: {
-          sucursalId: { not: matrizSanLucas.id }
-        }
-      });
-      if (eliminados.count > 0) {
-        console.log(`🧹 Limpieza completada: se eliminaron ${eliminados.count} registros de stock de sucursales secundarias.`);
-      }
-
-      // Limpiar de la base de datos el registro histórico y traslados
-      try {
-        const movsEliminados = await prisma.movimientoInventario.deleteMany({});
-        if (movsEliminados.count > 0) {
-          console.log(`🧹 Histórico y traslados limpiados: ${movsEliminados.count} movimientos eliminados.`);
-        }
-      } catch (movErr) {
-        console.warn('Aviso limpiando movimientos historicos:', movErr);
-      }
-
-      // Asegurar que TODOS los productos existentes en base de datos tengan existencias en San Lucas
-      const todosLosProductos = await prisma.producto.findMany({
+          stocks: {
+            none: {}
+          }
+        },
         select: { id: true, codigo: true }
       });
 
-      for (const prod of todosLosProductos) {
+      for (const prod of productosSinStock) {
         const catalogoItem = CATALOGO_PRODUCTOS_INICIAL.find(c => c.codigo === prod.codigo);
         const cantDefault = catalogoItem?.stockSugerido || 5;
 
-        await prisma.stock.upsert({
-          where: {
-            productoId_sucursalId: {
-              productoId: prod.id,
-              sucursalId: matrizSanLucas.id
-            }
-          },
-          update: {},
-          create: {
+        await prisma.stock.create({
+          data: {
             productoId: prod.id,
             sucursalId: matrizSanLucas.id,
             cantidad: cantDefault

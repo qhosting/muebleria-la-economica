@@ -31,6 +31,7 @@ export function EditarProductoModal({
     const esAdmin = (session?.user as any)?.role === 'admin';
     const [loading, setLoading] = useState(false);
     const [habilitar12Meses, setHabilitar12Meses] = useState(true);
+    const [sucursalIdOriginal, setSucursalIdOriginal] = useState('');
     const [formData, setFormData] = useState({
         id: '',
         codigo: '',
@@ -45,7 +46,7 @@ export function EditarProductoModal({
         precioVenta: '',
         stockMinimo: '2',
         stockTotal: '0',
-        sucursalId: 'todas',
+        sucursalId: '',
         unidadMedida: 'pieza'
     });
 
@@ -70,6 +71,12 @@ export function EditarProductoModal({
                 ? parseEntero(producto.precio4Meses, '')
                 : '';
 
+            // Detectar la sucursal actual donde el producto tiene existencias
+            const stockItem = producto.stockPorSucursal?.find((s: any) => s.cantidad > 0) || producto.stockPorSucursal?.[0];
+            const sucursalActualId = stockItem?.sucursalId || sucursales[0]?.id || '';
+            const cantStock = stockItem?.cantidad != null ? stockItem.cantidad.toString() : (producto.stockTotal || 0).toString();
+
+            setSucursalIdOriginal(sucursalActualId);
             setFormData({
                 id: producto.id || '',
                 codigo: (producto.codigo || '').toUpperCase(),
@@ -84,11 +91,11 @@ export function EditarProductoModal({
                 precio12Meses: p12M,
                 precioVenta: p12M || p4M || pContado,
                 stockMinimo: (producto.stockMinimo || 2).toString(),
-                stockTotal: (producto.stockTotal || 0).toString(),
-                sucursalId: 'todas'
+                stockTotal: cantStock,
+                sucursalId: sucursalActualId
             });
         }
-    }, [producto]);
+    }, [producto, sucursales]);
 
     // Cálculos de enganche fijo al 40% según precio (sin decimales)
     const numPrecio1M = Math.round(parseFloat(formData.precio1Mes) || 0);
@@ -125,6 +132,7 @@ export function EditarProductoModal({
 
         const payload = {
             ...formData,
+            sucursalIdOriginal,
             codigo: formData.codigo.trim().toUpperCase(),
             nombre: formData.nombre.trim().toUpperCase(),
             descripcion: formData.descripcion ? formData.descripcion.trim().toUpperCase() : '',
@@ -170,12 +178,9 @@ export function EditarProductoModal({
 
     const handleSelectChange = (name: string, value: string) => {
         if (name === 'sucursalId') {
-            let cant = producto?.stockTotal || 0;
-            if (value !== 'todas' && producto?.stockPorSucursal) {
-                const found = producto.stockPorSucursal.find((s: any) => s.sucursalId === value);
-                cant = found ? found.cantidad : 0;
-            }
-            setFormData(prev => ({ ...prev, sucursalId: value, stockTotal: cant.toString() }));
+            const found = producto?.stockPorSucursal?.find((s: any) => s.sucursalId === value);
+            const cant = found ? found.cantidad.toString() : formData.stockTotal;
+            setFormData(prev => ({ ...prev, sucursalId: value, stockTotal: cant }));
         } else {
             setFormData(prev => ({ ...prev, [name]: value }));
         }
@@ -461,9 +466,8 @@ export function EditarProductoModal({
                                     <SelectValue placeholder="Sucursal..." />
                                 </SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="todas">SAN LUCAS (Matriz)</SelectItem>
                                     {sucursales.map(s => (
-                                        <SelectItem key={s.id} value={s.id}>
+                                        <SelectItem key={s.id} value={s.id} className="cursor-pointer">
                                             {s.nombre} {s.esBodega ? '(Bodega)' : '(Tienda)'}
                                         </SelectItem>
                                     ))}

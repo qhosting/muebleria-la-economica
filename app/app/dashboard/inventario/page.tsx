@@ -165,7 +165,11 @@ export default function InventarioPage() {
     const filteredProductos = productos.filter(p => {
         // 1. Filtro por sucursal
         if (sucursalFiltro !== 'todas') {
-            const hasStock = p.stockPorSucursal?.some((s: any) => s.sucursalId === sucursalFiltro && s.cantidad > 0);
+            const nombreSucursalFiltro = sucursales.find(s => s.id === sucursalFiltro)?.nombre?.toUpperCase();
+            const hasStock = p.stockPorSucursal?.some((s: any) => 
+                (s.sucursalId === sucursalFiltro || (nombreSucursalFiltro && s.sucursalNombre?.toUpperCase() === nombreSucursalFiltro)) 
+                && (s.cantidad > 0 || estadoStockFiltro === 'agotado')
+            );
             if (!hasStock) return false;
         }
 
