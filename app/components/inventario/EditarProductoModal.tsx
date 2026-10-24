@@ -30,6 +30,7 @@ export function EditarProductoModal({
     const { data: session } = useSession();
     const esAdmin = (session?.user as any)?.role === 'admin';
     const [loading, setLoading] = useState(false);
+    const [habilitar12Meses, setHabilitar12Meses] = useState(true);
     const [formData, setFormData] = useState({
         id: '',
         codigo: '',
@@ -44,7 +45,8 @@ export function EditarProductoModal({
         precioVenta: '',
         stockMinimo: '2',
         stockTotal: '0',
-        sucursalId: 'todas'
+        sucursalId: 'todas',
+        unidadMedida: 'pieza'
     });
 
     useEffect(() => {
@@ -55,9 +57,12 @@ export function EditarProductoModal({
                 return isNaN(n) ? def : n.toString();
             };
 
+            const tiene12M = producto.precio12Meses != null && Number(producto.precio12Meses) > 0;
+            setHabilitar12Meses(tiene12M);
+
             const pCompra = parseEntero(producto.precioCompra, '0');
             const pContado = parseEntero(producto.precioContado, pCompra);
-            const p12M = parseEntero(producto.precio12Meses, parseEntero(producto.precioVenta, '0'));
+            const p12M = tiene12M ? parseEntero(producto.precio12Meses, '') : '';
             const p1M = producto.precio1Mes != null && producto.precio1Mes !== '' && producto.precio1Mes !== 0
                 ? parseEntero(producto.precio1Mes, '')
                 : '';
@@ -71,12 +76,13 @@ export function EditarProductoModal({
                 nombre: (producto.nombre || '').toUpperCase(),
                 descripcion: (producto.descripcion || '').toUpperCase(),
                 categoria: producto.categoria || 'Muebles',
+                unidadMedida: producto.unidadMedida || 'pieza',
                 precioCompra: pCompra,
                 precioContado: pContado,
                 precio1Mes: p1M,
                 precio4Meses: p4M,
                 precio12Meses: p12M,
-                precioVenta: p12M || pContado,
+                precioVenta: p12M || p4M || pContado,
                 stockMinimo: (producto.stockMinimo || 2).toString(),
                 stockTotal: (producto.stockTotal || 0).toString(),
                 sucursalId: 'todas'
@@ -105,7 +111,10 @@ export function EditarProductoModal({
         }
 
         const pContado = Math.round(parseFloat(formData.precioContado) || parseFloat(formData.precioCompra) || 0);
-        const p12M = Math.round(parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0);
+        const p1M = Math.round(parseFloat(formData.precio1Mes) || 0);
+        const p4M = Math.round(parseFloat(formData.precio4Meses) || 0);
+        const p12M = habilitar12Meses ? Math.round(parseFloat(formData.precio12Meses) || 0) : 0;
+        const pVenta = p12M || p4M || p1M || pContado;
 
         if (pContado < 0 || p12M < 0) {
             toast.error('Los precios no pueden ser negativos');
@@ -121,10 +130,11 @@ export function EditarProductoModal({
             descripcion: formData.descripcion ? formData.descripcion.trim().toUpperCase() : '',
             precioCompra: Math.round(parseFloat(formData.precioCompra) || 0),
             precioContado: pContado,
-            precio1Mes: Math.round(parseFloat(formData.precio1Mes) || 0),
-            precio4Meses: Math.round(parseFloat(formData.precio4Meses) || 0),
+            precio1Mes: p1M,
+            precio4Meses: p4M,
             precio12Meses: p12M,
-            precioVenta: p12M || pContado
+            precioVenta: pVenta,
+            unidadMedida: formData.unidadMedida || 'pieza'
         };
 
         try {
@@ -159,7 +169,16 @@ export function EditarProductoModal({
     };
 
     const handleSelectChange = (name: string, value: string) => {
-        setFormData(prev => ({ ...prev, [name]: value }));
+        if (name === 'sucursalId') {
+            let cant = producto?.stockTotal || 0;
+            if (value !== 'todas' && producto?.stockPorSucursal) {
+                const found = producto.stockPorSucursal.find((s: any) => s.sucursalId === value);
+                cant = found ? found.cantidad : 0;
+            }
+            setFormData(prev => ({ ...prev, sucursalId: value, stockTotal: cant.toString() }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
     };
 
     return (
@@ -364,49 +383,97 @@ export function EditarProductoModal({
                             </div>
 
                             {/* Precio 12 Meses */}
-                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-emerald-300 shadow-xs">
+                            <div className={`grid gap-1 p-3 rounded-lg border transition-all ${
+                                habilitar12Meses ? 'bg-white border-emerald-300 shadow-xs' : 'bg-slate-100/90 border-slate-200 opacity-80'
+                            }`}>
                                 <div className="flex items-center justify-between">
-                                    <Label htmlFor="edit-precio12Meses" className="text-xs font-bold text-emerald-900">
-                                        Precio 12 Meses ($)
-                                    </Label>
-                                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-semibold">
-                                        12 Meses
+                                    <div className="flex items-center gap-1.5">
+                                        <input
+                                            type="checkbox"
+                                            id="edit-check-12m"
+                                            checked={habilitar12Meses}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                setHabilitar12Meses(checked);
+                                                if (!checked) {
+                                                    setFormData(prev => ({ ...prev, precio12Meses: '' }));
+                                                }
+                                            }}
+                                            className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <Label htmlFor="edit-check-12m" className="text-xs font-bold text-emerald-950 cursor-pointer select-none">
+                                            Plan 12 Meses
+                                        </Label>
+                                    </div>
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                                        habilitar12Meses ? 'text-emerald-700 bg-emerald-50' : 'text-slate-500 bg-slate-200'
+                                    }`}>
+                                        {habilitar12Meses ? 'Activo' : 'No Aplica'}
                                     </span>
                                 </div>
                                 <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-emerald-600 font-bold">$</span>
+                                    <span className={`absolute left-3 top-2.5 font-bold ${habilitar12Meses ? 'text-emerald-600' : 'text-slate-400'}`}>$</span>
                                     <Input
                                         id="edit-precio12Meses"
                                         name="precio12Meses"
                                         type="number"
                                         step="1"
                                         min="0"
-                                        required
-                                        placeholder="0"
+                                        disabled={!habilitar12Meses}
+                                        required={habilitar12Meses}
+                                        placeholder={habilitar12Meses ? "0" : "Deshabilitado"}
                                         value={formData.precio12Meses}
                                         onChange={handleChange}
-                                        className="pl-7 text-base font-black text-emerald-800"
+                                        className={`pl-7 text-base font-black ${habilitar12Meses ? 'text-emerald-800' : 'text-slate-400 bg-slate-100 cursor-not-allowed'}`}
                                     />
                                 </div>
-                                <div className="mt-1 bg-emerald-50/80 border border-emerald-100 rounded-md p-1.5 text-[11px] space-y-0.5">
-                                    <div className="flex justify-between items-center text-emerald-950 font-bold">
-                                        <span>Enganche (40%):</span>
-                                        <span>{formatCurrency(enganche12M)}</span>
+                                {habilitar12Meses ? (
+                                    <div className="mt-1 bg-emerald-50/80 border border-emerald-100 rounded-md p-1.5 text-[11px] space-y-0.5">
+                                        <div className="flex justify-between items-center text-emerald-950 font-bold">
+                                            <span>Enganche (40%):</span>
+                                            <span>{formatCurrency(enganche12M)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-gray-500 text-[10px]">
+                                            <span>Saldo a 12 meses:</span>
+                                            <span>{formatCurrency(saldo12M)}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center text-gray-500 text-[10px]">
-                                        <span>Saldo a 12 meses:</span>
-                                        <span>{formatCurrency(saldo12M)}</span>
+                                ) : (
+                                    <div className="mt-1 bg-slate-200/60 border border-slate-200 rounded-md p-1.5 text-[10px] text-slate-500 text-center font-medium">
+                                        Este producto no se ofrecerá a 12 meses
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
                     {/* Stock y Almacén */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="edit-sucursalId" className="text-xs font-semibold text-gray-700">
+                                Almacén / Sucursal
+                            </Label>
+                            <Select
+                                value={formData.sucursalId}
+                                onValueChange={(v) => handleSelectChange('sucursalId', v)}
+                            >
+                                <SelectTrigger id="edit-sucursalId">
+                                    <SelectValue placeholder="Sucursal..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="todas">SAN LUCAS (Matriz)</SelectItem>
+                                    {sucursales.map(s => (
+                                        <SelectItem key={s.id} value={s.id}>
+                                            {s.nombre} {s.esBodega ? '(Bodega)' : '(Tienda)'}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
                         <div className="grid gap-1.5">
                             <Label htmlFor="edit-stockTotal" className="text-xs font-semibold text-gray-700">
-                                Stock Unidades
+                                Piezas en Almacén
                             </Label>
                             <Input
                                 id="edit-stockTotal"
@@ -415,8 +482,29 @@ export function EditarProductoModal({
                                 min="0"
                                 value={formData.stockTotal}
                                 onChange={handleChange}
-                                className="font-bold text-center"
+                                className="font-bold text-center text-blue-900"
                             />
+                        </div>
+
+                        <div className="grid gap-1.5">
+                            <Label htmlFor="edit-unidadMedida" className="text-xs font-semibold text-gray-700">
+                                Unidad
+                            </Label>
+                            <Select
+                                value={formData.unidadMedida}
+                                onValueChange={(v) => handleSelectChange('unidadMedida', v)}
+                            >
+                                <SelectTrigger id="edit-unidadMedida">
+                                    <SelectValue placeholder="Unidad..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="pieza">Pieza (Pza)</SelectItem>
+                                    <SelectItem value="juego">Juego (Jgo)</SelectItem>
+                                    <SelectItem value="set">Set / Paquete</SelectItem>
+                                    <SelectItem value="caja">Caja</SelectItem>
+                                    <SelectItem value="metro">Metro</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
 
                         <div className="grid gap-1.5">
@@ -432,26 +520,6 @@ export function EditarProductoModal({
                                 onChange={handleChange}
                                 className="text-center"
                             />
-                        </div>
-
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="edit-sucursalId" className="text-xs font-semibold text-gray-700">
-                                Asignar a Sucursal
-                            </Label>
-                            <Select
-                                value={formData.sucursalId}
-                                onValueChange={(v) => handleSelectChange('sucursalId', v)}
-                            >
-                                <SelectTrigger id="edit-sucursalId">
-                                    <SelectValue placeholder="Sucursal..." />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="todas">SAN LUCAS (Matriz)</SelectItem>
-                                    {sucursales.map(s => (
-                                        <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
                         </div>
                     </div>
 

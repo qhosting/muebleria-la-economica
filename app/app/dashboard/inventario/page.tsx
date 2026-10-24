@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -32,7 +32,9 @@ import {
     Clock,
     Loader2,
     Calendar,
-    CheckCircle2
+    CheckCircle2,
+    Filter,
+    X
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -52,6 +54,8 @@ export default function InventarioPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [sucursalFiltro, setSucursalFiltro] = useState<string>('todas');
+    const [categoriaFiltro, setCategoriaFiltro] = useState<string>('todas');
+    const [estadoStockFiltro, setEstadoStockFiltro] = useState<string>('todos');
     const [movimientoBusqueda, setMovimientoBusqueda] = useState('');
     const [filtroTipoMov, setFiltroTipoMov] = useState('todos');
     const [filtroSucursalMov, setFiltroSucursalMov] = useState('todas');
@@ -120,12 +124,44 @@ export default function InventarioPage() {
         }
     };
 
+    const listaCategorias = useMemo(() => {
+        return Array.from(new Set(productos.map(p => p.categoria).filter(Boolean))).sort();
+    }, [productos]);
+
+    // Función de normalización de texto para búsquedas insensibles a mayúsculas y acentos
+    const normalizar = (txt: string) => 
+        (txt || '')
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim();
+
     const filteredProductos = productos.filter(p => {
-        const matchSearch = p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                            p.codigo.toLowerCase().includes(searchTerm.toLowerCase());
-        if (!matchSearch) return false;
-        if (sucursalFiltro === 'todas') return true;
-        return p.stockPorSucursal?.some((s: any) => s.sucursalId === sucursalFiltro && s.cantidad > 0);
+        // 1. Filtro por sucursal
+        if (sucursalFiltro !== 'todas') {
+            const hasStock = p.stockPorSucursal?.some((s: any) => s.sucursalId === sucursalFiltro && s.cantidad > 0);
+            if (!hasStock) return false;
+        }
+
+        // 2. Filtro por categoría
+        if (categoriaFiltro !== 'todas' && p.categoria !== categoriaFiltro) {
+            return false;
+        }
+
+        // 3. Filtro por estado de stock
+        if (estadoStockFiltro === 'disponible' && (p.stockTotal <= 0)) return false;
+        if (estadoStockFiltro === 'bajo' && (!p.stockBajo || p.stockTotal <= 0)) return false;
+        if (estadoStockFiltro === 'agotado' && (p.stockTotal > 0)) return false;
+
+        // 4. Búsqueda inteligente por palabras clave / tokens
+        if (searchTerm.trim()) {
+            const tokens = normalizar(searchTerm).split(/\s+/).filter(Boolean);
+            const searchableText = normalizar(`${p.nombre || ''} ${p.codigo || ''} ${p.descripcion || ''} ${p.categoria || ''}`);
+            const allTokensMatch = tokens.every(token => searchableText.includes(token));
+            if (!allTokensMatch) return false;
+        }
+
+        return true;
     });
 
     const filteredMovimientos = movimientos.filter(m => {
@@ -244,30 +280,78 @@ export default function InventarioPage() {
                                         <CardTitle>Catálogo de Productos</CardTitle>
                                         <CardDescription>Inventario consolidado y por sucursal</CardDescription>
                                     </div>
-                                    <div className="flex flex-wrap items-center gap-2.5">
-                                        <div className="flex items-center gap-1.5 text-xs text-gray-600 bg-slate-50 border px-2.5 py-1 rounded-lg">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {/* Filtro Sucursal */}
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-2xs">
                                             <Store className="h-3.5 w-3.5 text-blue-700" />
-                                            <span className="font-semibold">Sucursal:</span>
+                                            <span className="font-semibold text-slate-500">Almacén:</span>
                                             <select
                                                 value={sucursalFiltro}
                                                 onChange={(e) => setSucursalFiltro(e.target.value)}
-                                                className="bg-transparent font-bold text-blue-900 border-none focus:outline-none text-xs cursor-pointer"
+                                                className="bg-transparent font-bold text-slate-900 border-none focus:outline-none text-xs cursor-pointer"
                                             >
-                                                <option value="todas">Todas las sucursales</option>
+                                                <option value="todas">Todos los almacenes</option>
                                                 {sucursales.map(s => (
-                                                    <option key={s.id} value={s.id}>{s.nombre}</option>
+                                                    <option key={s.id} value={s.id}>{s.nombre} {s.esBodega ? '(Bodega)' : ''}</option>
                                                 ))}
                                             </select>
                                         </div>
-                                        <div className="relative w-56">
-                                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-gray-400" />
+
+                                        {/* Filtro Categoría */}
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-2xs">
+                                            <Filter className="h-3.5 w-3.5 text-indigo-600" />
+                                            <span className="font-semibold text-slate-500">Categoría:</span>
+                                            <select
+                                                value={categoriaFiltro}
+                                                onChange={(e) => setCategoriaFiltro(e.target.value)}
+                                                className="bg-transparent font-bold text-slate-900 border-none focus:outline-none text-xs cursor-pointer"
+                                            >
+                                                <option value="todas">Todas las categorías</option>
+                                                {listaCategorias.map(cat => (
+                                                    <option key={cat} value={cat}>{cat}</option>
+                                                ))}
+                                            </select>
+                                        </div>
+
+                                        {/* Filtro Estado de Existencias */}
+                                        <div className="flex items-center gap-1.5 text-xs text-gray-700 bg-white border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-2xs">
+                                            <span className="font-semibold text-slate-500">Stock:</span>
+                                            <select
+                                                value={estadoStockFiltro}
+                                                onChange={(e) => setEstadoStockFiltro(e.target.value)}
+                                                className="bg-transparent font-bold text-slate-900 border-none focus:outline-none text-xs cursor-pointer"
+                                            >
+                                                <option value="todos">Todos los estados</option>
+                                                <option value="disponible">En Stock (&gt; 0)</option>
+                                                <option value="bajo">Bajo Stock (Alerta)</option>
+                                                <option value="agotado">Agotados (0)</option>
+                                            </select>
+                                        </div>
+
+                                        {/* Búsqueda inteligente multicampo */}
+                                        <div className="relative w-64">
+                                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-gray-400" />
                                             <Input
-                                                placeholder="Buscar por código, nombre..."
+                                                placeholder="Buscar mesa, sala, estufa, código..."
                                                 value={searchTerm}
                                                 onChange={(e) => setSearchTerm(e.target.value)}
-                                                className="pl-8 h-8 text-xs"
+                                                className="pl-8 pr-7 h-8 text-xs bg-white"
                                             />
+                                            {searchTerm && (
+                                                <button
+                                                    onClick={() => setSearchTerm('')}
+                                                    className="absolute right-2 top-2 text-gray-400 hover:text-gray-600"
+                                                    title="Limpiar búsqueda"
+                                                >
+                                                    <X className="h-3.5 w-3.5" />
+                                                </button>
+                                            )}
                                         </div>
+
+                                        {/* Badge de contador */}
+                                        <Badge variant="secondary" className="text-xs font-semibold px-2 py-1 bg-slate-100 text-slate-700 border border-slate-200">
+                                            {filteredProductos.length} / {productos.length}
+                                        </Badge>
                                     </div>
                                 </div>
                             </CardHeader>
@@ -645,6 +729,7 @@ export default function InventarioPage() {
                     isOpen={isProductoOpen}
                     onClose={() => setIsProductoOpen(false)}
                     onSuccess={fetchData}
+                    sucursales={sucursales}
                 />
 
                 <NuevaSucursalModal

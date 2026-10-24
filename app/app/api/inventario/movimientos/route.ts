@@ -220,18 +220,9 @@ export async function POST(request: NextRequest) {
                     }
                 });
 
-                if (!stockOrigen) {
-                    stockOrigen = await tx.stock.create({
-                        data: {
-                            productoId: realProductoId,
-                            sucursalId: realOrigenId,
-                            cantidad: Math.max(cantidadNum, 5)
-                        }
-                    });
-                }
-
-                if (stockOrigen.cantidad < cantidadNum) {
-                    throw new Error(`Stock insuficiente en origen para traspaso. Disponible: ${stockOrigen.cantidad}`);
+                if (!stockOrigen || stockOrigen.cantidad < cantidadNum) {
+                    const disp = stockOrigen ? stockOrigen.cantidad : 0;
+                    throw new Error(`Stock insuficiente en la sucursal origen para traspaso. Disponible: ${disp} piezas.`);
                 }
 
                 await tx.stock.update({
@@ -239,30 +230,23 @@ export async function POST(request: NextRequest) {
                     data: { cantidad: { decrement: cantidadNum } }
                 });
 
-                // Sumar a destino
-                const stockDestino = await tx.stock.findUnique({
+                // Sumar o dar de alta en sucursal destino
+                await tx.stock.upsert({
                     where: {
                         productoId_sucursalId: {
                             productoId: realProductoId,
                             sucursalId: realDestinoId
                         }
+                    },
+                    update: {
+                        cantidad: { increment: cantidadNum }
+                    },
+                    create: {
+                        productoId: realProductoId,
+                        sucursalId: realDestinoId,
+                        cantidad: cantidadNum
                     }
                 });
-
-                if (stockDestino) {
-                    await tx.stock.update({
-                        where: { id: stockDestino.id },
-                        data: { cantidad: { increment: cantidadNum } }
-                    });
-                } else {
-                    await tx.stock.create({
-                        data: {
-                            productoId: realProductoId,
-                            sucursalId: realDestinoId,
-                            cantidad: cantidadNum
-                        }
-                    });
-                }
             }
         });
 

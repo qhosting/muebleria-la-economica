@@ -934,9 +934,11 @@ export function obtenerPreciosProducto(item: CatalogoItem | any): PreciosModalid
     ? Math.round(Number(item.precioContado))
     : Math.round(Number(item.precioCompra || item.precioVenta || 0));
 
-  const doceMeses = item.precio12Meses != null && Number(item.precio12Meses) > 0
-    ? Math.round(Number(item.precio12Meses))
-    : Math.round(Number(item.precioVenta || contado));
+  const doceMeses = (item.precio12Meses !== undefined && item.precio12Meses !== null && Number(item.precio12Meses) === 0)
+    ? 0
+    : (item.precio12Meses != null && Number(item.precio12Meses) > 0
+        ? Math.round(Number(item.precio12Meses))
+        : Math.round(Number(item.precioVenta || contado)));
 
   const unMes = item.precio1Mes != null && Number(item.precio1Mes) > 0
     ? Math.round(Number(item.precio1Mes))

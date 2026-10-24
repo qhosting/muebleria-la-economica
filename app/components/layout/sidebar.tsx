@@ -84,7 +84,7 @@ const navigation: NavigationItem[] = [
     name: 'Pagos y Recibos',
     href: '/dashboard/pagos',
     icon: Receipt,
-    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza'],
+    roles: ['admin', 'gestor_cobranza', 'reporte_cobranza', 'vendedor'],
     section: 'Crédito y Cartera',
   },
   {

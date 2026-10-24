@@ -26,12 +26,19 @@ import {
   Upload,
   MoreVertical,
   Sparkles,
-  Loader2
+  Loader2,
+  Store,
+  Receipt,
+  FileText
 } from 'lucide-react';
 import { formatCurrency, formatDate, getDayName, getPeriodicidadLabel } from '@/lib/utils';
 import { toast } from 'sonner';
 import { Cliente, User } from '@/lib/types';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { CobranzaModal } from '@/components/cobranza/cobranza-modal';
+import { TicketModal } from '@/components/mobile/ticket-modal';
+import { EstadoDeCuentaModal } from '@/components/clientes/EstadoDeCuentaModal';
+import { TicketData } from '@/lib/bluetooth-printer';
 
 interface ClientesResponse {
   clientes: Cliente[];
@@ -71,6 +78,14 @@ export default function ClientesPage() {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [standardizing, setStandardizing] = useState(false);
+
+  // Estados para Cobros, Estado de Cuenta y Reimpresión de Tickets
+  const [cobranzaModalOpen, setCobranzaModalOpen] = useState(false);
+  const [clienteCobranza, setClienteCobranza] = useState<Cliente | null>(null);
+  const [estadoCuentaModalOpen, setEstadoCuentaModalOpen] = useState(false);
+  const [clienteEstadoCuenta, setClienteEstadoCuenta] = useState<Cliente | null>(null);
+  const [ticketModalOpen, setTicketModalOpen] = useState(false);
+  const [activeTicketData, setActiveTicketData] = useState<TicketData | null>(null);
 
   const userRole = (session?.user as any)?.role;
 
@@ -242,8 +257,70 @@ export default function ClientesPage() {
     }
   };
 
-  // Verificar permisos - cobradores solo pueden ver, no crear
-  if (!['admin', 'gestor_cobranza', 'cobrador'].includes(userRole)) {
+  const handleAbrirCobranza = (cliente: Cliente) => {
+    setClienteCobranza(cliente);
+    setCobranzaModalOpen(true);
+  };
+
+  const handleAbrirEstadoCuenta = async (cliente: Cliente) => {
+    try {
+      const res = await fetch(`/api/clientes/${cliente.id}`);
+      if (res.ok) {
+        const fullCliente = await res.json();
+        setClienteEstadoCuenta(fullCliente);
+      } else {
+        setClienteEstadoCuenta(cliente);
+      }
+    } catch {
+      setClienteEstadoCuenta(cliente);
+    }
+    setEstadoCuentaModalOpen(true);
+  };
+
+  const handleCobranzaSuccess = (nuevoPago?: any) => {
+    fetchClientes();
+    setCobranzaModalOpen(false);
+
+    if (nuevoPago && clienteCobranza) {
+      const data: TicketData = {
+        numeroRecibo: nuevoPago.numeroRecibo || nuevoPago.id?.slice(-6)?.toUpperCase(),
+        cliente: {
+          nombreCompleto: clienteCobranza.nombreCompleto,
+          codigoCliente: clienteCobranza.codigoCliente,
+          descripcionProducto: clienteCobranza.descripcionProducto,
+          telefono: clienteCobranza.telefono,
+          direccion: clienteCobranza.direccionCompleta,
+          diaPago: clienteCobranza.diaPago,
+        },
+        cobrador: {
+          nombre: (session?.user as any)?.name || 'Vendedor / Cobrador',
+          id: (session?.user as any)?.id || 'SISTEMA',
+        },
+        pago: {
+          monto: parseFloat(nuevoPago.monto) || 0,
+          tipoPago: nuevoPago.tipoPago || 'regular',
+          metodoPago: nuevoPago.metodoPago || 'Efectivo',
+          concepto: nuevoPago.concepto || 'Abono en sucursal',
+          fechaPago: nuevoPago.fechaPago || new Date().toISOString(),
+        },
+        saldos: {
+          anterior: parseFloat(nuevoPago.saldoAnterior) || clienteCobranza.saldoActual,
+          nuevo: parseFloat(nuevoPago.saldoNuevo) || (clienteCobranza.saldoActual - parseFloat(nuevoPago.monto)),
+        },
+        empresa: {
+          nombre: 'Mueblería La Económica',
+          direccion: 'Av. Principal #100, San Lucas Tecopilco',
+          telefono: '241-123-4567',
+        },
+      };
+
+      setActiveTicketData(data);
+      setTicketModalOpen(true);
+    }
+  };
+
+  // Verificar permisos - admin, gestor, cobrador y vendedor tienen acceso
+  if (!['admin', 'gestor_cobranza', 'cobrador', 'vendedor'].includes(userRole)) {
     return (
       <DashboardLayout>
         <div className="text-center py-12">
@@ -266,14 +343,16 @@ export default function ClientesPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              {userRole === 'cobrador' ? 'Mis Clientes Asignados' : 'Gestión de Clientes'}
+              {userRole === 'cobrador' ? 'Mis Clientes Asignados' : userRole === 'vendedor' ? 'Clientes de la Sucursal' : 'Gestión de Clientes'}
             </h1>
             <p className="text-gray-600 mt-1">
               {userRole === 'admin' ?
                 'Administra la información y asignaciones de clientes' :
                 userRole === 'gestor_cobranza' ?
                   'Administra clientes y asignaciones de cobradores' :
-                  'Visualiza tus clientes asignados (solo lectura)'
+                  userRole === 'vendedor' ?
+                    'Consulta cartera de clientes, registra cobros e imprime estados de cuenta' :
+                    'Visualiza tus clientes asignados (solo lectura)'
               }
             </p>
           </div>
@@ -432,12 +511,24 @@ export default function ClientesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleAbrirEstadoCuenta(cliente)}>
+                          <FileText className="h-4 w-4 mr-2 text-blue-600" />
+                          Estado de Cuenta
+                        </DropdownMenuItem>
+
+                        {cliente.saldoActual > 0 && (
+                          <DropdownMenuItem onClick={() => handleAbrirCobranza(cliente)}>
+                            <DollarSign className="h-4 w-4 mr-2 text-emerald-600" />
+                            Registrar Cobro
+                          </DropdownMenuItem>
+                        )}
+
                         {userRole === 'cobrador' ? (
                           <DropdownMenuItem onClick={() => handleViewClienteDetails(cliente)}>
                             <Users className="h-4 w-4 mr-2" />
                             Ver Detalles
                           </DropdownMenuItem>
-                        ) : (
+                        ) : (userRole === 'admin' || userRole === 'gestor_cobranza') ? (
                           <>
                             <DropdownMenuItem onClick={() => handleEditCliente(cliente)}>
                               <Edit className="h-4 w-4 mr-2" />
@@ -451,6 +542,11 @@ export default function ClientesPage() {
                               Desactivar Cliente
                             </DropdownMenuItem>
                           </>
+                        ) : (
+                          <DropdownMenuItem onClick={() => handleViewClienteDetails(cliente)}>
+                            <Users className="h-4 w-4 mr-2" />
+                            Ver Ficha Cliente
+                          </DropdownMenuItem>
                         )}
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -499,8 +595,38 @@ export default function ClientesPage() {
                     </div>
                   )}
 
+                  {cliente.sucursal && (
+                    <div className="flex items-center space-x-1.5 text-xs text-blue-900 bg-blue-50/70 px-2 py-1 rounded">
+                      <Store className="h-3.5 w-3.5 text-blue-700 shrink-0" />
+                      <span className="font-semibold truncate">Sucursal: {cliente.sucursal.nombre}</span>
+                    </div>
+                  )}
+
                   <div className="text-xs text-gray-500">
                     Registrado: {formatDate(cliente.createdAt)}
+                  </div>
+
+                  {/* Acciones directas: Estado de Cuenta y Cobro */}
+                  <div className="pt-2 border-t border-gray-100 grid grid-cols-2 gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleAbrirEstadoCuenta(cliente)}
+                      className="h-8 text-xs font-semibold text-gray-700 hover:text-blue-900 hover:bg-blue-50 border-slate-200 gap-1 w-full"
+                    >
+                      <FileText className="h-3.5 w-3.5 text-blue-600" />
+                      Estado Cuenta
+                    </Button>
+
+                    <Button
+                      size="sm"
+                      onClick={() => handleAbrirCobranza(cliente)}
+                      className="h-8 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white gap-1 w-full shadow-xs"
+                      disabled={cliente.saldoActual <= 0}
+                    >
+                      <DollarSign className="h-3.5 w-3.5" />
+                      {cliente.saldoActual <= 0 ? 'Liquidado' : 'Cobrar'}
+                    </Button>
                   </div>
                 </CardContent>
               </Card>
@@ -572,6 +698,44 @@ export default function ClientesPage() {
           open={importModalOpen}
           onOpenChange={setImportModalOpen}
           onSuccess={handleModalSuccess}
+        />
+      )}
+
+      {/* Modal de Cobranza en Sucursal */}
+      {clienteCobranza && (
+        <CobranzaModal
+          cliente={clienteCobranza}
+          isOpen={cobranzaModalOpen}
+          onClose={() => {
+            setCobranzaModalOpen(false);
+            setClienteCobranza(null);
+          }}
+          onSuccess={handleCobranzaSuccess}
+        />
+      )}
+
+      {/* Modal de Estado de Cuenta y Reimpresión */}
+      {clienteEstadoCuenta && (
+        <EstadoDeCuentaModal
+          cliente={clienteEstadoCuenta}
+          isOpen={estadoCuentaModalOpen}
+          onClose={() => {
+            setEstadoCuentaModalOpen(false);
+            setClienteEstadoCuenta(null);
+          }}
+          onOpenCobranza={handleAbrirCobranza}
+        />
+      )}
+
+      {/* Modal de Ticket de Pago (para imprimir o reimprimir) */}
+      {ticketModalOpen && activeTicketData && (
+        <TicketModal
+          ticketData={activeTicketData}
+          isOpen={ticketModalOpen}
+          onClose={() => {
+            setTicketModalOpen(false);
+            setActiveTicketData(null);
+          }}
         />
       )}
     </DashboardLayout>

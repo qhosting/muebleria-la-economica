@@ -27,9 +27,15 @@ export async function GET(
             email: true,
           },
         },
+        sucursal: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
         pagos: {
           orderBy: { fechaPago: 'desc' },
-          take: 10,
+          take: 100,
           include: {
             cobrador: {
               select: {

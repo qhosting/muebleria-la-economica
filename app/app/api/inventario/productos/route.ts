@@ -293,8 +293,8 @@ export async function POST(request: NextRequest) {
         const pContado = precioContado !== undefined && precioContado !== '' ? Math.round(parseFloat(precioContado)) : pCompra;
         const p1M = precio1Mes !== undefined && precio1Mes !== '' ? Math.round(parseFloat(precio1Mes)) : 0;
         const p4M = precio4Meses !== undefined && precio4Meses !== '' ? Math.round(parseFloat(precio4Meses)) : 0;
-        const p12M = precio12Meses !== undefined && precio12Meses !== '' ? Math.round(parseFloat(precio12Meses)) : Math.round(parseFloat(precioVenta) || 0);
-        const pVenta = p12M || Math.round(parseFloat(precioVenta) || 0) || pContado;
+        const p12M = precio12Meses !== undefined && precio12Meses !== '' ? Math.round(parseFloat(precio12Meses)) : 0;
+        const pVenta = p12M || p4M || p1M || pContado;
 
         const codigoUpper = codigo.trim().toUpperCase();
 
@@ -329,23 +329,55 @@ export async function POST(request: NextRequest) {
             }
         });
 
-        // Asignar stock inicial si se proporcionó
-        const cantInicial = parseInt(stockInicial) || 0;
-        if (cantInicial > 0) {
-            let targetSucursalId = sucursalId;
-            if (!targetSucursalId || targetSucursalId === 'todas') {
-                const matriz = await prisma.sucursal.findFirst({
-                    where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
-                }) || await prisma.sucursal.findFirst();
-                targetSucursalId = matriz?.id;
-            }
+        // Asignar stock inicial y registrar movimiento de inventario en el almacén elegido
+        const cantInicial = Math.max(0, parseInt(stockInicial) || 0);
+        let targetSucursal = null;
 
-            if (targetSucursalId) {
-                await prisma.stock.create({
+        if (sucursalId && sucursalId !== 'todas') {
+            targetSucursal = await prisma.sucursal.findFirst({
+                where: {
+                    OR: [
+                        { id: sucursalId },
+                        { nombre: { contains: sucursalId.replace(/^sucursal-/, '').replace(/-/g, ' '), mode: 'insensitive' } }
+                    ]
+                }
+            });
+        }
+
+        if (!targetSucursal) {
+            targetSucursal = await prisma.sucursal.findFirst({
+                where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
+            }) || await prisma.sucursal.findFirst({ where: { isActive: true } });
+        }
+
+        if (targetSucursal) {
+            await prisma.stock.upsert({
+                where: {
+                    productoId_sucursalId: {
+                        productoId: producto.id,
+                        sucursalId: targetSucursal.id
+                    }
+                },
+                update: {
+                    cantidad: cantInicial
+                },
+                create: {
+                    productoId: producto.id,
+                    sucursalId: targetSucursal.id,
+                    cantidad: cantInicial
+                }
+            });
+
+            if (cantInicial > 0) {
+                await prisma.movimientoInventario.create({
                     data: {
                         productoId: producto.id,
-                        sucursalId: targetSucursalId,
-                        cantidad: cantInicial
+                        tipoMovimiento: 'entrada',
+                        cantidad: cantInicial,
+                        sucursalDestinoId: targetSucursal.id,
+                        motivo: `Registro inicial de producto nuevo en almacén (${targetSucursal.nombre})`,
+                        referencia: 'ALTA-INVENTARIO',
+                        usuarioId: (session?.user as any)?.id || null
                     }
                 });
             }
@@ -403,11 +435,11 @@ export async function PUT(request: NextRequest) {
         if (precio1Mes !== undefined) updateData.precio1Mes = Math.round(parseFloat(precio1Mes) || 0);
         if (precio4Meses !== undefined) updateData.precio4Meses = Math.round(parseFloat(precio4Meses) || 0);
         if (precio12Meses !== undefined) {
-            updateData.precio12Meses = Math.round(parseFloat(precio12Meses) || 0);
-            updateData.precioVenta = Math.round(parseFloat(precio12Meses) || 0);
+            const p12 = Math.round(parseFloat(precio12Meses) || 0);
+            updateData.precio12Meses = p12;
+            updateData.precioVenta = p12 || updateData.precio4Meses || updateData.precio1Mes || updateData.precioContado || Math.round(parseFloat(precioVenta) || 0);
         } else if (precioVenta !== undefined) {
             updateData.precioVenta = Math.round(parseFloat(precioVenta) || 0);
-            if (updateData.precio12Meses === undefined) updateData.precio12Meses = Math.round(parseFloat(precioVenta) || 0);
         }
         if (unidadMedida) updateData.unidadMedida = unidadMedida;
         if (stockMinimo !== undefined) updateData.stockMinimo = parseInt(stockMinimo) || 0;

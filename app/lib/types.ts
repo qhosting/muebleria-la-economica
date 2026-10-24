@@ -38,6 +38,8 @@ export interface Cliente {
   importe3?: number;
   importe4?: number;
   cobradorAsignado?: User;
+  sucursal?: { id: string; nombre: string };
+  pagos?: any[];
   createdAt: Date;
   updatedAt: Date;
   // Campos de compatibilidad para offline

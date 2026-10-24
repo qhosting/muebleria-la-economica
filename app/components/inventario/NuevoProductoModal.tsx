@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -10,13 +10,22 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { DollarSign, ShieldCheck, PlusCircle } from 'lucide-react';
+import { DollarSign, ShieldCheck, PlusCircle, Warehouse, Package } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
-export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
+interface NuevoProductoModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    onSuccess: () => void;
+    sucursales?: any[];
+}
+
+export function NuevoProductoModal({ isOpen, onClose, onSuccess, sucursales = [] }: NuevoProductoModalProps) {
     const { data: session } = useSession();
     const esAdmin = (session?.user as any)?.role === 'admin';
     const [loading, setLoading] = useState(false);
+    const [sucursalesList, setSucursalesList] = useState<any[]>(sucursales);
+    const [habilitar12Meses, setHabilitar12Meses] = useState(true);
     const [formData, setFormData] = useState({
         codigo: '',
         nombre: '',
@@ -29,10 +38,37 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
         precio4Meses: '',
         precio12Meses: '',
         precioVenta: '',
-        stockMinimo: '5',
+        stockMinimo: '2',
         stockInicial: '1',
-        sucursalId: 'todas'
+        sucursalId: ''
     });
+
+    // Cargar y asegurar almacenes/sucursales disponibles
+    useEffect(() => {
+        if (sucursales && sucursales.length > 0) {
+            setSucursalesList(sucursales);
+            const matriz = sucursales.find((s: any) => s.nombre?.toUpperCase().includes('SAN LUCAS')) || sucursales[0];
+            if (matriz && (!formData.sucursalId || formData.sucursalId === 'todas')) {
+                setFormData(prev => ({ ...prev, sucursalId: matriz.id }));
+            }
+        } else if (isOpen) {
+            fetch('/api/inventario/sucursales')
+                .then(res => res.json())
+                .then(data => {
+                    if (Array.isArray(data) && data.length > 0) {
+                        setSucursalesList(data);
+                        const matriz = data.find((s: any) => s.nombre?.toUpperCase().includes('SAN LUCAS')) || data[0];
+                        if (matriz) {
+                            setFormData(prev => ({
+                                ...prev,
+                                sucursalId: prev.sucursalId && prev.sucursalId !== 'todas' ? prev.sucursalId : matriz.id
+                            }));
+                        }
+                    }
+                })
+                .catch(err => console.error('Error cargando almacenes/sucursales:', err));
+        }
+    }, [isOpen, sucursales]);
 
     // Cálculos de enganche fijo al 40% según precio (sin decimales)
     const numPrecio1M = Math.round(parseFloat(formData.precio1Mes) || 0);
@@ -49,13 +85,22 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        if (!formData.sucursalId) {
+            toast.error('Por favor elija el almacén o sucursal donde ingresará el producto');
+            return;
+        }
+
         setLoading(true);
 
         const pContado = Math.round(parseFloat(formData.precioContado) || 0);
         const pCompra = esAdmin ? Math.round(parseFloat(formData.precioCompra) || pContado) : pContado;
         const p1M = Math.round(parseFloat(formData.precio1Mes) || 0);
         const p4M = Math.round(parseFloat(formData.precio4Meses) || 0);
-        const p12M = Math.round(parseFloat(formData.precio12Meses) || parseFloat(formData.precioVenta) || 0);
+        const p12M = habilitar12Meses ? Math.round(parseFloat(formData.precio12Meses) || 0) : 0;
+        const pVenta = p12M || p4M || p1M || pContado;
+        const cantInicial = Math.max(0, parseInt(formData.stockInicial) || 0);
+        const cantMinima = Math.max(0, parseInt(formData.stockMinimo) || 0);
 
         const payload = {
             ...formData,
@@ -67,7 +112,11 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
             precio1Mes: p1M,
             precio4Meses: p4M,
             precio12Meses: p12M,
-            precioVenta: p12M || pContado
+            precioVenta: pVenta,
+            stockInicial: cantInicial,
+            stockMinimo: cantMinima,
+            sucursalId: formData.sucursalId,
+            unidadMedida: formData.unidadMedida || 'pieza'
         };
 
         try {
@@ -82,7 +131,7 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                 throw new Error(error.error || 'Error al crear producto');
             }
 
-            toast.success('Producto creado exitosamente');
+            toast.success('Producto creado y piezas ingresadas exitosamente al almacén');
             onSuccess();
             onClose();
             setFormData({
@@ -97,9 +146,9 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                 precio4Meses: '',
                 precio12Meses: '',
                 precioVenta: '',
-                stockMinimo: '5',
+                stockMinimo: '2',
                 stockInicial: '1',
-                sucursalId: 'todas'
+                sucursalId: sucursalesList[0]?.id || ''
             });
         } catch (error: any) {
             toast.error(error.message);
@@ -296,11 +345,32 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                             </div>
 
                             {/* Precio 12 Meses */}
-                            <div className="grid gap-1 bg-white p-3 rounded-lg border border-emerald-300 shadow-xs">
+                            <div className={`grid gap-1 p-3 rounded-lg border transition-all ${
+                                habilitar12Meses ? 'bg-white border-emerald-300 shadow-xs' : 'bg-slate-100/90 border-slate-200 opacity-80'
+                            }`}>
                                 <div className="flex items-center justify-between">
-                                    <Label htmlFor="precio12Meses" className="text-xs font-bold text-emerald-900">Precio 12 Meses ($)</Label>
-                                    <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded font-semibold">
-                                        12 Meses
+                                    <div className="flex items-center gap-1.5">
+                                        <input
+                                            type="checkbox"
+                                            id="check-12m"
+                                            checked={habilitar12Meses}
+                                            onChange={(e) => {
+                                                const checked = e.target.checked;
+                                                setHabilitar12Meses(checked);
+                                                if (!checked) {
+                                                    setFormData(prev => ({ ...prev, precio12Meses: '' }));
+                                                }
+                                            }}
+                                            className="h-3.5 w-3.5 rounded border-gray-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer"
+                                        />
+                                        <Label htmlFor="check-12m" className="text-xs font-bold text-emerald-950 cursor-pointer select-none">
+                                            Plan 12 Meses
+                                        </Label>
+                                    </div>
+                                    <span className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                                        habilitar12Meses ? 'text-emerald-700 bg-emerald-50' : 'text-slate-500 bg-slate-200'
+                                    }`}>
+                                        {habilitar12Meses ? 'Activo' : 'No Aplica'}
                                     </span>
                                 </div>
                                 <Input
@@ -309,51 +379,132 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess }: any) {
                                     type="number"
                                     min="0"
                                     step="1"
-                                    required
-                                    placeholder="0"
+                                    disabled={!habilitar12Meses}
+                                    required={habilitar12Meses}
+                                    placeholder={habilitar12Meses ? "0" : "Deshabilitado"}
                                     value={formData.precio12Meses}
                                     onChange={handleChange}
-                                    className="font-black text-emerald-800"
+                                    className={`font-black ${habilitar12Meses ? 'text-emerald-800' : 'text-slate-400 bg-slate-100 cursor-not-allowed'}`}
                                 />
-                                <div className="mt-1 bg-emerald-50/80 border border-emerald-100 rounded-md p-1.5 text-[11px] space-y-0.5">
-                                    <div className="flex justify-between items-center text-emerald-950 font-bold">
-                                        <span>Enganche (40%):</span>
-                                        <span>{formatCurrency(enganche12M)}</span>
+                                {habilitar12Meses ? (
+                                    <div className="mt-1 bg-emerald-50/80 border border-emerald-100 rounded-md p-1.5 text-[11px] space-y-0.5">
+                                        <div className="flex justify-between items-center text-emerald-950 font-bold">
+                                            <span>Enganche (40%):</span>
+                                            <span>{formatCurrency(enganche12M)}</span>
+                                        </div>
+                                        <div className="flex justify-between items-center text-gray-500 text-[10px]">
+                                            <span>Saldo a 12 meses:</span>
+                                            <span>{formatCurrency(saldo12M)}</span>
+                                        </div>
                                     </div>
-                                    <div className="flex justify-between items-center text-gray-500 text-[10px]">
-                                        <span>Saldo a 12 meses:</span>
-                                        <span>{formatCurrency(saldo12M)}</span>
+                                ) : (
+                                    <div className="mt-1 bg-slate-200/60 border border-slate-200 rounded-md p-1.5 text-[10px] text-slate-500 text-center font-medium">
+                                        Este producto no se ofrecerá a 12 meses
                                     </div>
-                                </div>
+                                )}
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="unidadMedida" className="text-xs font-semibold text-gray-700">Unidad</Label>
-                            <Select defaultValue="pieza" onValueChange={(v) => handleSelectChange('unidadMedida', v)}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder="Unidad" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="pieza">Pieza</SelectItem>
-                                    <SelectItem value="juego">Juego</SelectItem>
-                                    <SelectItem value="caja">Caja</SelectItem>
-                                    <SelectItem value="metro">Metro</SelectItem>
-                                </SelectContent>
-                            </Select>
+                    {/* SECCIÓN ALMACÉN Y PIEZAS INICIALES */}
+                    <div className="p-4 bg-gradient-to-br from-slate-50 to-blue-50/40 border border-slate-200 rounded-xl space-y-3">
+                        <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                            <div className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                                <Warehouse className="h-4 w-4 text-blue-700" />
+                                ALMACÉN Y PIEZAS (RECEPCIÓN INICIAL)
+                            </div>
+                            <span className="text-[11px] font-semibold text-slate-700 bg-white border border-slate-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                                <Package className="h-3.5 w-3.5 text-blue-600" />
+                                Entrada a Inventario
+                            </span>
                         </div>
-                        <div className="grid gap-1.5">
-                            <Label htmlFor="stockMinimo" className="text-xs font-semibold text-gray-700">Stock Mínimo Alerta</Label>
-                            <Input
-                                id="stockMinimo"
-                                name="stockMinimo"
-                                type="number"
-                                min="0"
-                                value={formData.stockMinimo}
-                                onChange={handleChange}
-                            />
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            {/* Almacén o Bodega */}
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="sucursalId" className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                                    Almacén / Sucursal de Ingreso <span className="text-red-500">*</span>
+                                </Label>
+                                <Select
+                                    value={formData.sucursalId}
+                                    onValueChange={(v) => handleSelectChange('sucursalId', v)}
+                                >
+                                    <SelectTrigger id="sucursalId" className="bg-white font-medium">
+                                        <SelectValue placeholder="Seleccionar almacén..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {sucursalesList.map((s: any) => (
+                                            <SelectItem key={s.id} value={s.id} className="cursor-pointer">
+                                                {s.nombre} {s.esBodega ? '(Bodega)' : '(Tienda)'}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <span className="text-[10px] text-gray-500">Bodega o sucursal donde se guardará la mercancía</span>
+                            </div>
+
+                            {/* Cantidad de Piezas Iniciales */}
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="stockInicial" className="text-xs font-bold text-gray-800 flex items-center gap-1">
+                                    Piezas a Ingresar (Stock Inicial) <span className="text-red-500">*</span>
+                                </Label>
+                                <Input
+                                    id="stockInicial"
+                                    name="stockInicial"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    required
+                                    value={formData.stockInicial}
+                                    onChange={handleChange}
+                                    className="bg-white font-bold text-blue-900 text-base"
+                                    placeholder="1"
+                                />
+                                <span className="text-[10px] text-gray-500">Número de piezas que ingresan físicamente</span>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                            {/* Tipo de Unidad */}
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="unidadMedida" className="text-xs font-semibold text-gray-700">
+                                    Unidad de Medida
+                                </Label>
+                                <Select
+                                    value={formData.unidadMedida}
+                                    onValueChange={(v) => handleSelectChange('unidadMedida', v)}
+                                >
+                                    <SelectTrigger id="unidadMedida" className="bg-white">
+                                        <SelectValue placeholder="Unidad" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="pieza">Pieza (Pza)</SelectItem>
+                                        <SelectItem value="juego">Juego (Jgo)</SelectItem>
+                                        <SelectItem value="set">Set / Paquete</SelectItem>
+                                        <SelectItem value="caja">Caja</SelectItem>
+                                        <SelectItem value="metro">Metro</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {/* Stock Mínimo Alerta */}
+                            <div className="grid gap-1.5">
+                                <Label htmlFor="stockMinimo" className="text-xs font-semibold text-gray-700">
+                                    Stock Mínimo (Alerta de Escasez)
+                                </Label>
+                                <Input
+                                    id="stockMinimo"
+                                    name="stockMinimo"
+                                    type="number"
+                                    min="0"
+                                    step="1"
+                                    value={formData.stockMinimo}
+                                    onChange={handleChange}
+                                    className="bg-white"
+                                    placeholder="2"
+                                />
+                                <span className="text-[10px] text-gray-500">Avisar cuando queden pocas piezas</span>
+                            </div>
                         </div>
                     </div>
 

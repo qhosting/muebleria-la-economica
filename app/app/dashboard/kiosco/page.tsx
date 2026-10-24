@@ -42,7 +42,9 @@ import {
   MessageCircle,
   CheckCircle,
   ArrowRight,
-  Loader2
+  Loader2,
+  Filter,
+  ArrowUpDown
 } from 'lucide-react';
 import { formatCurrency, getDayName, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -127,6 +129,8 @@ export default function KioscoVentasPage() {
 
   // Filtro de existencias (En Esta Sucursal vs Globales)
   const [filtroExistencias, setFiltroExistencias] = useState<'sucursal' | 'global'>('sucursal');
+  const [filtroRangoPrecio, setFiltroRangoPrecio] = useState<string>('todos');
+  const [filtroOrden, setFiltroOrden] = useState<string>('nombre');
 
   // Estado para eliminar venta (Solo Admin)
   const [ventaAEliminar, setVentaAEliminar] = useState<any | null>(null);
@@ -374,7 +378,15 @@ export default function KioscoVentasPage() {
   // Agregar producto del catálogo al carrito con modalidad especificada o la activa
   const agregarAlCarrito = (item: CatalogoItem, modalidadEspecifica?: ModalidadPrecio) => {
     const stockDisp = obtenerStockSucursal(item);
-    const modUso = modalidadEspecifica || modalidadPrecio;
+    let modUso = modalidadEspecifica || modalidadPrecio;
+    if (modUso === '12meses' && (!item.precio12Meses || item.precio12Meses <= 0)) {
+      if (modalidadEspecifica === '12meses') {
+        toast.error(`"${item.nombre}" no cuenta con plan a 12 Meses disponible`);
+        return;
+      }
+      modUso = '4meses';
+      toast.info(`"${item.nombre}" no tiene plan a 12 Meses; se agregó en modalidad 4 Meses`);
+    }
     const precio = obtenerPrecioPorModalidad(item, modUso);
 
     const existenteIndex = carrito.findIndex(
@@ -769,29 +781,53 @@ export default function KioscoVentasPage() {
     });
   }, [productosDB]);
 
-  // Filtrado de catálogo: según selector de existencias (En Esta Sucursal vs Globales)
-  const catalogoFiltrado = catalogoCombinado.filter(item => {
-    // 1. Si filtroExistencias === 'sucursal', filtrar por existencia en la sucursal activa
-    if (filtroExistencias === 'sucursal') {
+  // Normalizador de texto para búsquedas insensibles a mayúsculas y acentos
+  const normalizarKiosco = (txt: string) => 
+    (txt || '')
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+
+  // Filtrado de catálogo: exclusivo de sucursal para vendedor, y configurable para admin
+  const catalogoFiltrado = catalogoCombinado
+    .filter(item => {
+      // 1. Si NO es admin, o si filtroExistencias === 'sucursal', forzar que haya existencia en la sucursal activa
       const stockDisponible = obtenerStockSucursal(item);
-      if (stockDisponible <= 0) {
-        return false;
+      if (!esAdmin || filtroExistencias === 'sucursal') {
+        if (stockDisponible <= 0) {
+          return false;
+        }
       }
-    }
 
-    // 2. Filtro por categoría
-    const matchCat = categoriaSeleccionada === 'Todos' || item.categoria === categoriaSeleccionada;
-    if (!matchCat) return false;
+      // 2. Filtro por categoría
+      const matchCat = categoriaSeleccionada === 'Todos' || item.categoria === categoriaSeleccionada;
+      if (!matchCat) return false;
 
-    // 3. Filtro por búsqueda
-    const matchSearch =
-      item.nombre.toLowerCase().includes(busqueda.toLowerCase()) ||
-      item.marca.toLowerCase().includes(busqueda.toLowerCase()) ||
-      (item.modelo && item.modelo.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (item.codigo && item.codigo.toLowerCase().includes(busqueda.toLowerCase())) ||
-      (item.descripcion && item.descripcion.toLowerCase().includes(busqueda.toLowerCase()));
-    return matchSearch;
-  });
+      // 3. Filtro por rango de precio
+      const precioRef = item.precio12Meses && item.precio12Meses > 0 ? item.precio12Meses : (item.precioContado || item.precioVenta || 0);
+      if (filtroRangoPrecio === 'hasta3000' && precioRef > 3000) return false;
+      if (filtroRangoPrecio === '3000a7000' && (precioRef < 3000 || precioRef > 7000)) return false;
+      if (filtroRangoPrecio === '7000a12000' && (precioRef < 7000 || precioRef > 12000)) return false;
+      if (filtroRangoPrecio === 'mas12000' && precioRef <= 12000) return false;
+
+      // 4. Búsqueda inteligente por tokens y normalizada
+      if (busqueda.trim()) {
+        const tokens = normalizarKiosco(busqueda).split(/\s+/).filter(Boolean);
+        const searchableText = normalizarKiosco(`${item.nombre || ''} ${item.marca || ''} ${item.modelo || ''} ${item.codigo || ''} ${item.descripcion || ''} ${item.categoria || ''}`);
+        const allTokensMatch = tokens.every(token => searchableText.includes(token));
+        if (!allTokensMatch) return false;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const precioA = a.precio12Meses && a.precio12Meses > 0 ? a.precio12Meses : (a.precioContado || a.precioVenta || 0);
+      const precioB = b.precio12Meses && b.precio12Meses > 0 ? b.precio12Meses : (b.precioContado || b.precioVenta || 0);
+      if (filtroOrden === 'precioAsc') return precioA - precioB;
+      if (filtroOrden === 'precioDesc') return precioB - precioA;
+      return (a.nombre || '').localeCompare(b.nombre || '');
+    });
 
   // Procesar Venta / Levantamiento de Crédito
   const handleProcesarVenta = async () => {
@@ -1100,34 +1136,46 @@ export default function KioscoVentasPage() {
 
                   {/* Selector de Pestaña de Existencias: En Esta Sucursal vs Existencias Globales */}
                   <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100">
-                    <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
-                      <button
-                        type="button"
-                        onClick={() => setFiltroExistencias('sucursal')}
-                        className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-bold ${
-                          filtroExistencias === 'sucursal'
-                            ? 'bg-blue-900 text-white shadow-xs'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-slate-200/60'
-                        }`}
-                      >
-                        <Store className="h-3.5 w-3.5" />
-                        En Esta Sucursal ({sucursalActual?.nombre || 'Local'})
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setFiltroExistencias('global')}
-                        className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-bold ${
-                          filtroExistencias === 'global'
-                            ? 'bg-blue-900 text-white shadow-xs'
-                            : 'text-gray-600 hover:text-gray-900 hover:bg-slate-200/60'
-                        }`}
-                      >
-                        <Building2 className="h-3.5 w-3.5" />
-                        Existencias Globales (Todas las Bodegas/Tiendas)
-                      </button>
-                    </div>
+                    {esAdmin ? (
+                      <div className="inline-flex bg-slate-100 p-1 rounded-xl border border-slate-200 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setFiltroExistencias('sucursal')}
+                          className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-bold ${
+                            filtroExistencias === 'sucursal'
+                              ? 'bg-blue-900 text-white shadow-xs'
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Store className="h-3.5 w-3.5" />
+                          En Esta Sucursal ({sucursalActual?.nombre || 'Local'})
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFiltroExistencias('global')}
+                          className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 font-bold ${
+                            filtroExistencias === 'global'
+                              ? 'bg-blue-900 text-white shadow-xs'
+                              : 'text-gray-600 hover:text-gray-900 hover:bg-slate-200/60'
+                          }`}
+                        >
+                          <Building2 className="h-3.5 w-3.5" />
+                          Existencias Globales (Todas las Bodegas/Tiendas)
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border border-blue-200 rounded-lg text-xs font-bold text-blue-900">
+                          <Store className="h-3.5 w-3.5 text-blue-700" />
+                          Sucursal Asignada: {sucursalActual?.nombre || 'Mi Sucursal'}
+                        </div>
+                        <Badge variant="outline" className="text-[11px] text-emerald-700 bg-emerald-50 border-emerald-200 font-semibold">
+                          Catálogo de Venta Local (Stock Disponible)
+                        </Badge>
+                      </div>
+                    )}
 
-                    {filtroExistencias === 'global' && (
+                    {esAdmin && filtroExistencias === 'global' && (
                       <Badge variant="outline" className="text-[11px] text-blue-700 bg-blue-50 border-blue-200 font-semibold gap-1 py-1">
                         <Boxes className="h-3.5 w-3.5" />
                         Visualizando existencias consolidadas y traspasos entre sucursales
@@ -1172,23 +1220,55 @@ export default function KioscoVentasPage() {
                     </div>
                   </div>
 
-                  {/* Pills de Categorías con scroll horizontal */}
-                  <div className="flex gap-1.5 overflow-x-auto pb-2 scrollbar-none">
-                    {categorias.map(cat => (
-                      <Button
-                        key={cat}
-                        size="sm"
-                        variant={categoriaSeleccionada === cat ? 'default' : 'outline'}
-                        className={`rounded-full px-3 py-1 text-xs whitespace-nowrap font-semibold transition-all ${
-                          categoriaSeleccionada === cat
-                            ? 'bg-blue-800 text-white shadow-sm'
-                            : 'bg-white hover:bg-slate-100 text-gray-700'
-                        }`}
-                        onClick={() => setCategoriaSeleccionada(cat)}
-                      >
-                        {cat}
-                      </Button>
-                    ))}
+                  {/* Pills de Categorías y Filtros de Rango de Precio / Orden */}
+                  <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 pb-1">
+                    <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none flex-1">
+                      {categorias.map(cat => (
+                        <Button
+                          key={cat}
+                          size="sm"
+                          variant={categoriaSeleccionada === cat ? 'default' : 'outline'}
+                          className={`rounded-full px-3 py-1 text-xs whitespace-nowrap font-semibold transition-all ${
+                            categoriaSeleccionada === cat
+                              ? 'bg-blue-800 text-white shadow-sm'
+                              : 'bg-white hover:bg-slate-100 text-gray-700'
+                          }`}
+                          onClick={() => setCategoriaSeleccionada(cat)}
+                        >
+                          {cat}
+                        </Button>
+                      ))}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-1.5 bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
+                        <Filter className="h-3.5 w-3.5 text-slate-500" />
+                        <select
+                          value={filtroRangoPrecio}
+                          onChange={e => setFiltroRangoPrecio(e.target.value)}
+                          className="bg-transparent text-gray-800 font-semibold focus:outline-none cursor-pointer text-xs"
+                        >
+                          <option value="todos">Todos los precios</option>
+                          <option value="hasta3000">Hasta $3,000</option>
+                          <option value="3000a7000">$3,000 a $7,000</option>
+                          <option value="7000a12000">$7,000 a $12,000</option>
+                          <option value="mas12000">Más de $12,000</option>
+                        </select>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 bg-slate-100/80 border border-slate-200 rounded-lg px-2.5 py-1 text-xs">
+                        <ArrowUpDown className="h-3.5 w-3.5 text-slate-500" />
+                        <select
+                          value={filtroOrden}
+                          onChange={e => setFiltroOrden(e.target.value)}
+                          className="bg-transparent text-gray-800 font-semibold focus:outline-none cursor-pointer text-xs"
+                        >
+                          <option value="nombre">Orden: Nombre (A-Z)</option>
+                          <option value="precioAsc">Precio: Menor a Mayor</option>
+                          <option value="precioDesc">Precio: Mayor a Menor</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
 
                   {/* Grid de Productos - Diseño Amplio y Cómodo */}
@@ -1323,27 +1403,38 @@ export default function KioscoVentasPage() {
                                 </button>
 
                                 {/* 12 Meses */}
-                                <button
-                                  type="button"
-                                  onClick={() => agregarAlCarrito(prod, '12meses')}
-                                  className={`text-left p-1.5 rounded transition-all border ${
-                                    modalidadPrecio === '12meses'
-                                      ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-300 shadow-xs'
-                                      : 'bg-white hover:bg-slate-100 border-slate-200'
-                                  }`}
-                                  title="Click para agregar con precio 12 Meses"
-                                >
-                                  <div className="text-[10px] text-emerald-900 font-bold flex items-center justify-between">
-                                    <span>12 Meses</span>
-                                    {modalidadPrecio === '12meses' && <CheckCircle className="h-2.5 w-2.5 text-emerald-700" />}
+                                {(!prod.precio12Meses || prod.precio12Meses <= 0) ? (
+                                  <div
+                                    className="text-left p-1.5 rounded border border-dashed border-slate-200 bg-slate-50/70 select-none opacity-60"
+                                    title="Este producto no tiene plan a 12 meses"
+                                  >
+                                    <div className="text-[10px] text-gray-500 font-semibold">12 Meses</div>
+                                    <div className="font-bold text-xs text-gray-400 mt-0.5">No aplica</div>
+                                    <div className="text-[9px] text-gray-400">Sin plan anual</div>
                                   </div>
-                                  <div className="font-black text-xs text-emerald-950 mt-0.5">
-                                    {formatCurrency(prod.precio12Meses || prod.precioVenta)}
-                                  </div>
-                                  <div className="text-[9px] text-emerald-700 font-medium">
-                                    {formatCurrency(Math.ceil(((prod.precio12Meses || prod.precioVenta || 0) * 0.60) / 52))}/sem
-                                  </div>
-                                </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => agregarAlCarrito(prod, '12meses')}
+                                    className={`text-left p-1.5 rounded transition-all border ${
+                                      modalidadPrecio === '12meses'
+                                        ? 'bg-emerald-50 border-emerald-500 ring-1 ring-emerald-300 shadow-xs'
+                                        : 'bg-white hover:bg-slate-100 border-slate-200'
+                                    }`}
+                                    title="Click para agregar con precio 12 Meses"
+                                  >
+                                    <div className="text-[10px] text-emerald-900 font-bold flex items-center justify-between">
+                                      <span>12 Meses</span>
+                                      {modalidadPrecio === '12meses' && <CheckCircle className="h-2.5 w-2.5 text-emerald-700" />}
+                                    </div>
+                                    <div className="font-black text-xs text-emerald-950 mt-0.5">
+                                      {formatCurrency(prod.precio12Meses)}
+                                    </div>
+                                    <div className="text-[9px] text-emerald-700 font-medium">
+                                      {formatCurrency(Math.ceil((prod.precio12Meses * 0.60) / 52))}/sem
+                                    </div>
+                                  </button>
+                                )}
                               </div>
 
                               {/* Botones de acción solicitados */}
@@ -1539,20 +1630,26 @@ export default function KioscoVentasPage() {
                         <div className="flex items-center justify-between mt-2 px-2.5 py-1.5 bg-blue-50 border border-blue-200/80 rounded-lg text-xs">
                           <div className="flex items-center gap-1.5 text-blue-950 font-bold">
                             <Store className="h-3.5 w-3.5 text-blue-700" />
-                            <span>Sucursal:</span>
+                            <span>Sucursal de Emisión:</span>
                           </div>
-                          <Select value={sucursalSeleccionada} onValueChange={handleCambiarSucursal}>
-                            <SelectTrigger className="h-6 text-xs bg-white border-blue-300 w-48 font-semibold px-2 py-0">
-                              <SelectValue placeholder="Seleccionar" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {sucursales.map(s => (
-                                <SelectItem key={s.id} value={s.id} className="text-xs font-medium">
-                                  {s.nombre}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                          {esAdmin ? (
+                            <Select value={sucursalSeleccionada} onValueChange={handleCambiarSucursal}>
+                              <SelectTrigger className="h-6 text-xs bg-white border-blue-300 w-48 font-semibold px-2 py-0">
+                                <SelectValue placeholder="Seleccionar" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {sucursales.map(s => (
+                                  <SelectItem key={s.id} value={s.id} className="text-xs font-medium">
+                                    {s.nombre}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <span className="font-bold text-blue-900 bg-white px-2.5 py-0.5 rounded border border-blue-200 shadow-xs">
+                              {sucursalActual?.nombre || 'Mi Sucursal'}
+                            </span>
+                          )}
                         </div>
 
 {/* Selector y Comparador de Plazos y Precios (Contado, 1 Mes, 4 Meses, 12 Meses) */}

@@ -116,14 +116,25 @@ export function MovimientoModal({ isOpen, onClose, onSuccess, productos, sucursa
 
                         {(formData.tipoMovimiento === 'salida' || formData.tipoMovimiento === 'traspaso') && (
                             <div className="grid gap-2">
-                                <Label htmlFor="origen">Origen</Label>
+                                <div className="flex items-center justify-between">
+                                    <Label htmlFor="origen">Origen</Label>
+                                    {formData.productoId && formData.sucursalOrigenId && (
+                                        <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                                            Disp: {(() => {
+                                                const p = productos.find((item: any) => item.id === formData.productoId);
+                                                const s = p?.stockPorSucursal?.find((suc: any) => suc.sucursalId === formData.sucursalOrigenId);
+                                                return s ? `${s.cantidad} pzas` : '0 pzas';
+                                            })()}
+                                        </span>
+                                    )}
+                                </div>
                                 <Select onValueChange={(v) => handleChange('sucursalOrigenId', v)} required>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Bodega/Tienda" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {sucursales.map((s: any) => (
-                                            <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                                            <SelectItem key={s.id} value={s.id}>{s.nombre} {s.esBodega ? '(Bodega)' : ''}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
@@ -132,14 +143,14 @@ export function MovimientoModal({ isOpen, onClose, onSuccess, productos, sucursa
 
                         {(formData.tipoMovimiento === 'entrada' || formData.tipoMovimiento === 'traspaso') && (
                             <div className="grid gap-2">
-                                <Label htmlFor="destino">Destino</Label>
+                                <Label htmlFor="destino">Destino (Dar de alta o sumar)</Label>
                                 <Select onValueChange={(v) => handleChange('sucursalDestinoId', v)} required>
                                     <SelectTrigger>
                                         <SelectValue placeholder="Bodega/Tienda" />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {sucursales.map((s: any) => (
-                                            <SelectItem key={s.id} value={s.id}>{s.nombre}</SelectItem>
+                                            <SelectItem key={s.id} value={s.id}>{s.nombre} {s.esBodega ? '(Bodega)' : ''}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>

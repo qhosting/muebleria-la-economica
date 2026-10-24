@@ -25,7 +25,7 @@ interface CobranzaModalProps {
   cliente: Cliente;
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (nuevoPago?: any) => void;
 }
 
 export function CobranzaModal({ cliente, isOpen, onClose, onSuccess }: CobranzaModalProps) {
@@ -65,7 +65,9 @@ export function CobranzaModal({ cliente, isOpen, onClose, onSuccess }: CobranzaM
       });
 
       if (response.ok) {
-        onSuccess();
+        const nuevoPago = await response.json();
+        toast.success(`Pago registrado con éxito: ${formatCurrency(parseFloat(monto))}`);
+        onSuccess(nuevoPago);
       } else {
         const error = await response.json();
         throw new Error(error.message || 'Error al registrar pago');

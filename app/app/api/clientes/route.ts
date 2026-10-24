@@ -82,8 +82,9 @@ export async function GET(request: NextRequest) {
 
     const userRole = (session.user as any).role;
     const userId = (session.user as any).id;
+    const userSucursalId = (session.user as any).sucursalId;
 
-    // Solo cobradores tienen restricción de ver únicamente sus clientes asignados
+    // Restricciones por rol
     if (userRole === 'cobrador') {
       where.cobradorAsignadoId = userId;
 
@@ -92,6 +93,14 @@ export async function GET(request: NextRequest) {
         const today = new Date().getDay(); // 0=domingo, 1=lunes, ..., 6=sábado
         const diasMap = ['7', '1', '2', '3', '4', '5', '6']; // Ajustamos para que domingo=7
         where.diaPago = diasMap[today];
+      }
+    } else if (userRole === 'vendedor') {
+      // Vendedor: si no se busca por texto específico, filtrar por sucursal asignada
+      if (userSucursalId && !search) {
+        where.OR = [
+          { sucursalId: userSucursalId },
+          { sucursalId: null }
+        ];
       }
     }
     // Admins y gestores pueden ver todos los clientes
@@ -105,6 +114,23 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               email: true,
+            },
+          },
+          sucursal: {
+            select: {
+              id: true,
+              nombre: true,
+            },
+          },
+          pagos: {
+            orderBy: { fechaPago: 'desc' },
+            take: 30,
+            include: {
+              cobrador: {
+                select: {
+                  name: true,
+                },
+              },
             },
           },
         },
