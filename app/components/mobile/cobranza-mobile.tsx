@@ -38,6 +38,7 @@ import { formatCurrency, getDayName } from '@/lib/utils';
 import { toast } from 'sonner';
 import { FooterVersion } from '@/components/version-info';
 import { CorteModal } from './corte-modal';
+import { TicketModal } from './ticket-modal';
 import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
 import { Printer, Calculator, Receipt, ShieldCheck } from 'lucide-react';
 import { TicketData } from '@/lib/bluetooth-printer';
@@ -65,6 +66,7 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
   const [showPagosModal, setShowPagosModal] = useState(false);
   const [showBovedaModal, setShowBovedaModal] = useState(false);
   const [showCorteModal, setShowCorteModal] = useState(false);
+  const [reimprimirTicketData, setReimprimirTicketData] = useState<TicketData | null>(null);
   const [isOnline, setIsOnline] = useState(typeof window !== 'undefined' ? navigator.onLine : true);
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -342,10 +344,6 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
 
   const handleReimprimirUltimo = async () => {
     if (!userId) return;
-    if (!isPrinterConnected) {
-      toast.error('Impresora no conectada');
-      return;
-    }
 
     setPrintingLast(true);
     try {
@@ -375,6 +373,8 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
         numeroRecibo: lastPago.numeroRecibo || `REC-${lastPago.localId.slice(-8)}`,
         cliente: {
           nombreCompleto: cliente.nombreCompleto,
+          codigoCliente: cliente.codigoCliente,
+          descripcionProducto: cliente.descripcionProducto,
           telefono: cliente.telefono,
           direccion: cliente.direccion,
           diaPago: cliente.diaPago
@@ -401,9 +401,17 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
         }
       };
 
+      const preferUSB = typeof window !== 'undefined' && localStorage.getItem('ticket_tipo_impresora') === 'usb';
+      if (!isPrinterConnected || preferUSB) {
+        setReimprimirTicketData(ticketData);
+        return;
+      }
+
       const success = await printTicket(ticketData);
       if (success) {
         toast.success('Último ticket reimpreso correctamente');
+      } else {
+        setReimprimirTicketData(ticketData);
       }
     } catch (error) {
       console.error('Error al reimprimir último ticket:', error);
@@ -628,6 +636,17 @@ export default function CobranzaMobile({ initialClientes = [], disableLayout = f
           isOpen={showCorteModal}
           onClose={() => setShowCorteModal(false)}
           isOnline={isOnline}
+        />
+
+        {/* Modal de Ticket / Comprobante (USB y Bluetooth) */}
+        <TicketModal
+          isOpen={!!reimprimirTicketData}
+          onClose={() => setReimprimirTicketData(null)}
+          ticketData={reimprimirTicketData}
+          isPrinterConnected={isPrinterConnected}
+          onPrintBluetooth={async () => {
+            if (reimprimirTicketData) await printTicket(reimprimirTicketData);
+          }}
         />
 
         {/* Footer con información de versión */}

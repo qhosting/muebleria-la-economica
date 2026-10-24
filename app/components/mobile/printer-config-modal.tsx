@@ -1,8 +1,7 @@
 
-// Modal de configuración de impresora Bluetooth
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,9 +16,13 @@ import {
   Settings,
   AlertTriangle,
   CheckCircle,
-  X
+  X,
+  Laptop
 } from 'lucide-react';
 import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
+import { imprimirTicketTermicoUSB } from '@/lib/ticket-usb-printer';
+import { TicketData } from '@/lib/bluetooth-printer';
+import { toast } from 'sonner';
 
 interface PrinterConfigModalProps {
   isOpen: boolean;
@@ -42,6 +45,42 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
   } = useBluetoothPrinter();
 
   const [isTesting, setIsTesting] = useState(false);
+  const [isTestingUSB, setIsTestingUSB] = useState(false);
+  const [tipoImpresora, setTipoImpresora] = useState<'usb' | 'bluetooth'>('usb');
+  const [anchoPapel, setAnchoPapel] = useState<'80mm' | '58mm'>('80mm');
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTipo = localStorage.getItem('ticket_tipo_impresora');
+      const savedAncho = localStorage.getItem('ticket_ancho_papel');
+      if (savedTipo === 'usb' || savedTipo === 'bluetooth') {
+        setTipoImpresora(savedTipo);
+      } else if (isConnected) {
+        setTipoImpresora('bluetooth');
+      } else {
+        setTipoImpresora('usb');
+      }
+
+      if (savedAncho === '58mm' || savedAncho === '80mm') {
+        setAnchoPapel(savedAncho);
+      }
+    }
+  }, [isConnected]);
+
+  const handleCambiarTipo = (tipo: 'usb' | 'bluetooth') => {
+    setTipoImpresora(tipo);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ticket_tipo_impresora', tipo);
+    }
+    toast.success(`Modo de impresión cambiado a ${tipo === 'usb' ? 'USB / PC' : 'Bluetooth'}`);
+  };
+
+  const handleCambiarAncho = (ancho: '80mm' | '58mm') => {
+    setAnchoPapel(ancho);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ticket_ancho_papel', ancho);
+    }
+  };
 
   const handleConnect = async () => {
     await connectToPrinter();
@@ -64,6 +103,50 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
     }
   };
 
+  const handleTestPrintUSB = async () => {
+    setIsTestingUSB(true);
+    try {
+      const ticketPrueba: TicketData = {
+        numeroRecibo: 'PRUEBA-USB',
+        cliente: {
+          nombreCompleto: 'CLIENTE DE PRUEBA',
+          codigoCliente: 'CLI-001',
+          telefono: '448-000-0000',
+          direccion: 'Av. Principal #123, Centro',
+          diaPago: 'Lunes'
+        },
+        cobrador: {
+          nombre: 'Vendedor / Cobrador',
+          id: 'TEST-01'
+        },
+        pago: {
+          monto: 500,
+          tipoPago: 'regular',
+          metodoPago: 'Efectivo',
+          concepto: 'Prueba de Impresión USB POS',
+          fechaPago: new Date().toISOString()
+        },
+        saldos: {
+          anterior: 2500,
+          nuevo: 2000
+        },
+        empresa: {
+          nombre: 'MUEBLERIA LA ECONOMICA',
+          direccion: 'San Lucas 3er Cuartel',
+          telefono: 'Tel: (448) 123-4567'
+        }
+      };
+
+      await imprimirTicketTermicoUSB(ticketPrueba, anchoPapel);
+      toast.success('Ticket de prueba enviado a impresora USB/PC');
+    } catch (err) {
+      console.error('Error al imprimir prueba USB:', err);
+      toast.error('Error al enviar impresión de prueba USB');
+    } finally {
+      setIsTestingUSB(false);
+    }
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-md">
@@ -71,31 +154,140 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
           <div className="flex items-center justify-between">
             <DialogTitle className="flex items-center gap-2">
               <Printer className="w-5 h-5" />
-              Configurar Impresora
+              Configurar Impresión de Comprobantes
             </DialogTitle>
           </div>
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Estado de Bluetooth */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+          {/* Selector de Modo Predeterminado */}
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Tipo de Impresora Predeterminada
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button
+                type="button"
+                variant={tipoImpresora === 'usb' ? 'default' : 'outline'}
+                className="flex items-center justify-center gap-2 h-12"
+                onClick={() => handleCambiarTipo('usb')}
+              >
+                <Laptop className="w-4 h-4" />
+                <div className="text-left">
+                  <div className="text-xs font-bold leading-none">Impresora USB / PC</div>
+                  <div className="text-[10px] opacity-80 mt-0.5">Kiosco & Computadora</div>
+                </div>
+              </Button>
+
+              <Button
+                type="button"
+                variant={tipoImpresora === 'bluetooth' ? 'default' : 'outline'}
+                className="flex items-center justify-center gap-2 h-12"
+                onClick={() => handleCambiarTipo('bluetooth')}
+              >
                 <Bluetooth className="w-4 h-4" />
-                Estado de Bluetooth
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  Disponibilidad
-                </span>
-                <Badge variant={isBluetoothAvailable ? 'default' : 'destructive'}>
-                  {isBluetoothAvailable ? 'Disponible' : 'No Disponible'}
-                </Badge>
-              </div>
-            </CardContent>
-          </Card>
+                <div className="text-left">
+                  <div className="text-xs font-bold leading-none">Bluetooth ESC/POS</div>
+                  <div className="text-[10px] opacity-80 mt-0.5">Móvil & Inalámbrica</div>
+                </div>
+              </Button>
+            </div>
+          </div>
+
+          {/* Opciones según tipo seleccionado */}
+          {tipoImpresora === 'usb' ? (
+            <div className="space-y-3">
+              <Card className="border-blue-200 bg-blue-50/40 dark:bg-blue-950/20">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center justify-between">
+                    <span className="flex items-center gap-2">
+                      <Laptop className="w-4 h-4 text-blue-600" />
+                      Impresora de Computadora (USB)
+                    </span>
+                    <Badge variant="outline" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
+                      Activa
+                    </Badge>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
+                    Ideal para terminales de venta en sucursal y modo Kiosco. Imprime directamente a cualquier impresora térmica de rollo conectada por cable USB (Epson, Xprinter, POS-58, POS-80) o impresora predeterminada del sistema.
+                  </p>
+
+                  <Separator />
+
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium">Ancho del Papel Térmico</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={anchoPapel === '80mm' ? 'default' : 'outline'}
+                        className="text-xs h-8"
+                        onClick={() => handleCambiarAncho('80mm')}
+                      >
+                        80 mm (Estándar POS)
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant={anchoPapel === '58mm' ? 'default' : 'outline'}
+                        className="text-xs h-8"
+                        onClick={() => handleCambiarAncho('58mm')}
+                      >
+                        58 mm (Compacta)
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={handleTestPrintUSB}
+                    disabled={isTestingUSB}
+                    variant="outline"
+                    className="w-full text-xs h-9 bg-white dark:bg-slate-900 border-dashed"
+                  >
+                    <TestTube2 className="w-3.5 h-3.5 mr-2 text-blue-600" />
+                    {isTestingUSB ? 'Generando ticket de prueba...' : `Imprimir Prueba USB (${anchoPapel})`}
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-xs font-semibold flex items-center gap-1.5">
+                    <CheckCircle className="w-3.5 h-3.5 text-green-600" />
+                    ¿Cómo funciona la impresión USB?
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="text-[11px] text-muted-foreground space-y-1">
+                  <div>• Conecta tu impresora térmica a la computadora por puerto USB.</div>
+                  <div>• Al confirmar un cobro o reimprimir un ticket, se abre el cuadro de impresión limpio con corte automático a {anchoPapel}.</div>
+                  <div>• Selecciona tu impresora en Windows/Mac y haz clic en Imprimir.</div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {/* Estado de Bluetooth */}
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm flex items-center gap-2">
+                    <Bluetooth className="w-4 h-4" />
+                    Estado de Bluetooth
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Disponibilidad
+                    </span>
+                    <Badge variant={isBluetoothAvailable ? 'default' : 'destructive'}>
+                      {isBluetoothAvailable ? 'Disponible' : 'No Disponible'}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
 
           {!isBluetoothAvailable && (
             <div className="flex items-start gap-2 p-3 bg-orange-50 rounded-lg border-l-2 border-orange-400">
@@ -278,6 +470,8 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
                   Ahora puedes imprimir tickets de pago automáticamente.
                 </div>
               </div>
+            </div>
+          )}
             </div>
           )}
         </div>

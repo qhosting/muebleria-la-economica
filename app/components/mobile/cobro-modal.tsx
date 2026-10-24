@@ -23,7 +23,9 @@ import {
   CheckCircle,
   AlertTriangle,
   Printer,
-  Settings
+  Settings,
+  Laptop,
+  Bluetooth
 } from 'lucide-react';
 import { OfflineCliente } from '@/lib/offline-db';
 import { syncService } from '@/lib/sync-service';
@@ -33,6 +35,7 @@ import { generateLocalId } from '@/lib/offline-db';
 import { useBluetoothPrinter } from '@/hooks/use-bluetooth-printer';
 import { TicketData } from '@/lib/bluetooth-printer';
 import { PrinterConfigModal } from './printer-config-modal';
+import { TicketModal } from './ticket-modal';
 import { Switch } from '@/components/ui/switch';
 import { networkMonitor } from '@/lib/network-quality';
 
@@ -55,6 +58,9 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
   const [loading, setLoading] = useState(false);
   const [imprimirTicket, setImprimirTicket] = useState(true);
   const [showPrinterConfig, setShowPrinterConfig] = useState(false);
+  const [tipoImpresora, setTipoImpresora] = useState<'usb' | 'bluetooth'>('usb');
+  const [anchoPapel, setAnchoPapel] = useState<'80mm' | '58mm'>('80mm');
+  const [ticketParaModal, setTicketParaModal] = useState<TicketData | null>(null);
   const [calculatedValues, setCalculatedValues] = useState({
     saldoAnterior: 0,
     saldoNuevo: 0,
@@ -64,6 +70,23 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
 
   const userId = (session?.user as any)?.id;
   const { isConnected: isPrinterConnected, printTicket } = useBluetoothPrinter();
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTipo = localStorage.getItem('ticket_tipo_impresora');
+      if (savedTipo === 'usb' || savedTipo === 'bluetooth') {
+        setTipoImpresora(savedTipo);
+      } else if (isPrinterConnected) {
+        setTipoImpresora('bluetooth');
+      } else {
+        setTipoImpresora('usb');
+      }
+      const savedAncho = localStorage.getItem('ticket_ancho_papel');
+      if (savedAncho === '58mm' || savedAncho === '80mm') {
+        setAnchoPapel(savedAncho);
+      }
+    }
+  }, [isPrinterConnected]);
 
   // Reset form cuando se abre el modal
   useEffect(() => {
@@ -285,22 +308,33 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
         });
       }
 
-      // Imprimir ticket inmediatamente en la impresora Bluetooth
-      if (imprimirTicket && isPrinterConnected) {
-        try {
-          const fechaTicket = pagoRegular ? pagoRegular.fechaPago : (pagoMoratorio ? pagoMoratorio.fechaPago : new Date().toISOString());
-          const reciboTicket = (pagoRegular ? pagoRegular.numeroRecibo : (pagoMoratorio ? pagoMoratorio.numeroRecibo : '')) || '';
-          const ticketData = createTicketData(fechaTicket, reciboTicket);
-          await printTicket(ticketData);
-        } catch (error) {
-          console.error('Error imprimiendo ticket:', error);
-          toast.error('El cobro se guardó correctamente, pero hubo un error al imprimir el ticket');
-        }
-      }
+      // Gestionar impresión según selección (USB/PC o Bluetooth)
+      if (imprimirTicket) {
+        const fechaTicket = pagoRegular ? pagoRegular.fechaPago : (pagoMoratorio ? pagoMoratorio.fechaPago : new Date().toISOString());
+        const reciboTicket = (pagoRegular ? pagoRegular.numeroRecibo : (pagoMoratorio ? pagoMoratorio.numeroRecibo : '')) || '';
+        const ticketData = createTicketData(fechaTicket, reciboTicket);
 
-      // Notificar al padre y cerrar modal de inmediato
-      onSuccess();
-      onClose();
+        if (tipoImpresora === 'bluetooth' && isPrinterConnected) {
+          try {
+            await printTicket(ticketData);
+            onSuccess();
+            onClose();
+          } catch (error) {
+            console.error('Error imprimiendo ticket BT:', error);
+            toast.error('Error al imprimir por Bluetooth. Abriendo comprobante para imprimir...');
+            onSuccess();
+            setTicketParaModal(ticketData);
+          }
+        } else {
+          // Modo USB / PC o sin Bluetooth conectado: abrir comprobante para imprimir por USB
+          onSuccess();
+          setTicketParaModal(ticketData);
+        }
+      } else {
+        // Notificar al padre y cerrar modal de inmediato
+        onSuccess();
+        onClose();
+      }
 
       // En segundo plano (no bloqueante), si hay conexión, intentar sincronizar pendientes restantes
       setTimeout(async () => {
@@ -604,54 +638,100 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
           {/* Configuración de Impresión */}
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Printer className="w-4 h-4" />
-                Impresión de Ticket
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {/* Estado de la impresora */}
               <div className="flex items-center justify-between">
-                <span className="text-sm text-muted-foreground">
-                  Estado de Impresora
-                </span>
-                <div className="flex items-center gap-2">
-                  <Badge variant={isPrinterConnected ? 'default' : 'secondary'} className="text-xs">
-                    {isPrinterConnected ? 'Conectada' : 'Desconectada'}
-                  </Badge>
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Printer className="w-4 h-4" />
+                  Impresión de Comprobante
+                </CardTitle>
+                <div className="flex gap-1 bg-muted p-0.5 rounded-lg">
                   <Button
                     type="button"
-                    variant="ghost"
                     size="sm"
-                    onClick={() => setShowPrinterConfig(true)}
-                    className="h-6 w-6 p-0"
+                    variant={tipoImpresora === 'usb' ? 'default' : 'ghost'}
+                    className="h-6 px-2 text-[11px] flex items-center gap-1"
+                    onClick={() => {
+                      setTipoImpresora('usb');
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('ticket_tipo_impresora', 'usb');
+                      }
+                    }}
                   >
-                    <Settings className="w-3 h-3" />
+                    <Laptop className="w-3 h-3" />
+                    USB / PC
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={tipoImpresora === 'bluetooth' ? 'default' : 'ghost'}
+                    className="h-6 px-2 text-[11px] flex items-center gap-1"
+                    onClick={() => {
+                      setTipoImpresora('bluetooth');
+                      if (typeof window !== 'undefined') {
+                        localStorage.setItem('ticket_tipo_impresora', 'bluetooth');
+                      }
+                    }}
+                  >
+                    <Bluetooth className="w-3 h-3" />
+                    Bluetooth
                   </Button>
                 </div>
               </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {tipoImpresora === 'usb' ? (
+                <div className="flex items-center justify-between text-xs bg-slate-50 dark:bg-slate-900 p-2 rounded border">
+                  <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+                    <Laptop className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Impresora USB / Sistema ({anchoPapel})</span>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                    Lista
+                  </Badge>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">
+                    Estado Bluetooth
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isPrinterConnected ? 'default' : 'secondary'} className="text-xs">
+                      {isPrinterConnected ? 'Conectada' : 'Desconectada'}
+                    </Badge>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowPrinterConfig(true)}
+                      className="h-6 w-6 p-0"
+                    >
+                      <Settings className="w-3 h-3" />
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Switch para imprimir automáticamente */}
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <div className="text-sm font-medium">
-                    Imprimir ticket automáticamente
+                    Imprimir comprobante al registrar
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Se imprimirá después de registrar el pago
+                    {tipoImpresora === 'usb'
+                      ? 'Abre el comprobante listo para mandar a la impresora USB de tu PC'
+                      : 'Se enviará a la impresora Bluetooth al confirmar el cobro'}
                   </div>
                 </div>
                 <Switch
                   checked={imprimirTicket}
                   onCheckedChange={setImprimirTicket}
-                  disabled={!isPrinterConnected}
                 />
               </div>
 
-              {!isPrinterConnected && (
+              {tipoImpresora === 'bluetooth' && !isPrinterConnected && imprimirTicket && (
                 <div className="text-xs text-orange-600 bg-orange-50 p-2 rounded">
                   <AlertTriangle className="w-3 h-3 inline mr-1" />
-                  Conecta una impresora para habilitar la impresión automática
+                  No hay impresora Bluetooth conectada. Se abrirá el comprobante para imprimir por USB o PC.
                 </div>
               )}
             </CardContent>
@@ -696,10 +776,24 @@ export function CobroModal({ cliente, isOpen, onClose, onSuccess, isOnline }: Co
           )}
         </form>
 
-        {/* Modal de Configuración de Impresora */}
+        {/* Modal de Configuración de Impresora Bluetooth */}
         <PrinterConfigModal
           isOpen={showPrinterConfig}
           onClose={() => setShowPrinterConfig(false)}
+        />
+
+        {/* Modal de Comprobante / Ticket (USB y Bluetooth) */}
+        <TicketModal
+          isOpen={!!ticketParaModal}
+          onClose={() => {
+            setTicketParaModal(null);
+            onClose();
+          }}
+          ticketData={ticketParaModal}
+          isPrinterConnected={isPrinterConnected}
+          onPrintBluetooth={async () => {
+            if (ticketParaModal) await printTicket(ticketParaModal);
+          }}
         />
       </DialogContent>
     </Dialog>
