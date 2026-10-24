@@ -188,7 +188,7 @@ export default function KioscoVentasPage() {
       const [resCobradores, resSucursales, resProductos, resVendedores] = await Promise.all([
         fetch('/api/users/cobradores'),
         fetch('/api/inventario/sucursales'),
-        fetch('/api/inventario/productos'),
+        fetch(`/api/inventario/productos?t=${Date.now()}`, { cache: 'no-store' }),
         fetch('/api/users/vendedores')
       ]);
 
@@ -561,7 +561,7 @@ export default function KioscoVentasPage() {
 
       toast.success(`¡Traslado de ${cantidad} pza(s) registrado con éxito desde ${origen.nombre} hacia ${sucursalActual.nombre}!`);
       // Recargar catálogo de inventario
-      const prodRes = await fetch('/api/inventario/productos');
+      const prodRes = await fetch(`/api/inventario/productos?t=${Date.now()}`, { cache: 'no-store' });
       if (prodRes.ok) {
         const prodData = await prodRes.json();
         setProductosDB(prodData);

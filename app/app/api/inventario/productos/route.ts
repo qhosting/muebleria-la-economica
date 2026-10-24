@@ -545,3 +545,77 @@ export async function PUT(request: NextRequest) {
         );
     }
 }
+
+// DELETE - Eliminar producto del inventario
+export async function DELETE(request: NextRequest) {
+    try {
+        const session = await getServerSession(authOptions);
+        if (!session?.user) {
+            return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
+        }
+
+        const { searchParams } = new URL(request.url);
+        let id = searchParams.get('id');
+
+        if (!id) {
+            try {
+                const body = await request.json();
+                id = body.id;
+            } catch (e) {}
+        }
+
+        if (!id) {
+            return NextResponse.json({ error: 'ID de producto requerido' }, { status: 400 });
+        }
+
+        // 1. Desvincular de relaciones opcionales para evitar conflictos de llave foránea
+        try {
+            await prisma.cliente.updateMany({
+                where: { productoId: id },
+                data: { productoId: null }
+            });
+            await prisma.detalleVenta.updateMany({
+                where: { productoId: id },
+                data: { productoId: null }
+            });
+        } catch (relErr) {
+            console.warn('Aviso desvinculando relaciones de producto:', relErr);
+        }
+
+        // 2. Eliminar stocks y movimientos asociados
+        await prisma.stock.deleteMany({
+            where: { productoId: id }
+        });
+
+        try {
+            await prisma.movimientoInventario.deleteMany({
+                where: { productoId: id }
+            });
+        } catch (movErr) {
+            console.warn('Aviso eliminando movimientos de inventario:', movErr);
+        }
+
+        // 3. Eliminar el producto físicamente o marcarlo inactivo
+        try {
+            await prisma.producto.delete({
+                where: { id }
+            });
+        } catch (delErr) {
+            await prisma.producto.update({
+                where: { id },
+                data: { isActive: false }
+            });
+        }
+
+        return NextResponse.json({
+            success: true,
+            message: 'Producto eliminado exitosamente del inventario'
+        });
+    } catch (error: any) {
+        console.error('Error al eliminar producto:', error);
+        return NextResponse.json(
+            { error: error.message || 'Error al eliminar producto' },
+            { status: 500 }
+        );
+    }
+}

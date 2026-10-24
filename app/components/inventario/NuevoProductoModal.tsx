@@ -16,7 +16,7 @@ import { formatCurrency } from '@/lib/utils';
 interface NuevoProductoModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: () => void;
+    onSuccess: (nuevoProd?: any) => void;
     sucursales?: any[];
 }
 
@@ -131,8 +131,9 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess, sucursales = []
                 throw new Error(error.error || 'Error al crear producto');
             }
 
+            const nuevoProd = await res.json();
             toast.success('Producto creado y piezas ingresadas exitosamente al almacén');
-            onSuccess();
+            onSuccess(nuevoProd);
             onClose();
             setFormData({
                 codigo: '',

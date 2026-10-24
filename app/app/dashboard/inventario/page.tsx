@@ -71,18 +71,20 @@ export default function InventarioPage() {
     const [selectedProduct, setSelectedProduct] = useState<any>(null);
     const [isEditarSucursalOpen, setIsEditarSucursalOpen] = useState(false);
     const [sucursalAEditar, setSucursalAEditar] = useState<any>(null);
+    const [eliminandoProductoId, setEliminandoProductoId] = useState<string | null>(null);
 
     useEffect(() => {
         fetchData();
     }, []);
 
-    const fetchData = async () => {
+    const fetchData = async (silent: boolean = false) => {
         try {
-            setLoading(true);
+            if (!silent) setLoading(true);
+            const ts = Date.now();
             const [resProductos, resSucursales, resMovimientos] = await Promise.all([
-                fetch('/api/inventario/productos'),
-                fetch('/api/inventario/sucursales'),
-                fetch('/api/inventario/movimientos?limit=100')
+                fetch(`/api/inventario/productos?t=${ts}`, { cache: 'no-store' }),
+                fetch(`/api/inventario/sucursales?t=${ts}`, { cache: 'no-store' }),
+                fetch(`/api/inventario/movimientos?limit=100&t=${ts}`, { cache: 'no-store' })
             ]);
 
             if (resProductos.ok && resSucursales.ok) {
@@ -98,9 +100,39 @@ export default function InventarioPage() {
             }
         } catch (error) {
             console.error('Error cargando inventario:', error);
-            toast.error('Error al cargar datos de inventario');
+            if (!silent) toast.error('Error al cargar datos de inventario');
         } finally {
-            setLoading(false);
+            if (!silent) setLoading(false);
+        }
+    };
+
+    const handleEliminarProducto = async (prodOrId: any) => {
+        const prod = typeof prodOrId === 'string' ? productos.find(p => p.id === prodOrId) : prodOrId;
+        const id = typeof prodOrId === 'string' ? prodOrId : prodOrId?.id;
+        if (!id) return;
+
+        try {
+            setEliminandoProductoId(id);
+            // Optimistic update: removerlo de inmediato del estado en memoria
+            setProductos(prev => prev.filter(p => p.id !== id));
+
+            const res = await fetch(`/api/inventario/productos?id=${id}`, {
+                method: 'DELETE'
+            });
+
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Error al eliminar producto');
+            }
+
+            toast.success(data.message || `Producto eliminado: ${prod?.nombre || ''}`);
+            await fetchData(true);
+        } catch (err: any) {
+            console.error('Error al eliminar producto:', err);
+            toast.error(err.message || 'No se pudo eliminar el producto');
+            await fetchData(true);
+        } finally {
+            setEliminandoProductoId(null);
         }
     };
 
@@ -465,19 +497,39 @@ export default function InventarioPage() {
                                                             </div>
                                                         </td>
                                                         <td className="p-3 text-center">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                className="h-8 gap-1.5 text-xs text-blue-700 hover:text-blue-900 border-blue-200 hover:bg-blue-50 font-semibold"
-                                                                onClick={() => {
-                                                                    setProductoAEditar(producto);
-                                                                    setIsEditarOpen(true);
-                                                                }}
-                                                                title="Modificar precio y detalles"
-                                                            >
-                                                                <Pencil className="h-3.5 w-3.5 text-blue-600" />
-                                                                Editar
-                                                            </Button>
+                                                            <div className="flex items-center justify-center gap-1.5">
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-8 gap-1.5 text-xs text-blue-700 hover:text-blue-900 border-blue-200 hover:bg-blue-50 font-semibold"
+                                                                    onClick={() => {
+                                                                        setProductoAEditar(producto);
+                                                                        setIsEditarOpen(true);
+                                                                    }}
+                                                                    title="Modificar precio y detalles"
+                                                                >
+                                                                    <Pencil className="h-3.5 w-3.5 text-blue-600" />
+                                                                    Editar
+                                                                </Button>
+                                                                <Button
+                                                                    variant="outline"
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0 text-xs text-rose-600 hover:text-rose-800 border-rose-200 hover:bg-rose-50"
+                                                                    onClick={() => {
+                                                                        if (window.confirm(`¿Seguro que deseas eliminar "${producto.nombre}" (${producto.codigo}) del inventario?`)) {
+                                                                            handleEliminarProducto(producto);
+                                                                        }
+                                                                    }}
+                                                                    disabled={eliminandoProductoId === producto.id}
+                                                                    title="Eliminar producto del inventario"
+                                                                >
+                                                                    {eliminandoProductoId === producto.id ? (
+                                                                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                                    ) : (
+                                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                                    )}
+                                                                </Button>
+                                                            </div>
                                                         </td>
                                                     </tr>
                                                 ))}
@@ -771,20 +823,42 @@ export default function InventarioPage() {
                 <NuevoProductoModal
                     isOpen={isProductoOpen}
                     onClose={() => setIsProductoOpen(false)}
-                    onSuccess={fetchData}
+                    onSuccess={async (nuevoProd) => {
+                        if (nuevoProd && (nuevoProd.id || nuevoProd.codigo)) {
+                            // Reflejar inmediatamente en la vista
+                            setProductos(prev => {
+                                const existe = prev.some(p => p.id === nuevoProd.id || p.codigo === nuevoProd.codigo);
+                                if (existe) return prev.map(p => (p.id === nuevoProd.id || p.codigo === nuevoProd.codigo) ? { ...p, ...nuevoProd } : p);
+                                return [nuevoProd, ...prev];
+                            });
+                        }
+                        await fetchData(true);
+                    }}
                     sucursales={sucursales}
                 />
 
                 <NuevaSucursalModal
                     isOpen={isSucursalOpen}
                     onClose={() => setIsSucursalOpen(false)}
-                    onSuccess={fetchData}
+                    onSuccess={() => fetchData(true)}
                 />
 
                 <EditarProductoModal
                     isOpen={isEditarOpen}
                     onClose={() => setIsEditarOpen(false)}
-                    onSuccess={fetchData}
+                    onSuccess={async (prodActualizado) => {
+                        if (prodActualizado && prodActualizado.id) {
+                            // Reflejar inmediatamente en la vista
+                            setProductos(prev => prev.map(p => {
+                                if (p.id === prodActualizado.id) {
+                                    return { ...p, ...prodActualizado };
+                                }
+                                return p;
+                            }));
+                        }
+                        await fetchData(true);
+                    }}
+                    onEliminar={handleEliminarProducto}
                     producto={productoAEditar}
                     sucursales={sucursales}
                 />

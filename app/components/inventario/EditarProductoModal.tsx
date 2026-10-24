@@ -9,13 +9,14 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { DollarSign, Tag, CheckCircle2, ShieldCheck, Sparkles } from 'lucide-react';
+import { DollarSign, Tag, CheckCircle2, ShieldCheck, Sparkles, Trash2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 
 interface EditarProductoModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSuccess: () => void;
+    onSuccess: (prodActualizado?: any) => void;
+    onEliminar?: (productoId: string) => void;
     producto: any;
     sucursales: any[];
 }
@@ -24,6 +25,7 @@ export function EditarProductoModal({
     isOpen,
     onClose,
     onSuccess,
+    onEliminar,
     producto,
     sucursales = []
 }: EditarProductoModalProps) {
@@ -157,8 +159,9 @@ export function EditarProductoModal({
                 throw new Error(errorData.error || 'Error al actualizar producto');
             }
 
+            const dataRes = await res.json();
             toast.success(`Precios y datos actualizados para: ${formData.nombre}`);
-            onSuccess();
+            onSuccess(dataRes.producto || payload);
             onClose();
         } catch (error: any) {
             toast.error(error.message);
@@ -546,18 +549,40 @@ export function EditarProductoModal({
                         />
                     </div>
 
-                    <DialogFooter className="gap-2 pt-2">
-                        <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
-                            Cancelar
-                        </Button>
-                        <Button type="submit" disabled={loading} className="bg-blue-700 hover:bg-blue-800 text-white font-bold gap-2">
-                            {loading ? 'Guardando...' : (
-                                <>
-                                    <CheckCircle2 className="h-4 w-4" />
-                                    Guardar Cambios
-                                </>
-                            )}
-                        </Button>
+                    <DialogFooter className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-3 border-t">
+                        {onEliminar ? (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                    if (window.confirm(`¿Seguro que deseas eliminar "${formData.nombre}" (${formData.codigo}) del inventario?`)) {
+                                        onEliminar(formData.id);
+                                        onClose();
+                                    }
+                                }}
+                                disabled={loading}
+                                className="text-rose-600 hover:text-rose-700 hover:bg-rose-50 text-xs font-semibold gap-1.5 w-full sm:w-auto"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Eliminar Producto
+                            </Button>
+                        ) : (
+                            <div />
+                        )}
+                        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                            <Button type="button" variant="outline" size="sm" onClick={onClose} disabled={loading} className="text-xs">
+                                Cancelar
+                            </Button>
+                            <Button type="submit" size="sm" disabled={loading} className="bg-blue-700 hover:bg-blue-800 text-white font-bold gap-1.5 text-xs shadow-sm">
+                                {loading ? 'Guardando...' : (
+                                    <>
+                                        <CheckCircle2 className="h-4 w-4" />
+                                        Guardar Cambios
+                                    </>
+                                )}
+                            </Button>
+                        </div>
                     </DialogFooter>
                 </form>
             </DialogContent>
