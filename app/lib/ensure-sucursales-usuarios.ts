@@ -60,24 +60,39 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
   try {
     const sucursalesMap = new Map<string, any>();
 
-    // 1. Asegurar las sucursales oficiales
+    // 1. Asegurar las sucursales oficiales respetando dirección y teléfono personalizados
     for (const suc of SUCURSALES_SISTEMA) {
-      const s = await prisma.sucursal.upsert({
-        where: { nombre: suc.nombre },
-        update: {
-          direccion: suc.direccion,
-          telefono: suc.telefono,
-          esBodega: suc.esBodega,
-          isActive: true,
-        },
-        create: {
-          nombre: suc.nombre,
-          direccion: suc.direccion,
-          telefono: suc.telefono,
-          esBodega: suc.esBodega,
-          isActive: true,
-        },
+      const existente = await prisma.sucursal.findFirst({
+        where: {
+          OR: [
+            { nombre: { equals: suc.nombre, mode: 'insensitive' } },
+            { id: suc.id }
+          ]
+        }
       });
+
+      let s;
+      if (existente) {
+        // Preservar la dirección y teléfono asignados por los vendedores en la base de datos
+        s = await prisma.sucursal.update({
+          where: { id: existente.id },
+          data: {
+            isActive: true,
+            direccion: existente.direccion || suc.direccion,
+            telefono: existente.telefono || suc.telefono,
+          }
+        });
+      } else {
+        s = await prisma.sucursal.create({
+          data: {
+            nombre: suc.nombre,
+            direccion: suc.direccion,
+            telefono: suc.telefono,
+            esBodega: suc.esBodega,
+            isActive: true,
+          }
+        });
+      }
       sucursalesMap.set(suc.nombre.toUpperCase().trim(), s);
     }
 

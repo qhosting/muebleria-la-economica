@@ -2318,8 +2318,14 @@ export default function KioscoVentasPage() {
                                 size="sm"
                                 variant="outline"
                                 onClick={() => {
+                                  const sucMatch = sucursales.find(s => s.id === v.sucursalId || s.nombre?.toUpperCase() === (v.sucursal?.nombre || v.sucursalNombre)?.toUpperCase()) || v.sucursal || sucursalActual;
                                   setVentaParaImprimir({
                                     ...v,
+                                    sucursal: sucMatch,
+                                    sucursalId: v.sucursalId || sucMatch?.id,
+                                    sucursalNombre: sucMatch?.nombre || v.sucursalNombre || v.sucursal?.nombre,
+                                    sucursalTelefono: sucMatch?.telefono || v.sucursal?.telefono || '',
+                                    sucursalDireccion: sucMatch?.direccion || v.sucursal?.direccion || '',
                                     detalles: v.detalles || []
                                   });
                                 }}

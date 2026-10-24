@@ -1087,7 +1087,15 @@ export default function MobileKioscoPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => setRemisionParaImprimir(ventaCompletada)}
+                    onClick={() => {
+                      const sucMatch = sucursales.find(s => s.id === ventaCompletada?.sucursalId || s.nombre?.toUpperCase() === ventaCompletada?.sucursalNombre?.toUpperCase()) || sucursalActual;
+                      setRemisionParaImprimir({
+                        ...ventaCompletada,
+                        sucursal: sucMatch,
+                        sucursalTelefono: sucMatch?.telefono || '',
+                        sucursalDireccion: sucMatch?.direccion || '',
+                      });
+                    }}
                     className="col-span-2 bg-slate-900 border-blue-500/50 hover:bg-slate-800 text-blue-400 font-bold gap-1.5 text-xs h-10"
                   >
                     <FileText className="w-4 h-4" />
@@ -1575,28 +1583,34 @@ export default function MobileKioscoPage() {
                       <Button
                         size="sm"
                         variant="outline"
-                        onClick={() => setRemisionParaImprimir({
-                          folio: v.folio,
-                          fecha: v.fecha || new Date(),
-                          nombreCliente: v.nombreCliente,
-                          telefonoCliente: v.telefonoCliente,
-                          direccionCliente: v.direccionCliente || '',
-                          tipoVenta: v.tipoVenta,
-                          total: v.total,
-                          enganche: v.enganche || 0,
-                          saldoFinanciado: v.saldoFinanciado || 0,
-                          plazoSemanas: v.plazoSemanas || 26,
-                          montoCuota: v.montoCuota || 0,
-                          diaPago: v.diaPago || '1',
-                          sucursalId: v.sucursalId || sucursalSeleccionada,
-                          sucursalNombre: v.sucursalNombre || sucursalActual?.nombre,
-                          detalles: v.detalles?.map((d: any) => ({
-                            concepto: d.concepto,
-                            cantidad: d.cantidad,
-                            precioUnitario: d.precioUnitario,
-                            importe: d.subtotal || (d.cantidad * d.precioUnitario)
-                          })) || [{ concepto: 'Artículos varios', cantidad: 1, precioUnitario: v.total, importe: v.total }]
-                        })}
+                        onClick={() => {
+                          const sucMatch = sucursales.find(s => s.id === v.sucursalId || s.nombre?.toUpperCase() === (v.sucursalNombre || v.sucursal?.nombre)?.toUpperCase()) || v.sucursal || sucursalActual;
+                          setRemisionParaImprimir({
+                            folio: v.folio,
+                            fecha: v.fecha || new Date(),
+                            nombreCliente: v.nombreCliente,
+                            telefonoCliente: v.telefonoCliente,
+                            direccionCliente: v.direccionCliente || '',
+                            tipoVenta: v.tipoVenta,
+                            total: v.total,
+                            enganche: v.enganche || 0,
+                            saldoFinanciado: v.saldoFinanciado || 0,
+                            plazoSemanas: v.plazoSemanas || 26,
+                            montoCuota: v.montoCuota || 0,
+                            diaPago: v.diaPago || '1',
+                            sucursalId: v.sucursalId || sucMatch?.id || sucursalSeleccionada,
+                            sucursalNombre: sucMatch?.nombre || v.sucursalNombre || sucursalActual?.nombre,
+                            sucursalTelefono: sucMatch?.telefono || v.sucursal?.telefono || '',
+                            sucursalDireccion: sucMatch?.direccion || v.sucursal?.direccion || '',
+                            sucursal: sucMatch || v.sucursal,
+                            detalles: v.detalles?.map((d: any) => ({
+                              concepto: d.concepto,
+                              cantidad: d.cantidad,
+                              precioUnitario: d.precioUnitario,
+                              importe: d.subtotal || (d.cantidad * d.precioUnitario)
+                            })) || [{ concepto: 'Artículos varios', cantidad: 1, precioUnitario: v.total, importe: v.total }]
+                          });
+                        }}
                         className="bg-slate-950 border-slate-800 hover:bg-slate-800 text-blue-400 font-semibold text-xs h-8 px-2 gap-1"
                       >
                         <FileText className="w-3.5 h-3.5" />

@@ -390,7 +390,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                 <span className="text-[11px] text-gray-500 font-semibold">({venta.codigoCliente || 'CL-PENDIENTE'})</span>
               </div>
               <div className="text-[11px] font-medium text-gray-700">
-                Aculco, Méx., a <strong className="text-gray-900">{fechaLegal.dia}</strong> de <strong className="text-gray-900 uppercase">{fechaLegal.mes}</strong> de 20<strong className="text-gray-900">{fechaLegal.anio.slice(-2)}</strong>
+                {sucursalActiva.ciudad ? `${sucursalActiva.ciudad.split(',')[0]}, ${sucursalActiva.ciudad.split(',')[1] || 'Méx.'}` : 'Aculco, Méx.'}, a <strong className="text-gray-900">{fechaLegal.dia}</strong> de <strong className="text-gray-900 uppercase">{fechaLegal.mes}</strong> de 20<strong className="text-gray-900">{fechaLegal.anio.slice(-2)}</strong>
               </div>
             </div>
 
@@ -457,6 +457,12 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                   {formatCurrency(montoPagare, 2)} M.N.
                 </span>
               </div>
+            </div>
+
+            {/* DOMICILIO DE PAGO Y TELÉFONO OFICIAL DE LA SUCURSAL */}
+            <div className="flex flex-wrap justify-between items-center text-[10px] text-blue-950 bg-blue-100/70 border border-blue-200 rounded px-2.5 py-1 mb-1.5 font-medium shadow-2xs">
+              <span>Domicilio Legal de Pago: <strong className="text-gray-900">{sucursalActiva.direccion}{sucursalActiva.ciudad ? `, ${sucursalActiva.ciudad}` : ''}</strong></span>
+              <span>Tel. Sucursal: <strong className="text-blue-900">{sucursalActiva.telefono}</strong></span>
             </div>
 
             {/* MONTO EN LETRA DESTACADO Y FORMAL (PESOS M.N. / MXN) */}
