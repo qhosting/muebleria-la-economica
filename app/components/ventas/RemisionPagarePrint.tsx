@@ -109,6 +109,12 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
     ciudad: sucursalBD?.ciudad || (venta.sucursal as any)?.ciudad || sucursalFallback.ciudad || 'Aculco, Edo. de Méx.',
   };
 
+  const direccionCompleta = sucursalActiva.direccion
+    ? (sucursalActiva.ciudad && !sucursalActiva.direccion.toLowerCase().includes(sucursalActiva.ciudad.split(',')[0].toLowerCase().trim())
+        ? `${sucursalActiva.direccion}, ${sucursalActiva.ciudad}`
+        : sucursalActiva.direccion)
+    : (sucursalActiva.ciudad || 'Domicilio Conocido');
+
   const esHogarYEstilo = sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO');
   const nombreEmpresa = esHogarYEstilo ? 'HOGAR Y ESTILO' : 'MUEBLERÍA LA ECONÓMICA';
 
@@ -366,7 +372,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                 SUCURSAL {sucursalActiva.nombre} • Tel. {sucursalActiva.telefono}
               </p>
               <p className="text-[10px] text-gray-600 mt-0.5">
-                {sucursalActiva.direccion}, {sucursalActiva.ciudad}
+                {direccionCompleta}
               </p>
             </div>
 
@@ -461,7 +467,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
 
             {/* DOMICILIO DE PAGO Y TELÉFONO OFICIAL DE LA SUCURSAL */}
             <div className="flex flex-wrap justify-between items-center text-[10px] text-blue-950 bg-blue-100/70 border border-blue-200 rounded px-2.5 py-1 mb-1.5 font-medium shadow-2xs">
-              <span>Domicilio Legal de Pago: <strong className="text-gray-900">{sucursalActiva.direccion}{sucursalActiva.ciudad ? `, ${sucursalActiva.ciudad}` : ''}</strong></span>
+              <span>Domicilio Legal de Pago: <strong className="text-gray-900">{direccionCompleta}</strong></span>
               <span>Tel. Sucursal: <strong className="text-blue-900">{sucursalActiva.telefono}</strong></span>
             </div>
 
@@ -476,7 +482,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             </div>
 
             <p className="text-[10px] leading-relaxed text-gray-800 text-left my-1.5">
-              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DE <strong className="text-blue-950">{nombreEmpresa}</strong> (SUCURSAL {sucursalActiva.nombre}) EN SU DOMICILIO UBICADO EN <strong className="text-gray-950">{sucursalActiva.direccion}{sucursalActiva.ciudad ? `, ${sucursalActiva.ciudad}` : ''}</strong>{sucursalActiva.telefono ? ` (TEL. ${sucursalActiva.telefono})` : ''}, LA CANTIDAD DE{' '}
+              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DE <strong className="text-blue-950">{nombreEmpresa}</strong> (SUCURSAL {sucursalActiva.nombre}) EN SU DOMICILIO UBICADO EN <strong className="text-gray-950">{direccionCompleta}</strong>{sucursalActiva.telefono ? ` (TEL. ${sucursalActiva.telefono})` : ''}, LA CANTIDAD DE{' '}
               <strong className="text-gray-950">{formatCurrency(montoPagare, 2)} M.N. ({importeEnLetras})</strong> EL DÍA{' '}
               <strong className="text-blue-950">{venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}</strong>. VALOR RECIBIDO A MI ENTERA SATISFACCIÓN. EN CASO DE MORA O INCUMPLIMIENTO CAUSARÁ UN INTERÉS MORATORIO DEL <strong>{venta.interesMoratorioMensual || 10}%</strong> MENSUAL A PARTIR DEL SEGUNDO MES DE NO PAGO CONSECUTIVO.
             </p>
@@ -545,7 +551,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                 COMPROBANTE DE COMPRA Y CONTRATO DE CRÉDITO • SUCURSAL {sucursalActiva.nombre} • TEL. {sucursalActiva.telefono}
               </p>
               <p className="text-[9.5px] text-slate-600 mt-0.5">
-                {sucursalActiva.direccion}{sucursalActiva.ciudad ? `, ${sucursalActiva.ciudad}` : ''}
+                {direccionCompleta}
               </p>
             </div>
 
@@ -627,7 +633,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                   <strong>5. MORA Y VENCIMIENTO:</strong> Todo pago no cubierto en el plazo estipulado causará el interés moratorio del <strong>{venta.interesMoratorioMensual || 10}% mensual a partir del segundo mes consecutivo de no pago</strong>, pactado en el pagaré mercantil original.
                 </p>
                 <p>
-                  <strong>6. ATENCIÓN Y ACLARACIONES:</strong> Para aclaraciones, soporte o reportes comuníquese al teléfono <strong>{sucursalActiva.telefono}</strong> o visítenos en <strong>{sucursalActiva.direccion}{sucursalActiva.ciudad ? `, ${sucursalActiva.ciudad}` : ''}</strong>.
+                  <strong>6. ATENCIÓN Y ACLARACIONES:</strong> Para aclaraciones, soporte o reportes comuníquese al teléfono <strong>{sucursalActiva.telefono}</strong> o visítenos en <strong>{direccionCompleta}</strong>.
                 </p>
               </div>
             </div>
