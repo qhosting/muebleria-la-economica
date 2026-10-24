@@ -51,7 +51,7 @@ export async function GET(request: NextRequest) {
             }
           },
           sucursal: {
-            select: { id: true, nombre: true }
+            select: { id: true, nombre: true, direccion: true, telefono: true }
           }
         },
         orderBy: { folio: 'desc' },
@@ -264,7 +264,8 @@ export async function POST(request: NextRequest) {
       },
       include: {
         detalles: true,
-        cliente: true
+        cliente: true,
+        sucursal: true
       }
     });
 

@@ -902,7 +902,18 @@ export default function InventarioPage() {
                 <EditarSucursalModal
                     isOpen={isEditarSucursalOpen}
                     onClose={() => setIsEditarSucursalOpen(false)}
-                    onSuccess={fetchData}
+                    onSuccess={async (sucursalActualizada) => {
+                        if (sucursalActualizada && sucursalActualizada.id) {
+                            // Actualización inmediata del estado sin refrescar la página
+                            setSucursales(prev => prev.map(s => {
+                                if (s.id === sucursalActualizada.id) {
+                                    return { ...s, ...sucursalActualizada };
+                                }
+                                return s;
+                            }));
+                        }
+                        await fetchData(true);
+                    }}
                     sucursal={sucursalAEditar}
                 />
 

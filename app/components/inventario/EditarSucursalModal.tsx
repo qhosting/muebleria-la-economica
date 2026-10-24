@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 interface EditarSucursalModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess: (sucursalActualizada?: any) => void;
   sucursal: any;
 }
 
@@ -55,28 +55,30 @@ export function EditarSucursalModal({ isOpen, onClose, onSuccess, sucursal }: Ed
     setLoading(true);
 
     try {
+      const payloadEnvio = {
+        telefono: formData.telefono.trim(),
+        direccion: formData.direccion.trim(),
+        ...(esAdmin ? {
+          nombre: formData.nombre.trim().toUpperCase(),
+          esBodega: formData.esBodega
+        } : {
+          nombre: sucursal.nombre
+        })
+      };
+
       const response = await fetch(`/api/inventario/sucursales/${sucursal.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          telefono: formData.telefono.trim(),
-          direccion: formData.direccion.trim(),
-          ...(esAdmin ? {
-            nombre: formData.nombre.trim().toUpperCase(),
-            esBodega: formData.esBodega
-          } : {
-            nombre: sucursal.nombre
-          })
-        }),
+        body: JSON.stringify(payloadEnvio),
       });
 
       const data = await response.json();
 
       if (response.ok) {
         toast.success(data.message || 'Información de la sucursal actualizada exitosamente');
-        onSuccess();
+        onSuccess(data.sucursal || { ...sucursal, ...formData });
         onClose();
       } else {
         throw new Error(data.error || 'Error al actualizar sucursal');
@@ -151,19 +153,28 @@ export function EditarSucursalModal({ isOpen, onClose, onSuccess, sucursal }: Ed
             />
           </div>
 
-          {/* Dirección */}
-          <div className="space-y-1.5">
-            <Label htmlFor="edit-suc-direccion" className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
-              <MapPin className="h-3.5 w-3.5 text-indigo-600" />
-              Dirección de la Sucursal
-            </Label>
+          {/* Dirección de la Sucursal - Editable por cualquier vendedor */}
+          <div className="space-y-1.5 p-3 rounded-xl border border-indigo-200 bg-indigo-50/50 dark:bg-indigo-950/20">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="edit-suc-direccion" className="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-indigo-600" />
+                Dirección Oficial de Sucursal *
+              </Label>
+              <Badge variant="outline" className="text-[10px] bg-indigo-100 text-indigo-800 border-indigo-300 font-bold px-1.5 py-0">
+                Editable por Vendedor
+              </Badge>
+            </div>
+            <p className="text-[11px] text-indigo-800/80 leading-tight">
+              Esta dirección se imprimirá en los contratos, pagarés mercantiles y pólizas de garantía de los clientes.
+            </p>
             <Input
               id="edit-suc-direccion"
-              placeholder="Domicilio Conocido, Aculco, Edo. de México"
+              placeholder="Ej: Carretera Aculco-Amealco San Lucas 3er. Cuartel"
               value={formData.direccion}
               onChange={(e) => setFormData({ ...formData, direccion: e.target.value })}
               disabled={loading}
-              className="text-xs"
+              className="text-xs font-medium bg-white text-gray-900 border-indigo-300 focus-visible:ring-indigo-500"
+              required
             />
           </div>
 

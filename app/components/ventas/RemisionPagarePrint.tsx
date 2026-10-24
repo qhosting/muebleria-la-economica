@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Printer, Download, X, FileText, Loader2, Scissors, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
@@ -35,7 +35,15 @@ interface RemisionPagarePrintProps {
     codigoCliente?: string;
     sucursalId?: string | number;
     sucursalNombre?: string;
-    sucursal?: { nombre?: string };
+    sucursalDireccion?: string;
+    sucursalTelefono?: string;
+    sucursal?: {
+      id?: string;
+      nombre?: string;
+      direccion?: string;
+      telefono?: string;
+      ciudad?: string;
+    };
     detalles: ItemVenta[];
   };
   onClose?: () => void;
@@ -55,11 +63,51 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
 
   const importeEnLetras = numeroALetras(montoPagare);
 
-  // Resolver datos de la sucursal de emisión
-  const sucursalActiva = SUCURSALES_SISTEMA.find(s =>
+  // Fallback inicial con la lista estática del sistema
+  const sucursalFallback = SUCURSALES_SISTEMA.find(s =>
     s.id === venta.sucursalId ||
     s.nombre.toUpperCase() === (venta.sucursalNombre || venta.sucursal?.nombre || '').toUpperCase()
   ) || SUCURSALES_SISTEMA[0];
+
+  // Estado para la sucursal real de la base de datos (con teléfono y dirección editados)
+  const [sucursalBD, setSucursalBD] = useState<any>(venta.sucursal || null);
+
+  useEffect(() => {
+    // Si la venta ya incluye teléfono y dirección específicos, usarlos
+    if (venta.sucursal?.telefono && venta.sucursal?.direccion) {
+      setSucursalBD(venta.sucursal);
+      return;
+    }
+
+    let isMounted = true;
+    fetch('/api/inventario/sucursales')
+      .then(res => (res.ok ? res.json() : []))
+      .then(lista => {
+        if (!isMounted || !Array.isArray(lista)) return;
+        const encontrada = lista.find((s: any) =>
+          s.id === venta.sucursalId ||
+          s.id === (venta.sucursal as any)?.id ||
+          s.nombre?.toUpperCase() === (venta.sucursalNombre || venta.sucursal?.nombre || '').toUpperCase()
+        );
+        if (encontrada) {
+          setSucursalBD(encontrada);
+        }
+      })
+      .catch(err => console.warn('Advertencia cargando sucursal:', err));
+
+    return () => {
+      isMounted = false;
+    };
+  }, [venta.sucursalId, venta.sucursalNombre, venta.sucursal]);
+
+  // Consolidar datos de la sucursal emisora
+  const sucursalActiva = {
+    id: sucursalBD?.id || venta.sucursal?.id || sucursalFallback.id,
+    nombre: sucursalBD?.nombre || venta.sucursal?.nombre || venta.sucursalNombre || sucursalFallback.nombre,
+    telefono: sucursalBD?.telefono || venta.sucursal?.telefono || venta.sucursalTelefono || sucursalFallback.telefono,
+    direccion: sucursalBD?.direccion || venta.sucursal?.direccion || venta.sucursalDireccion || sucursalFallback.direccion,
+    ciudad: sucursalBD?.ciudad || (venta.sucursal as any)?.ciudad || sucursalFallback.ciudad || 'Aculco, Edo. de Méx.',
+  };
 
   const esHogarYEstilo = sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO');
   const nombreEmpresa = esHogarYEstilo ? 'HOGAR Y ESTILO' : 'MUEBLERÍA LA ECONÓMICA';
@@ -422,7 +470,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             </div>
 
             <p className="text-[10px] leading-relaxed text-gray-800 text-left my-1.5">
-              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DE <strong className="text-blue-950">{nombreEmpresa}</strong> EN SU DOMICILIO EN {sucursalActiva.nombre}, LA CANTIDAD DE{' '}
+              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DE <strong className="text-blue-950">{nombreEmpresa}</strong> (SUCURSAL {sucursalActiva.nombre}) EN SU DOMICILIO UBICADO EN <strong className="text-gray-950">{sucursalActiva.direccion}{sucursalActiva.ciudad ? `, ${sucursalActiva.ciudad}` : ''}</strong>{sucursalActiva.telefono ? ` (TEL. ${sucursalActiva.telefono})` : ''}, LA CANTIDAD DE{' '}
               <strong className="text-gray-950">{formatCurrency(montoPagare, 2)} M.N. ({importeEnLetras})</strong> EL DÍA{' '}
               <strong className="text-blue-950">{venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}</strong>. VALOR RECIBIDO A MI ENTERA SATISFACCIÓN. EN CASO DE MORA O INCUMPLIMIENTO CAUSARÁ UN INTERÉS MORATORIO DEL <strong>{venta.interesMoratorioMensual || 10}%</strong> MENSUAL A PARTIR DEL SEGUNDO MES DE NO PAGO CONSECUTIVO.
             </p>
@@ -488,7 +536,10 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                 </span>
               </div>
               <p className="text-[10px] font-bold text-slate-700 uppercase mt-0.5">
-                COMPROBANTE DE COMPRA Y CONTRATO DE CRÉDITO • SUCURSAL {sucursalActiva.nombre}
+                COMPROBANTE DE COMPRA Y CONTRATO DE CRÉDITO • SUCURSAL {sucursalActiva.nombre} • TEL. {sucursalActiva.telefono}
+              </p>
+              <p className="text-[9.5px] text-slate-600 mt-0.5">
+                {sucursalActiva.direccion}{sucursalActiva.ciudad ? `, ${sucursalActiva.ciudad}` : ''}
               </p>
             </div>
 
@@ -570,7 +621,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                   <strong>5. MORA Y VENCIMIENTO:</strong> Todo pago no cubierto en el plazo estipulado causará el interés moratorio del <strong>{venta.interesMoratorioMensual || 10}% mensual a partir del segundo mes consecutivo de no pago</strong>, pactado en el pagaré mercantil original.
                 </p>
                 <p>
-                  <strong>6. ATENCIÓN Y ACLARACIONES:</strong> Para aclaraciones, soporte o reportes comuníquese al teléfono <strong>{sucursalActiva.telefono}</strong> o visítenos en <strong>{sucursalActiva.direccion}</strong>.
+                  <strong>6. ATENCIÓN Y ACLARACIONES:</strong> Para aclaraciones, soporte o reportes comuníquese al teléfono <strong>{sucursalActiva.telefono}</strong> o visítenos en <strong>{sucursalActiva.direccion}{sucursalActiva.ciudad ? `, ${sucursalActiva.ciudad}` : ''}</strong>.
                 </p>
               </div>
             </div>

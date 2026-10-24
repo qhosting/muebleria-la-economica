@@ -913,6 +913,9 @@ export default function KioscoVentasPage() {
         codigoCliente: data.codigoCliente || 'CL-NUEVO',
         sucursalId: sucursalSeleccionada,
         sucursalNombre: sucursalActual?.nombre || 'SAN LUCAS 3ER CUARTEL',
+        sucursalTelefono: sucursalActual?.telefono || '',
+        sucursalDireccion: sucursalActual?.direccion || '',
+        sucursal: sucursalActual,
         vendedor: nombreVendedorFinal,
         total: totalBruto,
         enganche: tipoVenta === 'credito' ? planCredito.enganche : 0,
@@ -2723,11 +2726,14 @@ export default function KioscoVentasPage() {
           </Dialog>
         )}
 
-        {/* Modal para editar número de contacto de sucursal */}
+        {/* Modal para editar número de contacto y dirección de sucursal */}
         <EditarSucursalModal
           isOpen={isEditarSucursalOpen}
           onClose={() => setIsEditarSucursalOpen(false)}
-          onSuccess={async () => {
+          onSuccess={async (sucActualizada) => {
+            if (sucActualizada && sucActualizada.id) {
+              setSucursales(prev => prev.map(s => s.id === sucActualizada.id ? { ...s, ...sucActualizada } : s));
+            }
             // Recargar datos para refrescar teléfonos en todo el Kiosco
             try {
               const res = await fetch('/api/inventario/sucursales');
