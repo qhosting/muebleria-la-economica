@@ -61,6 +61,9 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
     s.nombre.toUpperCase() === (venta.sucursalNombre || venta.sucursal?.nombre || '').toUpperCase()
   ) || SUCURSALES_SISTEMA[0];
 
+  const esHogarYEstilo = sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO');
+  const nombreEmpresa = esHogarYEstilo ? 'HOGAR Y ESTILO' : 'MUEBLERÍA LA ECONÓMICA';
+
   // Impresión aislada: crea un iframe independiente para que NUNCA se imprima el dashboard ni el sidebar
   const handlePrint = () => {
     if (!printRef.current) {
@@ -93,7 +96,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
       <!DOCTYPE html>
       <html lang="es">
         <head>
-          <title>Remisión y Pagaré Nº ${folioFormateado} - Mueblería La Económica</title>
+          <title>Remisión y Pagaré Nº ${folioFormateado} - ${nombreEmpresa}</title>
           <meta charset="utf-8" />
           ${styles}
           <style>
@@ -305,16 +308,13 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             <div className="flex-1">
               <div className="flex items-center gap-2.5">
                 <h1 className="text-xl md:text-2xl font-black tracking-wide text-blue-900 uppercase font-serif">
-                  {sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO')
-                    ? 'HOGAR Y ESTILO'
-                    : 'MUEBLERÍA LA ECONÓMICA'}
+                  {nombreEmpresa}
                 </h1>
                 <span className="bg-blue-900 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
                   ORIGINAL TIENDA
                 </span>
               </div>
               <p className="text-xs font-bold text-blue-800 uppercase tracking-tight mt-0.5">
-                {sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO') ? 'MUEBLERÍA LA ECONÓMICA • ' : ''}
                 SUCURSAL {sucursalActiva.nombre} • Tel. {sucursalActiva.telefono}
               </p>
               <p className="text-[10px] text-gray-600 mt-0.5">
@@ -422,7 +422,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             </div>
 
             <p className="text-[10px] leading-relaxed text-gray-800 text-left my-1.5">
-              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DE <strong className="text-blue-950">MUEBLERÍA LA ECONÓMICA</strong> EN SU DOMICILIO EN {sucursalActiva.nombre}, LA CANTIDAD DE{' '}
+              DEBO(EMOS) Y PAGARE(MOS) INCONDICIONALMENTE POR ESTE PAGARÉ A LA ORDEN DE <strong className="text-blue-950">{nombreEmpresa}</strong> EN SU DOMICILIO EN {sucursalActiva.nombre}, LA CANTIDAD DE{' '}
               <strong className="text-gray-950">{formatCurrency(montoPagare, 2)} M.N. ({importeEnLetras})</strong> EL DÍA{' '}
               <strong className="text-blue-950">{venta.diaPago ? `DÍA ${venta.diaPago} DE CADA SEMANA/PERÍODO` : 'A SU VENCIMIENTO'}</strong>. VALOR RECIBIDO A MI ENTERA SATISFACCIÓN. EN CASO DE MORA O INCUMPLIMIENTO CAUSARÁ UN INTERÉS MORATORIO DEL <strong>{venta.interesMoratorioMensual || 10}%</strong> MENSUAL A PARTIR DEL SEGUNDO MES DE NO PAGO CONSECUTIVO.
             </p>
@@ -481,16 +481,13 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             <div className="flex-1">
               <div className="flex items-center gap-2.5">
                 <h2 className="text-lg md:text-xl font-black tracking-wide text-slate-900 uppercase font-serif">
-                  {sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO')
-                    ? 'HOGAR Y ESTILO'
-                    : 'MUEBLERÍA LA ECONÓMICA'}
+                  {nombreEmpresa}
                 </h2>
                 <span className="bg-emerald-700 text-white text-[10px] font-bold px-2 py-0.5 rounded uppercase tracking-wider">
                   COPIA CLIENTE
                 </span>
               </div>
               <p className="text-[10px] font-bold text-slate-700 uppercase mt-0.5">
-                {sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO') ? 'MUEBLERÍA LA ECONÓMICA • ' : ''}
                 COMPROBANTE DE COMPRA Y CONTRATO DE CRÉDITO • SUCURSAL {sucursalActiva.nombre}
               </p>
             </div>
@@ -584,7 +581,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
             <span className="font-semibold text-emerald-800">
               ✓ ¡Gracias por su preferencia! Conserve este comprobante como póliza de garantía.
             </span>
-            <span className="font-medium">Mueblería La Económica • Atención al Cliente</span>
+            <span className="font-medium">{nombreEmpresa} • Atención al Cliente</span>
           </div>
         </div>
       </div>
