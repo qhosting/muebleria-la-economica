@@ -468,15 +468,51 @@ export default function InventarioPage() {
                                                                 </div>
                                                                 <div className="flex items-center justify-between gap-2">
                                                                     <span className="text-gray-500 font-medium">12 Meses:</span>
-                                                                    <span className="font-bold text-emerald-800">
-                                                                        {formatCurrency(producto.precio12Meses || producto.precioVenta)}
-                                                                    </span>
+                                                                    {producto.precio12Meses && Number(producto.precio12Meses) > 0 ? (
+                                                                        <span className="font-bold text-emerald-800">
+                                                                            {formatCurrency(producto.precio12Meses)}
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-gray-400 font-medium italic text-[11px]">
+                                                                            No aplica
+                                                                        </span>
+                                                                    )}
                                                                 </div>
-                                                                <div className="text-[10px] text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded font-semibold mt-1 border border-amber-200/60 leading-tight">
-                                                                    Eng. 40%: {formatCurrency(Math.round(((producto.precio12Meses || producto.precioVenta) || 0) * 0.40))} (12M)
-                                                                    {producto.precio4Meses > 0 ? ` · ${formatCurrency(Math.round(producto.precio4Meses * 0.40))} (4M)` : ''}
-                                                                    {producto.precio1Mes > 0 ? ` · ${formatCurrency(Math.round(producto.precio1Mes * 0.40))} (1M)` : ''}
-                                                                </div>
+                                                                {(() => {
+                                                                    const tiene12M = producto.precio12Meses && Number(producto.precio12Meses) > 0;
+                                                                    const tiene4M = producto.precio4Meses && Number(producto.precio4Meses) > 0;
+                                                                    const tiene1M = producto.precio1Mes && Number(producto.precio1Mes) > 0;
+
+                                                                    if (tiene12M) {
+                                                                        return (
+                                                                            <div className="text-[10px] text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded font-semibold mt-1 border border-amber-200/60 leading-tight">
+                                                                                Eng. 40%: {formatCurrency(Math.round(Number(producto.precio12Meses) * 0.40))} (12M)
+                                                                                {tiene4M ? ` · ${formatCurrency(Math.round(Number(producto.precio4Meses) * 0.40))} (4M)` : ''}
+                                                                                {tiene1M ? ` · ${formatCurrency(Math.round(Number(producto.precio1Mes) * 0.40))} (1M)` : ''}
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    if (tiene4M) {
+                                                                        return (
+                                                                            <div className="text-[10px] text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded font-semibold mt-1 border border-amber-200/60 leading-tight">
+                                                                                Eng. 40%: {formatCurrency(Math.round(Number(producto.precio4Meses) * 0.40))} (4M)
+                                                                                {tiene1M ? ` · ${formatCurrency(Math.round(Number(producto.precio1Mes) * 0.40))} (1M)` : ''}
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    if (tiene1M) {
+                                                                        return (
+                                                                            <div className="text-[10px] text-amber-800 bg-amber-50/90 px-1.5 py-0.5 rounded font-semibold mt-1 border border-amber-200/60 leading-tight">
+                                                                                Eng. 40%: {formatCurrency(Math.round(Number(producto.precio1Mes) * 0.40))} (1M)
+                                                                            </div>
+                                                                        );
+                                                                    }
+                                                                    return (
+                                                                        <div className="text-[10px] text-slate-500 bg-slate-100/90 px-1.5 py-0.5 rounded font-medium mt-1 border border-slate-200/60 leading-tight text-center">
+                                                                            Solo Contado (Sin crédito)
+                                                                        </div>
+                                                                    );
+                                                                })()}
                                                             </div>
                                                         </td>
                                                         <td className="p-3 text-center font-bold text-lg">

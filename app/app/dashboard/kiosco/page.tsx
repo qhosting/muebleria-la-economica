@@ -2534,7 +2534,11 @@ export default function KioscoVentasPage() {
                     </div>
                     <div className="bg-emerald-50/70 p-2 rounded border border-emerald-200">
                       <div className="text-[10px] text-emerald-900 font-bold">12 Meses</div>
-                      <div className="text-sm font-black text-emerald-950">{formatCurrency(productoSeleccionadoExistencias.precio12Meses || productoSeleccionadoExistencias.precioVenta)}</div>
+                      <div className="text-sm font-black text-emerald-950">
+                        {productoSeleccionadoExistencias.precio12Meses && Number(productoSeleccionadoExistencias.precio12Meses) > 0
+                          ? formatCurrency(productoSeleccionadoExistencias.precio12Meses)
+                          : 'No aplica'}
+                      </div>
                     </div>
                   </div>
                 </div>

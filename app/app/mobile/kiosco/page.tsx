@@ -442,7 +442,16 @@ export default function MobileKioscoPage() {
 
   // Manejo de Carrito
   const agregarAlCarrito = (prod: CatalogoItem, modalidadEspecifica?: ModalidadPrecio) => {
-    const modUso = modalidadEspecifica || modalidadPrecio;
+    let modUso = modalidadEspecifica || modalidadPrecio;
+    const precios = obtenerPreciosProducto(prod);
+
+    if (modUso === '12meses' && (!precios.doceMeses || precios.doceMeses <= 0)) {
+      if (precios.cuatroMeses > 0) modUso = '4meses';
+      else if (precios.unMes > 0) modUso = '1mes';
+      else modUso = 'contado';
+      toast.info(`"${prod.nombre}" no cuenta con plan a 12 Meses; se agregó en modalidad ${modUso === '4meses' ? '4 Meses' : modUso === '1mes' ? '1 Mes' : 'Contado'}`);
+    }
+
     const precioUnitario = obtenerPrecioPorModalidad(prod, modUso);
 
     setCarrito(prev => {
@@ -972,26 +981,37 @@ export default function MobileKioscoPage() {
                         </button>
 
                         {/* 12 Meses */}
-                        <button
-                          type="button"
-                          onClick={() => agregarAlCarrito(prod, '12meses')}
-                          className={`text-left p-1.5 rounded transition-all border ${
-                            modalidadPrecio === '12meses'
-                              ? 'bg-emerald-950/80 border-emerald-500 text-white ring-1 ring-emerald-400'
-                              : 'bg-slate-900 border-slate-800 text-slate-300'
-                          }`}
-                        >
-                          <div className="text-[10px] text-emerald-400 font-bold flex justify-between items-center">
-                            <span>12 Meses</span>
-                            {modalidadPrecio === '12meses' && <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />}
+                        {(!precios.doceMeses || precios.doceMeses <= 0) ? (
+                          <div
+                            className="text-left p-1.5 rounded border border-dashed border-slate-800 bg-slate-900/40 select-none opacity-60"
+                            title="Este producto no tiene plan a 12 meses"
+                          >
+                            <div className="text-[10px] text-slate-500 font-semibold">12 Meses</div>
+                            <div className="font-bold text-xs text-slate-400 mt-0.5">No aplica</div>
+                            <div className="text-[9px] text-slate-600">Sin plan anual</div>
                           </div>
-                          <div className="font-bold text-xs font-mono mt-0.5">
-                            ${precios.doceMeses.toLocaleString()}
-                          </div>
-                          <div className="text-[9px] text-emerald-300/80">
-                            ${Math.ceil((precios.doceMeses * 0.60) / 52)}/sem
-                          </div>
-                        </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => agregarAlCarrito(prod, '12meses')}
+                            className={`text-left p-1.5 rounded transition-all border ${
+                              modalidadPrecio === '12meses'
+                                ? 'bg-emerald-950/80 border-emerald-500 text-white ring-1 ring-emerald-400'
+                                : 'bg-slate-900 border-slate-800 text-slate-300'
+                            }`}
+                          >
+                            <div className="text-[10px] text-emerald-400 font-bold flex justify-between items-center">
+                              <span>12 Meses</span>
+                              {modalidadPrecio === '12meses' && <CheckCircle className="w-2.5 h-2.5 text-emerald-400" />}
+                            </div>
+                            <div className="font-bold text-xs font-mono mt-0.5">
+                              ${precios.doceMeses.toLocaleString()}
+                            </div>
+                            <div className="text-[9px] text-emerald-300/80">
+                              ${Math.ceil((precios.doceMeses * 0.60) / 52)}/sem
+                            </div>
+                          </button>
+                        )}
                       </div>
 
                       {/* Botones de acción */}
