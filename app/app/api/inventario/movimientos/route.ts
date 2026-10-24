@@ -272,6 +272,16 @@ export async function DELETE(request: NextRequest) {
 
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        const limpiar = searchParams.get('limpiar');
+
+        // Opción para limpiar de la base de datos todo el histórico y traslados
+        if (limpiar === 'true' || id === 'todos') {
+            const eliminados = await prisma.movimientoInventario.deleteMany({});
+            return NextResponse.json({
+                success: true,
+                message: `Registro histórico y traslados eliminados exitosamente de la base de datos (${eliminados.count} movimientos limpiados).`
+            });
+        }
 
         if (!id) {
             return NextResponse.json({ error: 'ID de movimiento requerido' }, { status: 400 });

@@ -92,6 +92,8 @@ async function asegurarCatalogoInicial() {
     }
 }
 
+import { asegurarSucursalesYUsuarios } from '@/lib/ensure-sucursales-usuarios';
+
 // GET - Listar productos con stock consolidado
 export async function GET(request: NextRequest) {
     try {
@@ -107,8 +109,24 @@ export async function GET(request: NextRequest) {
         const activosParam = searchParams.get('activos') ?? searchParams.get('activo');
         const activos = activosParam !== 'false';
 
-        // Auto-asegurar si la base de datos está vacía
-        await asegurarCatalogoInicial();
+        // Auto-asegurar sucursales y limpiar histórico / stock secundario en BD
+        await asegurarSucursalesYUsuarios();
+
+        // Obtener la sucursal matriz San Lucas 3er Cuartel
+        const matrizSanLucas = await prisma.sucursal.findFirst({
+            where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
+        });
+
+        // Eliminar activamente cualquier stock que no sea de San Lucas 3er Cuartel
+        if (matrizSanLucas) {
+            try {
+                await prisma.stock.deleteMany({
+                    where: { sucursalId: { not: matrizSanLucas.id } }
+                });
+            } catch (delErr) {
+                console.warn('Aviso limpiando stock no matriz:', delErr);
+            }
+        }
 
         const where: any = {};
 
@@ -128,10 +146,12 @@ export async function GET(request: NextRequest) {
             where.isActive = true;
         }
 
+        // Consultar productos asegurando que los stocks vinculados sean ÚNICAMENTE de San Lucas 3er Cuartel
         const productos = await prisma.producto.findMany({
             where,
             include: {
                 stocks: {
+                    where: matrizSanLucas ? { sucursalId: matrizSanLucas.id } : undefined,
                     include: {
                         sucursal: {
                             select: { id: true, nombre: true, esBodega: true }
@@ -147,12 +167,15 @@ export async function GET(request: NextRequest) {
             const stocksList = producto.stocks || [];
             const stockTotal = stocksList.reduce((sum: number, s: any) => sum + (s.cantidad || 0), 0);
             
-            const stockPorSucursal = stocksList.map((s: any) => ({
-                sucursalId: s.sucursal?.id || s.sucursalId || '',
-                sucursalNombre: s.sucursal?.nombre || 'SAN LUCAS 3ER CUARTEL',
-                esBodega: s.sucursal?.esBodega || false,
-                cantidad: s.cantidad || 0
-            }));
+            // La distribución refleja exclusivamente San Lucas 3er Cuartel
+            const stockPorSucursal = stocksList
+                .filter((s: any) => !matrizSanLucas || s.sucursalId === matrizSanLucas.id)
+                .map((s: any) => ({
+                    sucursalId: s.sucursal?.id || s.sucursalId || matrizSanLucas?.id || '',
+                    sucursalNombre: s.sucursal?.nombre || 'SAN LUCAS 3ER CUARTEL',
+                    esBodega: s.sucursal?.esBodega || false,
+                    cantidad: s.cantidad || 0
+                }));
 
             const pCompra = producto.precioCompra ? Math.round(parseFloat(producto.precioCompra.toString())) : 0;
             const pVenta = producto.precioVenta ? Math.round(parseFloat(producto.precioVenta.toString())) : 0;

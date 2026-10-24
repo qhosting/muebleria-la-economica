@@ -150,7 +150,7 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
       });
     }
 
-    // 3. Limpiar existencias de productos en sucursales secundarias
+    // 3. Limpiar existencias de productos en sucursales secundarias y registros históricos
     // SOLO SAN LUCAS 3ER CUARTEL debe conservar inventario.
     if (matrizSanLucas) {
       // Eliminar stock de cualquier sucursal que NO sea San Lucas 3er Cuartel
@@ -163,34 +163,39 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
         console.log(`🧹 Limpieza completada: se eliminaron ${eliminados.count} registros de stock de sucursales secundarias.`);
       }
 
-      // Asegurar que San Lucas 3er Cuartel tenga existencias iniciales si está vacío
-      const stockSanLucasCount = await prisma.stock.count({
-        where: { sucursalId: matrizSanLucas.id }
+      // Limpiar de la base de datos el registro histórico y traslados
+      try {
+        const movsEliminados = await prisma.movimientoInventario.deleteMany({});
+        if (movsEliminados.count > 0) {
+          console.log(`🧹 Histórico y traslados limpiados: ${movsEliminados.count} movimientos eliminados.`);
+        }
+      } catch (movErr) {
+        console.warn('Aviso limpiando movimientos historicos:', movErr);
+      }
+
+      // Asegurar que TODOS los productos existentes en base de datos tengan existencias en San Lucas
+      const todosLosProductos = await prisma.producto.findMany({
+        select: { id: true, codigo: true }
       });
 
-      if (stockSanLucasCount === 0) {
-        for (const item of CATALOGO_PRODUCTOS_INICIAL) {
-          const prod = await prisma.producto.findUnique({
-            where: { codigo: item.codigo }
-          });
+      for (const prod of todosLosProductos) {
+        const catalogoItem = CATALOGO_PRODUCTOS_INICIAL.find(c => c.codigo === prod.codigo);
+        const cantDefault = catalogoItem?.stockSugerido || 5;
 
-          if (prod) {
-            await prisma.stock.upsert({
-              where: {
-                productoId_sucursalId: {
-                  productoId: prod.id,
-                  sucursalId: matrizSanLucas.id
-                }
-              },
-              update: {},
-              create: {
-                productoId: prod.id,
-                sucursalId: matrizSanLucas.id,
-                cantidad: item.stockSugerido || 5
-              }
-            });
+        await prisma.stock.upsert({
+          where: {
+            productoId_sucursalId: {
+              productoId: prod.id,
+              sucursalId: matrizSanLucas.id
+            }
+          },
+          update: {},
+          create: {
+            productoId: prod.id,
+            sucursalId: matrizSanLucas.id,
+            cantidad: cantDefault
           }
-        }
+        });
       }
     }
 

@@ -34,7 +34,8 @@ import {
     Calendar,
     CheckCircle2,
     Filter,
-    X
+    X,
+    Trash2
 } from 'lucide-react';
 import { formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -61,6 +62,7 @@ export default function InventarioPage() {
     const [filtroSucursalMov, setFiltroSucursalMov] = useState('todas');
     const [movimientoADeshacer, setMovimientoADeshacer] = useState<any | null>(null);
     const [deshaciendoMovimiento, setDeshaciendoMovimiento] = useState(false);
+    const [limpiandoHistorico, setLimpiandoHistorico] = useState(false);
     const [isMovimientoOpen, setIsMovimientoOpen] = useState(false);
     const [isProductoOpen, setIsProductoOpen] = useState(false);
     const [isSucursalOpen, setIsSucursalOpen] = useState(false);
@@ -121,6 +123,30 @@ export default function InventarioPage() {
             toast.error(error.message || 'Error al deshacer el movimiento');
         } finally {
             setDeshaciendoMovimiento(false);
+        }
+    };
+
+    const handleLimpiarTodoElHistorico = async () => {
+        if (!window.confirm('¿Confirmas que deseas limpiar de la base de datos todo el registro histórico y traslados? Esta acción vaciará completamente el historial.')) {
+            return;
+        }
+
+        try {
+            setLimpiandoHistorico(true);
+            const res = await fetch('/api/inventario/movimientos?limpiar=true', {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                throw new Error(data.error || 'Error al limpiar histórico');
+            }
+            toast.success(data.message || 'Registro histórico y traslados eliminados exitosamente');
+            await fetchData();
+        } catch (error: any) {
+            console.error('Error al limpiar histórico:', error);
+            toast.error(error.message || 'Error al limpiar histórico');
+        } finally {
+            setLimpiandoHistorico(false);
         }
     };
 
@@ -517,6 +543,19 @@ export default function InventarioPage() {
                                                 className="pl-8 h-8 text-xs bg-white"
                                             />
                                         </div>
+
+                                        {/* Botón para limpiar de la base de datos histórico y traslados */}
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={handleLimpiarTodoElHistorico}
+                                            disabled={limpiandoHistorico || movimientos.length === 0}
+                                            className="h-8 text-xs text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-1.5"
+                                            title="Limpiar de la base de datos todo el registro histórico y traslados"
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                            {limpiandoHistorico ? 'Limpiando...' : 'Limpiar Histórico'}
+                                        </Button>
                                     </div>
                                 </div>
                             </CardHeader>

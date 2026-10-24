@@ -1,5 +1,5 @@
 # Multi-stage build para optimizar el tamaño de la imagen
-FROM node:18-alpine3.19 AS base
+FROM node:20-alpine3.20 AS base
 
 # Instalar dependencias necesarias para Prisma y Alpine
 RUN apk update && apk add --no-cache libc6-compat openssl bash
@@ -13,10 +13,15 @@ WORKDIR /app
 # Copiar archivos de dependencias
 COPY app/package.json app/package-lock.json ./
 
-# Instalar dependencias con npm (más compatible que yarn berry)
+# Instalar dependencias con npm con reintentos y timeouts extendidos para evitar fallos de red (ECONNRESET)
 RUN set -ex && \
+    echo "⚙️ Configurando timeouts y reintentos para npm..." && \
+    npm config set fetch-retries 5 && \
+    npm config set fetch-retry-mintimeout 20000 && \
+    npm config set fetch-retry-maxtimeout 120000 && \
+    npm config set fetch-timeout 300000 && \
     echo "📦 Installing dependencies with npm..." && \
-    npm ci --legacy-peer-deps 2>&1 | tee /tmp/npm-install.log && \
+    (npm ci --legacy-peer-deps || npm ci --legacy-peer-deps || npm install --legacy-peer-deps) 2>&1 | tee /tmp/npm-install.log && \
     echo "📦 Verifying installation..." && \
     if [ ! -d "node_modules" ]; then \
         echo "❌ ERROR: node_modules not created!" && \
