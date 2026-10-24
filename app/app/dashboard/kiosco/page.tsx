@@ -242,9 +242,15 @@ export default function KioscoVentasPage() {
       if (vendSuc) {
         setVendedorSeleccionadoId(vendSuc.id);
         setVendedorNombre(vendSuc.name);
+        // El mismo usuario de ventas de la sucursal cobra por default
+        setCobradorAsignadoId(vendSuc.id);
       } else {
         setVendedorSeleccionadoId('tienda');
         setVendedorNombre('VENTA MOSTRADOR');
+        const cobSuc = cobradores.find(c => c.sucursalId === id);
+        if (cobSuc) {
+          setCobradorAsignadoId(cobSuc.id);
+        }
       }
     }
   };
@@ -310,12 +316,14 @@ export default function KioscoVentasPage() {
     }
 
     // 2. Si no hay registro explícito en BD para esta sucursal:
+    // Únicamente la matriz SAN LUCAS 3ER CUARTEL conserva productos/stock por defecto.
+    // Todas las demás sucursales permanecen en 0 hasta que reciban un traspaso oficial.
     const esSanLucas = sucNom.toUpperCase().includes('SAN LUCAS');
     if (esSanLucas) {
       return item.stockSugerido || item.stockTotal || 5;
     }
 
-    return item.stockSugerido ? Math.min(3, item.stockSugerido) : 2;
+    return 0;
   };
 
   // Cambiar modalidad de precios global para la remisión
@@ -1808,8 +1816,12 @@ export default function KioscoVentasPage() {
                         if (val !== 'otro' && val !== 'tienda') {
                           const v = vendedores.find(x => x.id === val);
                           setVendedorNombre(v?.name || val);
+                          // El mismo usuario de sucursal es vendedor y cobrador
+                          setCobradorAsignadoId(val);
                         } else if (val === 'tienda') {
                           setVendedorNombre('VENTA MOSTRADOR');
+                          const cobSuc = cobradores.find(c => c.sucursalId === sucursalSeleccionada);
+                          if (cobSuc) setCobradorAsignadoId(cobSuc.id);
                         }
                       }}
                     >
@@ -2087,7 +2099,7 @@ export default function KioscoVentasPage() {
                               <SelectItem value="sin-asignar">Sin asignar por el momento</SelectItem>
                               {cobradores.map(cob => (
                                 <SelectItem key={cob.id} value={cob.id}>
-                                  {cob.name} {cob.codigoGestor ? `(${cob.codigoGestor})` : ''}
+                                  {cob.name} {cob.role === 'vendedor' ? '(Vendedor/Cobrador)' : cob.codigoGestor ? `(${cob.codigoGestor})` : ''}
                                 </SelectItem>
                               ))}
                             </SelectContent>

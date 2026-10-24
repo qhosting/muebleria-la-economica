@@ -5,6 +5,8 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/db';
 
+import { asegurarSucursalesYUsuarios } from '@/lib/ensure-sucursales-usuarios';
+
 // GET - Listar todos los cobradores / gestores de campo para asignación de cobranza
 export async function GET(request: NextRequest) {
   try {
@@ -14,9 +16,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
+    try {
+      await asegurarSucursalesYUsuarios();
+    } catch (e) {
+      console.warn('Aviso asegurando cobradores:', e);
+    }
+
     const cobradores = await prisma.user.findMany({
       where: {
-        role: { in: ['cobrador', 'gestor_cobranza'] },
+        role: { in: ['cobrador', 'gestor_cobranza', 'vendedor'] },
         isActive: true,
       },
       select: {
@@ -26,6 +34,12 @@ export async function GET(request: NextRequest) {
         role: true,
         codigoGestor: true,
         sucursalId: true,
+        sucursal: {
+          select: {
+            id: true,
+            nombre: true,
+          },
+        },
       },
       orderBy: { name: 'asc' },
     });

@@ -46,8 +46,9 @@ let lastSyncTimestamp = 0;
 const SYNC_INTERVAL_MS = 60 * 1000; // Máximo una vez por minuto durante peticiones web normales
 
 /**
- * Asegura la existencia de las 5 sucursales oficiales, 1 usuario vendedor para cada sucursal
- * y que cada sucursal cuente con existencias en su inventario para operar en el Kiosco.
+ * Asegura la existencia de las sucursales oficiales, un único usuario integral por sucursal
+ * (que atiende tanto ventas como cobranza para no duplicar cuentas),
+ * y que ÚNICAMENTE la sucursal matriz SAN LUCAS 3ER CUARTEL conserve existencias iniciales de productos.
  */
 export async function asegurarSucursalesYUsuarios(force: boolean = false) {
   const now = Date.now();
@@ -59,7 +60,7 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
   try {
     const sucursalesMap = new Map<string, any>();
 
-    // 1. Asegurar las 4 sucursales oficiales
+    // 1. Asegurar las sucursales oficiales
     for (const suc of SUCURSALES_SISTEMA) {
       const s = await prisma.sucursal.upsert({
         where: { nombre: suc.nombre },
@@ -80,9 +81,24 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
       sucursalesMap.set(suc.nombre.toUpperCase().trim(), s);
     }
 
-    // 2. Asegurar 1 usuario vendedor por cada sucursal
+    // 2. Asegurar 1 usuario único por sucursal (atiende ventas y cobranza)
     const defaultPasswordHash = await bcrypt.hash('vendedor123', 12);
     const usuariosResultado = [];
+
+    // Limpiar usuarios duplicados temporales si existieran
+    await prisma.user.deleteMany({
+      where: {
+        email: {
+          in: [
+            'cobrador.sanlucas@economica.local',
+            'cobrador.amealco@economica.local',
+            'cobrador.laestancia@economica.local',
+            'cobrador.sanildefonso@economica.local',
+            'cobrador.hogaryestilo@economica.local',
+          ]
+        }
+      }
+    });
 
     for (const v of VENDEDORES_SUCURSAL_SISTEMA) {
       const suc = sucursalesMap.get(v.sucursalNombre.toUpperCase().trim());
@@ -118,41 +134,63 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
       usuariosResultado.push(user);
     }
 
-    // 3. Asegurar catálogo de productos y stock por sucursal
-    // Si alguna sucursal tiene 0 registros de stock, inicializamos sus existencias
-    for (const [sucNombre, suc] of sucursalesMap.entries()) {
-      try {
-        const stockCount = await prisma.stock.count({
-          where: { sucursalId: suc.id }
-        });
+    // Si existe cobrador general de ruta sin sucursal asignada, vincularlo a San Lucas
+    const matrizSanLucas = Array.from(sucursalesMap.values()).find(
+      s => s.nombre.toUpperCase().includes('SAN LUCAS')
+    );
+    if (matrizSanLucas) {
+      await prisma.user.updateMany({
+        where: {
+          role: 'cobrador',
+          sucursalId: null,
+        },
+        data: {
+          sucursalId: matrizSanLucas.id
+        }
+      });
+    }
 
-        if (stockCount === 0) {
-          const esMatrizSanLucas = sucNombre.includes('SAN LUCAS');
-          for (const item of CATALOGO_PRODUCTOS_INICIAL) {
-            const prod = await prisma.producto.findUnique({
-              where: { codigo: item.codigo }
-            });
+    // 3. Limpiar existencias de productos en sucursales secundarias
+    // SOLO SAN LUCAS 3ER CUARTEL debe conservar inventario.
+    if (matrizSanLucas) {
+      // Eliminar stock de cualquier sucursal que NO sea San Lucas 3er Cuartel
+      const eliminados = await prisma.stock.deleteMany({
+        where: {
+          sucursalId: { not: matrizSanLucas.id }
+        }
+      });
+      if (eliminados.count > 0) {
+        console.log(`🧹 Limpieza completada: se eliminaron ${eliminados.count} registros de stock de sucursales secundarias.`);
+      }
 
-            if (prod) {
-              await prisma.stock.upsert({
-                where: {
-                  productoId_sucursalId: {
-                    productoId: prod.id,
-                    sucursalId: suc.id
-                  }
-                },
-                update: {},
-                create: {
+      // Asegurar que San Lucas 3er Cuartel tenga existencias iniciales si está vacío
+      const stockSanLucasCount = await prisma.stock.count({
+        where: { sucursalId: matrizSanLucas.id }
+      });
+
+      if (stockSanLucasCount === 0) {
+        for (const item of CATALOGO_PRODUCTOS_INICIAL) {
+          const prod = await prisma.producto.findUnique({
+            where: { codigo: item.codigo }
+          });
+
+          if (prod) {
+            await prisma.stock.upsert({
+              where: {
+                productoId_sucursalId: {
                   productoId: prod.id,
-                  sucursalId: suc.id,
-                  cantidad: esMatrizSanLucas ? (item.stockSugerido || 5) : 3
+                  sucursalId: matrizSanLucas.id
                 }
-              });
-            }
+              },
+              update: {},
+              create: {
+                productoId: prod.id,
+                sucursalId: matrizSanLucas.id,
+                cantidad: item.stockSugerido || 5
+              }
+            });
           }
         }
-      } catch (stockErr) {
-        console.warn(`Aviso asegurando stock para sucursal ${sucNombre}:`, stockErr);
       }
     }
 
