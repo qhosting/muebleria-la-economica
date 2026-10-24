@@ -44,7 +44,9 @@ import {
   ArrowRight,
   Loader2,
   Filter,
-  ArrowUpDown
+  ArrowUpDown,
+  Pencil,
+  Phone
 } from 'lucide-react';
 import { formatCurrency, getDayName, cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -65,6 +67,7 @@ import {
 import { RemisionPagarePrint } from '@/components/ventas/RemisionPagarePrint';
 import { SignaturePadModal } from '@/components/ventas/SignaturePadModal';
 import { DigitalizadorModal } from '@/components/boveda/digitalizador-modal';
+import { EditarSucursalModal } from '@/components/inventario/EditarSucursalModal';
 import { CartItem, Cliente, User as UserType } from '@/lib/types';
 
 export default function KioscoVentasPage() {
@@ -73,6 +76,9 @@ export default function KioscoVentasPage() {
   const userSucursalId = (session?.user as any)?.sucursalId || (session?.user as any)?.sucursal?.id;
   const userSucursalNombre = (session?.user as any)?.sucursal?.nombre;
   const esAdmin = userRole === 'admin';
+
+  const [isEditarSucursalOpen, setIsEditarSucursalOpen] = useState(false);
+  const [sucursalAEditar, setSucursalAEditar] = useState<any>(null);
 
   // Estados de catálogo y productos
   const [categoriaSeleccionada, setCategoriaSeleccionada] = useState<string>('Todos');
@@ -969,6 +975,23 @@ export default function KioscoVentasPage() {
                   <Lock className="h-2.5 w-2.5" />
                   Asignada
                 </Badge>
+                {sucursalActual && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSucursalAEditar(sucursalActual);
+                      setIsEditarSucursalOpen(true);
+                    }}
+                    className="h-6 px-2 text-[10px] text-emerald-200 hover:text-white hover:bg-emerald-600/40 font-bold flex items-center gap-1 border border-emerald-400/30 rounded-lg ml-1 transition-all"
+                    title="Editar número de contacto de la sucursal"
+                  >
+                    <Phone className="h-3 w-3 text-emerald-300" />
+                    <span>{sucursalActual.telefono || 'Editar Tel'}</span>
+                    <Pencil className="h-2.5 w-2.5 opacity-70" />
+                  </Button>
+                )}
               </div>
             ) : (
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur px-3 py-1.5 rounded-xl border border-white/20">
@@ -986,6 +1009,23 @@ export default function KioscoVentasPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {sucursalActual && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSucursalAEditar(sucursalActual);
+                      setIsEditarSucursalOpen(true);
+                    }}
+                    className="h-7 px-2 text-[11px] text-blue-100 hover:text-white hover:bg-white/10 font-bold flex items-center gap-1 border border-white/20 rounded-lg"
+                    title="Editar número de contacto de la sucursal"
+                  >
+                    <Phone className="h-3 w-3 text-emerald-300" />
+                    <span>{sucursalActual.telefono || 'Editar Tel'}</span>
+                    <Pencil className="h-2.5 w-2.5 opacity-70" />
+                  </Button>
+                )}
                 {esAdmin && (
                   <span className="text-[10px] text-blue-200 font-bold hidden sm:inline bg-blue-950/50 px-2 py-0.5 rounded">
                     Admin
@@ -2678,6 +2718,25 @@ export default function KioscoVentasPage() {
             </DialogContent>
           </Dialog>
         )}
+
+        {/* Modal para editar número de contacto de sucursal */}
+        <EditarSucursalModal
+          isOpen={isEditarSucursalOpen}
+          onClose={() => setIsEditarSucursalOpen(false)}
+          onSuccess={async () => {
+            // Recargar datos para refrescar teléfonos en todo el Kiosco
+            try {
+              const res = await fetch('/api/inventario/sucursales');
+              if (res.ok) {
+                const data = await res.json();
+                setSucursales(data || []);
+              }
+            } catch (err) {
+              console.error('Error recargando sucursales:', err);
+            }
+          }}
+          sucursal={sucursalAEditar}
+        />
       </div>
     </DashboardLayout>
   );

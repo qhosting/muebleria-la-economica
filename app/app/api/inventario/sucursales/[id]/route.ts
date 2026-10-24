@@ -37,7 +37,7 @@ export async function GET(
   }
 }
 
-// PUT / PATCH - Modificar datos de una sucursal/bodega (Solo Administradores)
+// PUT / PATCH - Modificar datos de una sucursal/bodega (Permite a cualquier vendedor editar número de contacto)
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -48,10 +48,13 @@ export async function PUT(
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 });
     }
 
-    const userRole = (session.user as any)?.role;
-    if (userRole !== 'admin') {
+    const userRole = (session.user as any)?.role?.toLowerCase();
+    const isAdmin = userRole === 'admin';
+    const isVendedor = ['vendedor', 'cobrador', 'gestor_cobranza'].includes(userRole);
+
+    if (!isAdmin && !isVendedor) {
       return NextResponse.json(
-        { error: 'Solo administradores pueden modificar información de sucursales y bodegas' },
+        { error: 'No tienes permisos para modificar información de sucursales' },
         { status: 403 }
       );
     }
@@ -68,8 +71,8 @@ export async function PUT(
       return NextResponse.json({ error: 'Sucursal no encontrada' }, { status: 404 });
     }
 
-    // Si se cambia el nombre, verificar que no choque con otra sucursal
-    if (nombre && nombre.trim().toUpperCase() !== sucursalExistente.nombre.toUpperCase()) {
+    // Solo admin puede modificar el nombre oficial de la sucursal
+    if (isAdmin && nombre && nombre.trim().toUpperCase() !== sucursalExistente.nombre.toUpperCase()) {
       const duplicada = await prisma.sucursal.findFirst({
         where: {
           nombre: { equals: nombre.trim(), mode: 'insensitive' },
@@ -84,21 +87,29 @@ export async function PUT(
       }
     }
 
+    // Datos a actualizar: cualquier vendedor puede modificar número de contacto (teléfono) y dirección
+    const updateData: any = {};
+    if (telefono !== undefined) {
+      updateData.telefono = telefono ? telefono.trim() : null;
+    }
+    if (direccion !== undefined) {
+      updateData.direccion = direccion ? direccion.trim() : null;
+    }
+    if (isAdmin) {
+      if (nombre) updateData.nombre = nombre.trim().toUpperCase();
+      if (typeof esBodega === 'boolean') updateData.esBodega = esBodega;
+      if (typeof isActive === 'boolean') updateData.isActive = isActive;
+    }
+
     const sucursalActualizada = await prisma.sucursal.update({
       where: { id },
-      data: {
-        nombre: nombre ? nombre.trim().toUpperCase() : undefined,
-        direccion: direccion !== undefined ? (direccion ? direccion.trim() : null) : undefined,
-        telefono: telefono !== undefined ? (telefono ? telefono.trim() : null) : undefined,
-        esBodega: typeof esBodega === 'boolean' ? esBodega : undefined,
-        isActive: typeof isActive === 'boolean' ? isActive : undefined
-      }
+      data: updateData
     });
 
     return NextResponse.json({
       success: true,
       sucursal: sucursalActualizada,
-      message: 'Sucursal actualizada exitosamente'
+      message: 'Información de contacto de la sucursal actualizada exitosamente'
     });
   } catch (error: any) {
     console.error('Error al actualizar sucursal:', error);
