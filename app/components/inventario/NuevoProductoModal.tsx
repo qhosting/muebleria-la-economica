@@ -127,13 +127,25 @@ export function NuevoProductoModal({ isOpen, onClose, onSuccess, sucursales = []
             });
 
             if (!res.ok) {
-                const error = await res.json();
-                throw new Error(error.error || 'Error al crear producto');
+                let errorMsg = 'Error al crear producto';
+                try {
+                    const error = await res.json();
+                    errorMsg = error.error || errorMsg;
+                } catch {
+                    errorMsg = res.statusText || errorMsg;
+                }
+                throw new Error(errorMsg);
             }
 
             const nuevoProd = await res.json();
             toast.success('Producto creado y piezas ingresadas exitosamente al almacén');
-            onSuccess(nuevoProd);
+            if (typeof onSuccess === 'function') {
+                try {
+                    onSuccess(nuevoProd);
+                } catch (errCallback) {
+                    console.error('Error al actualizar catálogo en vista:', errCallback);
+                }
+            }
             onClose();
             setFormData({
                 codigo: '',

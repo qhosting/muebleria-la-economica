@@ -387,7 +387,38 @@ export async function POST(request: NextRequest) {
             }
         }
 
-        return NextResponse.json(producto, { status: 201 });
+        // Consultar producto completo con stocks y distribución para respuesta consolidada
+        const productoCompleto = await prisma.producto.findUnique({
+            where: { id: producto.id },
+            include: {
+                stocks: {
+                    include: {
+                        sucursal: {
+                            select: { id: true, nombre: true, esBodega: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        const stocksList = productoCompleto?.stocks || [];
+        const stockTotal = stocksList.reduce((sum: number, s: any) => sum + (s.cantidad || 0), 0);
+        const stockPorSucursal = stocksList.map((s: any) => ({
+            sucursalId: s.sucursal?.id || s.sucursalId || '',
+            sucursalNombre: s.sucursal?.nombre || 'SUCURSAL',
+            esBodega: s.sucursal?.esBodega || false,
+            cantidad: s.cantidad || 0
+        }));
+
+        const prodFormateado = {
+            ...productoCompleto,
+            stockTotal,
+            stockMinimo: producto.stockMinimo || 0,
+            stockBajo: stockTotal <= (producto.stockMinimo || 0),
+            stockPorSucursal
+        };
+
+        return NextResponse.json(prodFormateado, { status: 201 });
     } catch (error: any) {
         console.error('Error al crear producto:', error);
         return NextResponse.json(
@@ -421,7 +452,7 @@ export async function PUT(request: NextRequest) {
             precioVenta,
             unidadMedida,
             stockMinimo,
-            stockTotal,
+            stockTotal: stockInput,
             sucursalId,
             sucursalIdOriginal
         } = body;
@@ -455,8 +486,8 @@ export async function PUT(request: NextRequest) {
         });
 
         // Actualizar stock en la sucursal elegida
-        if (stockTotal !== undefined && stockTotal !== null && stockTotal !== '') {
-            const cant = Math.max(0, parseInt(stockTotal) || 0);
+        if (stockInput !== undefined && stockInput !== null && stockInput !== '') {
+            const cant = Math.max(0, parseInt(stockInput) || 0);
 
             let targetSucursal = null;
             if (sucursalId && sucursalId !== 'todas') {
@@ -532,9 +563,40 @@ export async function PUT(request: NextRequest) {
             }
         }
 
+        // Consultar producto completo con stocks y distribución para respuesta consolidada
+        const productoCompleto = await prisma.producto.findUnique({
+            where: { id },
+            include: {
+                stocks: {
+                    include: {
+                        sucursal: {
+                            select: { id: true, nombre: true, esBodega: true }
+                        }
+                    }
+                }
+            }
+        });
+
+        const stocksList = productoCompleto?.stocks || [];
+        const stockTotal = stocksList.reduce((sum: number, s: any) => sum + (s.cantidad || 0), 0);
+        const stockPorSucursal = stocksList.map((s: any) => ({
+            sucursalId: s.sucursal?.id || s.sucursalId || '',
+            sucursalNombre: s.sucursal?.nombre || 'SUCURSAL',
+            esBodega: s.sucursal?.esBodega || false,
+            cantidad: s.cantidad || 0
+        }));
+
+        const prodFormateado = {
+            ...productoCompleto,
+            stockTotal,
+            stockMinimo: productoActualizado.stockMinimo || 0,
+            stockBajo: stockTotal <= (productoActualizado.stockMinimo || 0),
+            stockPorSucursal
+        };
+
         return NextResponse.json({
             success: true,
-            producto: productoActualizado,
+            producto: prodFormateado,
             message: 'Producto y precios actualizados exitosamente'
         });
     } catch (error: any) {

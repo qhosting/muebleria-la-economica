@@ -250,9 +250,11 @@ export default function InventarioPage() {
         return true;
     });
 
-    const StockBadge = ({ cantidad, minimo }: { cantidad: number, minimo: number }) => {
-        if (cantidad <= 0) return <Badge variant="destructive">Agotado</Badge>;
-        if (cantidad <= minimo) return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Bajo Stock</Badge>;
+    const StockBadge = ({ cantidad, minimo }: { cantidad?: number, minimo?: number }) => {
+        const cant = Number(cantidad ?? 0);
+        const min = Number(minimo ?? 0);
+        if (cant <= 0) return <Badge variant="destructive">Agotado</Badge>;
+        if (cant <= min) return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">Bajo Stock</Badge>;
         return <Badge variant="default" className="bg-green-100 text-green-800">En Stock</Badge>;
     };
 
@@ -296,7 +298,7 @@ export default function InventarioPage() {
                         </CardHeader>
                         <CardContent>
                             <div className="text-2xl font-bold text-green-600">
-                                {formatCurrency(productos.reduce((sum, p) => sum + (p.precioCompra * p.stockTotal), 0))}
+                                {formatCurrency(productos.reduce((sum, p) => sum + ((Number(p.precioCompra) || 0) * (Number(p.stockTotal) || 0)), 0))}
                             </div>
                         </CardContent>
                     </Card>
@@ -516,20 +518,23 @@ export default function InventarioPage() {
                                                             </div>
                                                         </td>
                                                         <td className="p-3 text-center font-bold text-lg">
-                                                            {producto.stockTotal}
+                                                            {producto.stockTotal ?? 0}
                                                         </td>
                                                         <td className="p-3">
-                                                            <StockBadge cantidad={producto.stockTotal} minimo={producto.stockMinimo} />
+                                                            <StockBadge cantidad={producto.stockTotal ?? 0} minimo={producto.stockMinimo ?? 0} />
                                                         </td>
                                                         <td className="p-3">
                                                             <div className="flex flex-wrap gap-1">
-                                                                {producto.stockPorSucursal.map((s: any) => (
+                                                                {(producto.stockPorSucursal || []).map((s: any) => (
                                                                     s.cantidad > 0 && (
-                                                                        <Badge key={s.sucursalId} variant="outline" className="text-xs">
+                                                                        <Badge key={s.sucursalId || s.sucursalNombre} variant="outline" className="text-xs">
                                                                             {s.sucursalNombre}: {s.cantidad}
                                                                         </Badge>
                                                                     )
                                                                 ))}
+                                                                {(!producto.stockPorSucursal || producto.stockPorSucursal.length === 0 || !producto.stockPorSucursal.some((s: any) => s.cantidad > 0)) && (
+                                                                    <span className="text-xs text-gray-400 italic">Sin existencias registradas</span>
+                                                                )}
                                                             </div>
                                                         </td>
                                                         <td className="p-3 text-center">
@@ -861,11 +866,20 @@ export default function InventarioPage() {
                     onClose={() => setIsProductoOpen(false)}
                     onSuccess={async (nuevoProd) => {
                         if (nuevoProd && (nuevoProd.id || nuevoProd.codigo)) {
-                            // Reflejar inmediatamente en la vista
+                            const cantTotal = Number(nuevoProd.stockTotal ?? nuevoProd.stockInicial ?? 0);
+                            const minStock = Number(nuevoProd.stockMinimo ?? 0);
+                            const prodNormalizado = {
+                                ...nuevoProd,
+                                stockTotal: cantTotal,
+                                stockMinimo: minStock,
+                                stockBajo: cantTotal <= minStock,
+                                stockPorSucursal: Array.isArray(nuevoProd.stockPorSucursal) ? nuevoProd.stockPorSucursal : []
+                            };
+                            // Reflejar inmediatamente en la vista de forma segura
                             setProductos(prev => {
-                                const existe = prev.some(p => p.id === nuevoProd.id || p.codigo === nuevoProd.codigo);
-                                if (existe) return prev.map(p => (p.id === nuevoProd.id || p.codigo === nuevoProd.codigo) ? { ...p, ...nuevoProd } : p);
-                                return [nuevoProd, ...prev];
+                                const existe = prev.some(p => p.id === prodNormalizado.id || p.codigo === prodNormalizado.codigo);
+                                if (existe) return prev.map(p => (p.id === prodNormalizado.id || p.codigo === prodNormalizado.codigo) ? { ...p, ...prodNormalizado } : p);
+                                return [prodNormalizado, ...prev];
                             });
                         }
                         await fetchData(true);
@@ -887,7 +901,11 @@ export default function InventarioPage() {
                             // Reflejar inmediatamente en la vista
                             setProductos(prev => prev.map(p => {
                                 if (p.id === prodActualizado.id) {
-                                    return { ...p, ...prodActualizado };
+                                    return {
+                                        ...p,
+                                        ...prodActualizado,
+                                        stockPorSucursal: Array.isArray(prodActualizado.stockPorSucursal) ? prodActualizado.stockPorSucursal : (p.stockPorSucursal || [])
+                                    };
                                 }
                                 return p;
                             }));
