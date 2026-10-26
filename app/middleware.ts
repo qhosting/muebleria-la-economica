@@ -12,6 +12,14 @@ const allowedOrigins = [
 
 export default withAuth(
   function middleware(req) {
+    // Si un cliente o pestaña abierta antes de reiniciar/desplegar envía una petición con 'next-action',
+    // evitamos el error 500 "Failed to find Server Action ... reading 'workers'" redirigiendo con 303 para
+    // que el navegador recargue la versión fresca de la página vía GET.
+    if (req.headers.has('next-action')) {
+      const redirectUrl = req.nextUrl.clone();
+      return NextResponse.redirect(redirectUrl, { status: 303 });
+    }
+
     const origin = req.headers.get('origin');
     const response = NextResponse.next();
 
