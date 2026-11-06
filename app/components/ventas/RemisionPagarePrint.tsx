@@ -109,11 +109,9 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
     ciudad: sucursalBD?.ciudad || (venta.sucursal as any)?.ciudad || sucursalFallback.ciudad || 'Aculco, Edo. de Méx.',
   };
 
-  const direccionCompleta = sucursalActiva.direccion
-    ? (sucursalActiva.ciudad && !sucursalActiva.direccion.toLowerCase().includes(sucursalActiva.ciudad.split(',')[0].toLowerCase().trim())
-        ? `${sucursalActiva.direccion}, ${sucursalActiva.ciudad}`
-        : sucursalActiva.direccion)
-    : (sucursalActiva.ciudad || 'Domicilio Conocido');
+  // Dirección 100% dinámica de la sucursal: se respeta fidedignamente la dirección configurada en la base de datos sin concatenar sufijos fijos
+  const direccionCompleta = (sucursalActiva.direccion || '').trim() || (sucursalFallback.direccion ? `${sucursalFallback.direccion}, ${sucursalFallback.ciudad}` : 'Domicilio Conocido');
+  const ciudadEmision = (sucursalActiva.ciudad || sucursalFallback.ciudad || 'Aculco, Edo. de Méx.').replace(/\s*\/\s*Aculco/i, '').trim();
 
   const esHogarYEstilo = sucursalActiva.nombre?.toUpperCase().includes('HOGAR Y ESTILO');
   const nombreEmpresa = esHogarYEstilo ? 'HOGAR Y ESTILO' : 'MUEBLERÍA LA ECONÓMICA';
@@ -396,7 +394,7 @@ export function RemisionPagarePrint({ venta, onClose }: RemisionPagarePrintProps
                 <span className="text-[11px] text-gray-500 font-semibold">({venta.codigoCliente || 'CL-PENDIENTE'})</span>
               </div>
               <div className="text-[11px] font-medium text-gray-700">
-                {sucursalActiva.ciudad ? `${sucursalActiva.ciudad.split(',')[0]}, ${sucursalActiva.ciudad.split(',')[1] || 'Méx.'}` : 'Aculco, Méx.'}, a <strong className="text-gray-900">{fechaLegal.dia}</strong> de <strong className="text-gray-900 uppercase">{fechaLegal.mes}</strong> de 20<strong className="text-gray-900">{fechaLegal.anio.slice(-2)}</strong>
+                {ciudadEmision}, a <strong className="text-gray-900">{fechaLegal.dia}</strong> de <strong className="text-gray-900 uppercase">{fechaLegal.mes}</strong> de 20<strong className="text-gray-900">{fechaLegal.anio.slice(-2)}</strong>
               </div>
             </div>
 

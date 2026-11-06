@@ -116,14 +116,8 @@ export async function POST(
 
     if (!direccionFinal && sucursalCatalogo) {
       direccionFinal = sucursalCatalogo.direccion
-        ? `${sucursalCatalogo.direccion}, ${sucursalCatalogo.ciudad}`
-        : sucursalCatalogo.ciudad;
-    } else if (
-      direccionFinal &&
-      sucursalCatalogo?.ciudad &&
-      !direccionFinal.toLowerCase().includes(sucursalCatalogo.ciudad.split(',')[0].toLowerCase().trim())
-    ) {
-      direccionFinal = `${direccionFinal}, ${sucursalCatalogo.ciudad}`;
+        ? (sucursalCatalogo.ciudad ? `${sucursalCatalogo.direccion}, ${sucursalCatalogo.ciudad}` : sucursalCatalogo.direccion)
+        : (sucursalCatalogo.ciudad || '');
     }
 
     if (!direccionFinal) {

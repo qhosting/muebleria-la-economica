@@ -39,7 +39,7 @@ export const SUCURSALES_SISTEMA: SucursalInfo[] = [
     id: 'sucursal-san-ildefonso',
     nombre: 'SAN ILDEFONSO',
     direccion: 'Av. Hidalgo Centro, San Ildefonso Tultepec',
-    ciudad: 'Amealco / Aculco, Qro.',
+    ciudad: 'Amealco de Bonfil, Qro.',
     telefono: '427 273 2216',
     esBodega: false
   },
