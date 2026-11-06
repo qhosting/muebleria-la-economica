@@ -2167,11 +2167,23 @@ export default function KioscoVentasPage() {
                             </SelectTrigger>
                             <SelectContent>
                               <SelectItem value="sin-asignar">Sin asignar por el momento</SelectItem>
-                              {cobradores.map(cob => (
-                                <SelectItem key={cob.id} value={cob.id}>
-                                  {cob.name} {cob.role === 'vendedor' ? '(Vendedor/Cobrador)' : cob.codigoGestor ? `(${cob.codigoGestor})` : ''}
-                                </SelectItem>
-                              ))}
+                              {cobradores.map(cob => {
+                                const sucursalNombre = cob.sucursal?.nombre;
+                                const esVendedor = cob.role === 'vendedor';
+                                let etiqueta = cob.name;
+                                if (sucursalNombre) {
+                                  etiqueta += ` (${esVendedor ? 'Vendedor/Cobrador' : 'Sucursal'} - ${sucursalNombre})`;
+                                } else if (esVendedor) {
+                                  etiqueta += ' (Vendedor / Cobrador)';
+                                } else if (cob.codigoGestor) {
+                                  etiqueta += ` (${cob.codigoGestor})`;
+                                }
+                                return (
+                                  <SelectItem key={cob.id} value={cob.id}>
+                                    {etiqueta}
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectContent>
                           </Select>
                         </div>

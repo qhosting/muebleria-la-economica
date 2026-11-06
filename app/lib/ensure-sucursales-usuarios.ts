@@ -149,6 +149,52 @@ export async function asegurarSucursalesYUsuarios(force: boolean = false) {
       usuariosResultado.push(user);
     }
 
+    // Asegurar que TODAS las sucursales en BD tengan un usuario vendedor/cobrador activo
+    const todasLasSucursales = await prisma.sucursal.findMany({
+      where: { isActive: true },
+      include: {
+        usuarios: {
+          where: { isActive: true }
+        }
+      }
+    });
+
+    for (const suc of todasLasSucursales) {
+      const tieneVendedorOCobrador = suc.usuarios.some(u => u.role === 'vendedor' || u.role === 'cobrador');
+      if (!tieneVendedorOCobrador) {
+        const cleanSlug = suc.nombre.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const emailSuc = `vendedor.${cleanSlug || suc.id.slice(0, 8)}@economica.local`;
+        const user = await prisma.user.upsert({
+          where: { email: emailSuc },
+          update: {
+            name: `Vendedor ${suc.nombre}`,
+            role: 'vendedor',
+            sucursalId: suc.id,
+            isActive: true,
+          },
+          create: {
+            email: emailSuc,
+            name: `Vendedor ${suc.nombre}`,
+            password: defaultPasswordHash,
+            role: 'vendedor',
+            sucursalId: suc.id,
+            isActive: true,
+          },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            role: true,
+            sucursalId: true,
+            sucursal: {
+              select: { id: true, nombre: true }
+            }
+          }
+        });
+        usuariosResultado.push(user);
+      }
+    }
+
     // Si existe cobrador general de ruta sin sucursal asignada, vincularlo a San Lucas
     const matrizSanLucas = Array.from(sucursalesMap.values()).find(
       s => s.nombre.toUpperCase().includes('SAN LUCAS')

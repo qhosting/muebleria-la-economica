@@ -173,11 +173,10 @@ export default function ReportesPage() {
 
   const fetchCobradores = async () => {
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch('/api/users/cobradores');
       if (response.ok) {
-        const users = await response.json();
-        const cobradoresData = users.filter((user: User) => user.role === 'cobrador');
-        setCobradores(cobradoresData);
+        const cobradoresData = await response.json();
+        setCobradores(cobradoresData || []);
       }
     } catch (error) {
       console.error('Error al cargar cobradores:', error);
@@ -792,9 +791,23 @@ export default function ReportesPage() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="all">Todos los cobradores</SelectItem>
-                          {cobradores.map(c => (
-                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                          ))}
+                          {cobradores.map(c => {
+                            const sucursalNombre = (c as any).sucursal?.nombre;
+                            const esVendedor = c.role === 'vendedor';
+                            let etiqueta = c.name;
+                            if (sucursalNombre) {
+                              etiqueta += ` (${esVendedor ? 'Vendedor/Cobrador' : 'Sucursal'} - ${sucursalNombre})`;
+                            } else if (esVendedor) {
+                              etiqueta += ' (Vendedor / Sucursal)';
+                            } else if ((c as any).codigoGestor) {
+                              etiqueta += ` (${(c as any).codigoGestor})`;
+                            }
+                            return (
+                              <SelectItem key={c.id} value={c.id}>
+                                {etiqueta}
+                              </SelectItem>
+                            );
+                          })}
                         </SelectContent>
                       </Select>
                     </div>

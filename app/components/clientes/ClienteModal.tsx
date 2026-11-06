@@ -261,11 +261,25 @@ export function ClienteModal({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="sin-asignar">Sin asignar</SelectItem>
-                  {cobradores.map((cobrador) => (
-                    <SelectItem key={cobrador.id} value={cobrador.id}>
-                      {cobrador.name}
-                    </SelectItem>
-                  ))}
+                  {cobradores.map((cobrador) => {
+                    const sucursalNombre = cobrador.sucursal?.nombre;
+                    const esVendedor = cobrador.role === 'vendedor';
+                    let etiqueta = cobrador.name;
+                    if (sucursalNombre) {
+                      etiqueta += ` (${esVendedor ? 'Vendedor/Cobrador' : 'Sucursal'} - ${sucursalNombre})`;
+                    } else if (esVendedor) {
+                      etiqueta += ' (Vendedor / Sucursal)';
+                    } else if (cobrador.codigoGestor) {
+                      etiqueta += ` (${cobrador.codigoGestor})`;
+                    } else if (cobrador.role === 'cobrador') {
+                      etiqueta += ' (Cobrador Campo)';
+                    }
+                    return (
+                      <SelectItem key={cobrador.id} value={cobrador.id}>
+                        {etiqueta}
+                      </SelectItem>
+                    );
+                  })}
                 </SelectContent>
               </Select>
             </div>
@@ -292,7 +306,16 @@ export function ClienteModal({
                 <Label htmlFor="sucursalId">Sucursal de Venta</Label>
                 <Select
                   value={formData.sucursalId}
-                  onValueChange={(v) => setFormData({ ...formData, sucursalId: v })}
+                  onValueChange={(v) => {
+                    const newFormData: any = { ...formData, sucursalId: v };
+                    if (v && (!formData.cobradorAsignadoId || formData.cobradorAsignadoId === 'sin-asignar')) {
+                      const cobSuc = cobradores.find(c => c.sucursalId === v);
+                      if (cobSuc) {
+                        newFormData.cobradorAsignadoId = cobSuc.id;
+                      }
+                    }
+                    setFormData(newFormData);
+                  }}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Seleccionar sucursal..." />

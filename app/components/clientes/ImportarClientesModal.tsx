@@ -77,11 +77,10 @@ export function ImportarClientesModal({
 
   const fetchCobradores = async () => {
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch('/api/users/cobradores');
       if (response.ok) {
-        const users = await response.json();
-        const filteredCobradores = users.filter((u: any) => u.role === 'cobrador');
-        setCobradores(filteredCobradores);
+        const data = await response.json();
+        setCobradores(data || []);
       }
     } catch (error) {
       console.error('Error al cargar cobradores:', error);
@@ -618,11 +617,23 @@ export function ImportarClientesModal({
                       {cobradores.length === 0 ? (
                         <SelectItem value="none" disabled>No hay cobradores disponibles</SelectItem>
                       ) : (
-                        cobradores.map((c) => (
-                          <SelectItem key={c.id} value={c.id}>
-                            {c.name} {c.codigoGestor ? `(${c.codigoGestor})` : ''}
-                          </SelectItem>
-                        ))
+                        cobradores.map((c) => {
+                          const sucursalNombre = c.sucursal?.nombre;
+                          const esVendedor = c.role === 'vendedor';
+                          let etiqueta = c.name;
+                          if (sucursalNombre) {
+                            etiqueta += ` (${esVendedor ? 'Vendedor/Cobrador' : 'Sucursal'} - ${sucursalNombre})`;
+                          } else if (esVendedor) {
+                            etiqueta += ' (Vendedor / Sucursal)';
+                          } else if (c.codigoGestor) {
+                            etiqueta += ` (${c.codigoGestor})`;
+                          }
+                          return (
+                            <SelectItem key={c.id} value={c.id}>
+                              {etiqueta}
+                            </SelectItem>
+                          );
+                        })
                       )}
                     </SelectContent>
                   </Select>

@@ -120,7 +120,7 @@ function getSemanaAnteriorSabadoViernes(fechaRef: Date = new Date()) {
 export default function PagosPage() {
   const { data: session } = useSession();
   const [pagos, setPagos] = useState<Pago[]>([]);
-  const [cobradores, setCobradores] = useState<{ id: string; name: string }[]>([]);
+  const [cobradores, setCobradores] = useState<any[]>([]);
   const [estadisticas, setEstadisticas] = useState<EstadisticasPagos | null>(null);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -232,13 +232,10 @@ export default function PagosPage() {
 
   const fetchCobradores = async () => {
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch('/api/users/cobradores');
       if (response.ok) {
         const users = await response.json();
-        const filteredCobradores = users
-          .filter((u: any) => u.role === 'cobrador' && u.isActive)
-          .map((u: any) => ({ id: u.id, name: u.name }));
-        setCobradores(filteredCobradores);
+        setCobradores(users || []);
       }
     } catch (error) {
       console.error('Error al obtener cobradores:', error);
@@ -677,11 +674,23 @@ export default function PagosPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cobradores</SelectItem>
-                    {cobradores.map((cobrador) => (
-                      <SelectItem key={cobrador.id} value={cobrador.id}>
-                        {cobrador.name}
-                      </SelectItem>
-                    ))}
+                    {cobradores.map((cobrador) => {
+                      const sucursalNombre = cobrador.sucursal?.nombre;
+                      const esVendedor = cobrador.role === 'vendedor';
+                      let etiqueta = cobrador.name;
+                      if (sucursalNombre) {
+                        etiqueta += ` (${esVendedor ? 'Vendedor/Cobrador' : 'Sucursal'} - ${sucursalNombre})`;
+                      } else if (esVendedor) {
+                        etiqueta += ' (Vendedor / Sucursal)';
+                      } else if (cobrador.codigoGestor) {
+                        etiqueta += ` (${cobrador.codigoGestor})`;
+                      }
+                      return (
+                        <SelectItem key={cobrador.id} value={cobrador.id}>
+                          {etiqueta}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>

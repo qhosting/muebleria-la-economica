@@ -142,10 +142,10 @@ export default function ClientesPage() {
 
   const fetchCobradores = async () => {
     try {
-      const response = await fetch('/api/users');
+      const response = await fetch('/api/users/cobradores');
       if (response.ok) {
-        const users: User[] = await response.json();
-        setCobradores(users.filter(u => u.role === 'cobrador' && u.isActive));
+        const data: User[] = await response.json();
+        setCobradores(data || []);
       } else if (response.status === 401) {
         console.log('Usuario no autenticado al obtener cobradores');
         return;
@@ -420,11 +420,23 @@ export default function ClientesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">Todos los cobradores</SelectItem>
-                    {cobradores.map((cobrador) => (
-                      <SelectItem key={cobrador.id} value={cobrador.id}>
-                        {cobrador.name}
-                      </SelectItem>
-                    ))}
+                    {cobradores.map((cobrador) => {
+                      const sucursalNombre = cobrador.sucursal?.nombre;
+                      const esVendedor = cobrador.role === 'vendedor';
+                      let etiqueta = cobrador.name;
+                      if (sucursalNombre) {
+                        etiqueta += ` (${esVendedor ? 'Vendedor/Cobrador' : 'Sucursal'} - ${sucursalNombre})`;
+                      } else if (esVendedor) {
+                        etiqueta += ' (Vendedor / Sucursal)';
+                      } else if (cobrador.codigoGestor) {
+                        etiqueta += ` (${cobrador.codigoGestor})`;
+                      }
+                      return (
+                        <SelectItem key={cobrador.id} value={cobrador.id}>
+                          {etiqueta}
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               )}
@@ -591,6 +603,11 @@ export default function ClientesPage() {
                       <p className="text-xs text-gray-500">Cobrador asignado:</p>
                       <p className="text-sm font-medium text-gray-900">
                         {cliente.cobradorAsignado.name}
+                        {cliente.cobradorAsignado.sucursal?.nombre && (
+                          <span className="ml-1 text-xs text-muted-foreground font-normal">
+                            ({cliente.cobradorAsignado.sucursal.nombre})
+                          </span>
+                        )}
                       </p>
                     </div>
                   )}

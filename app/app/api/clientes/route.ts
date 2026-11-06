@@ -95,10 +95,12 @@ export async function GET(request: NextRequest) {
         where.diaPago = diasMap[today];
       }
     } else if (userRole === 'vendedor') {
-      // Vendedor: si no se busca por texto específico, filtrar por sucursal asignada
-      if (userSucursalId && !search) {
+      // Vendedor / Cobrador de sucursal: ver clientes de su sucursal, donde es cobrador asignado o vendedor
+      if (!search) {
         where.OR = [
-          { sucursalId: userSucursalId },
+          ...(userSucursalId ? [{ sucursalId: userSucursalId }] : []),
+          { cobradorAsignadoId: userId },
+          ...(session.user?.name ? [{ vendedor: session.user.name }] : []),
           { sucursalId: null }
         ];
       }
@@ -114,6 +116,15 @@ export async function GET(request: NextRequest) {
               id: true,
               name: true,
               email: true,
+              role: true,
+              codigoGestor: true,
+              sucursalId: true,
+              sucursal: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
             },
           },
           sucursal: {
@@ -299,6 +310,15 @@ export async function POST(request: NextRequest) {
               id: true,
               name: true,
               email: true,
+              role: true,
+              codigoGestor: true,
+              sucursalId: true,
+              sucursal: {
+                select: {
+                  id: true,
+                  nombre: true,
+                },
+              },
             },
           },
           producto: {

@@ -24,8 +24,11 @@ export async function GET(request: NextRequest) {
 
     const cobradores = await prisma.user.findMany({
       where: {
-        role: { in: ['cobrador', 'gestor_cobranza', 'vendedor'] },
         isActive: true,
+        OR: [
+          { role: { in: ['cobrador', 'gestor_cobranza', 'vendedor'] } },
+          { sucursalId: { not: null } },
+        ],
       },
       select: {
         id: true,
@@ -41,7 +44,9 @@ export async function GET(request: NextRequest) {
           },
         },
       },
-      orderBy: { name: 'asc' },
+      orderBy: [
+        { name: 'asc' },
+      ],
     });
 
     return NextResponse.json(cobradores);

@@ -174,8 +174,11 @@ export function EstadoDeCuentaModal({
 
               {cliente.cobradorAsignado?.name && (
                 <div>
-                  <span className="text-gray-500 font-semibold block">Cobrador de Ruta:</span>
-                  <span className="font-semibold text-gray-800">{cliente.cobradorAsignado.name}</span>
+                  <span className="text-gray-500 font-semibold block">Cobrador Asignado:</span>
+                  <span className="font-semibold text-gray-800">
+                    {cliente.cobradorAsignado.name}
+                    {cliente.cobradorAsignado.sucursal?.nombre ? ` (Sucursal ${cliente.cobradorAsignado.sucursal.nombre})` : ''}
+                  </span>
                 </div>
               )}
 

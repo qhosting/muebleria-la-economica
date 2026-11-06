@@ -25,6 +25,15 @@ export async function GET(
             id: true,
             name: true,
             email: true,
+            role: true,
+            codigoGestor: true,
+            sucursalId: true,
+            sucursal: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
           },
         },
         sucursal: {
@@ -169,6 +178,15 @@ export async function PUT(
             id: true,
             name: true,
             email: true,
+            role: true,
+            codigoGestor: true,
+            sucursalId: true,
+            sucursal: {
+              select: {
+                id: true,
+                nombre: true,
+              },
+            },
           },
         },
       },
