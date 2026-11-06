@@ -76,9 +76,9 @@ export function EstadoDeCuentaModal({
         nuevo: parseFloat(pago.saldoNuevo) || parseFloat(cliente.saldoActual.toString()),
       },
       empresa: {
-        nombre: 'Mueblería La Económica',
-        direccion: 'Av. Principal #100, San Lucas Tecopilco',
-        telefono: '241-123-4567',
+        nombre: ((cliente as any).sucursal?.nombre?.toUpperCase().includes('HOGAR Y ESTILO') ? 'HOGAR Y ESTILO' : 'Mueblería La Económica'),
+        direccion: (cliente as any).sucursal?.direccion || 'Carretera Aculco-Amealco San Lucas 3er. Cuartel, Aculco, Edo. de Méx.',
+        telefono: (cliente as any).sucursal?.telefono?.replace(/^tel[:.]?\s*/i, '') || '427 273 2216',
       },
     };
 

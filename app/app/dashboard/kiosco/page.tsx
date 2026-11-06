@@ -153,9 +153,9 @@ export default function KioscoVentasPage() {
     cargarDatosIniciales();
   }, []);
 
-  // Si la sesión de usuario carga después de las sucursales, auto-asumir la sucursal del usuario
+  // Si la sesión de usuario carga después de las sucursales, auto-asumir y fijar la sucursal del usuario
   useEffect(() => {
-    if (sucursales.length > 0 && (userSucursalId || userSucursalNombre)) {
+    if (sucursales.length > 0 && !esAdmin) {
       const userSuc = sucursales.find((s: any) => 
         (userSucursalId && s.id === userSucursalId) ||
         (userSucursalNombre && s.nombre?.toUpperCase().trim() === userSucursalNombre?.toUpperCase().trim())
@@ -163,8 +163,16 @@ export default function KioscoVentasPage() {
       if (userSuc && sucursalSeleccionada !== userSuc.id) {
         setSucursalSeleccionada(userSuc.id);
       }
+    } else if (sucursales.length > 0 && esAdmin && !sucursalSeleccionada) {
+      const userSuc = sucursales.find((s: any) => 
+        (userSucursalId && s.id === userSucursalId) ||
+        (userSucursalNombre && s.nombre?.toUpperCase().trim() === userSucursalNombre?.toUpperCase().trim())
+      );
+      if (userSuc) {
+        setSucursalSeleccionada(userSuc.id);
+      }
     }
-  }, [userSucursalId, userSucursalNombre, sucursales]);
+  }, [userSucursalId, userSucursalNombre, sucursales, esAdmin, sucursalSeleccionada]);
 
   // Si el usuario logueado es vendedor o usuario de sucursal, auto-asignarlo como vendedor y cobrador
   useEffect(() => {
@@ -240,6 +248,10 @@ export default function KioscoVentasPage() {
     SUCURSAL_SAN_LUCAS;
 
   const handleCambiarSucursal = (id: string) => {
+    if (!esAdmin) {
+      toast.error('Solo los administradores pueden cambiar entre diferentes sucursales');
+      return;
+    }
     setSucursalSeleccionada(id);
     const suc = sucursales.find(s => s.id === id);
     if (suc) {
@@ -258,12 +270,15 @@ export default function KioscoVentasPage() {
           setCobradorAsignadoId(cobSuc.id);
         }
       }
+      cargarHistorial(id);
     }
   };
 
-  const cargarHistorial = async () => {
+  const cargarHistorial = async (targetSucursalId?: string) => {
     try {
-      const res = await fetch('/api/ventas?limit=15');
+      const sucId = targetSucursalId || (esAdmin ? sucursalSeleccionada : undefined);
+      const url = sucId ? `/api/ventas?limit=25&sucursalId=${sucId}` : '/api/ventas?limit=25';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setHistorialVentas(data.ventas || []);
@@ -964,39 +979,8 @@ export default function KioscoVentasPage() {
               </div>
             </div>
 
-            {/* Selector de Sucursal Activa */}
-            {(!esAdmin && (userSucursalId || userSucursalNombre)) ? (
-              <div className="flex items-center gap-2 bg-emerald-500/20 backdrop-blur px-3.5 py-1.5 rounded-xl border border-emerald-400/40 text-white shadow-sm">
-                <MapPin className="h-4 w-4 text-emerald-300 shrink-0" />
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] text-blue-200 font-semibold">Sucursal:</span>
-                  <span className="text-xs font-black text-white uppercase tracking-wider">
-                    {sucursalActual?.nombre || userSucursalNombre}
-                  </span>
-                </div>
-                <Badge variant="outline" className="text-[10px] bg-emerald-950/60 text-emerald-200 border-emerald-400/30 font-bold px-1.5 py-0 flex items-center gap-1 ml-1">
-                  <Lock className="h-2.5 w-2.5" />
-                  Asignada
-                </Badge>
-                {sucursalActual && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setSucursalAEditar(sucursalActual);
-                      setIsEditarSucursalOpen(true);
-                    }}
-                    className="h-6 px-2 text-[10px] text-emerald-200 hover:text-white hover:bg-emerald-600/40 font-bold flex items-center gap-1 border border-emerald-400/30 rounded-lg ml-1 transition-all"
-                    title="Editar número de contacto de la sucursal"
-                  >
-                    <Phone className="h-3 w-3 text-emerald-300" />
-                    <span>{sucursalActual.telefono || 'Editar Tel'}</span>
-                    <Pencil className="h-2.5 w-2.5 opacity-70" />
-                  </Button>
-                )}
-              </div>
-            ) : (
+            {/* Selector de Sucursal Activa: Solo Administradores pueden ver y cambiar sucursales */}
+            {esAdmin ? (
               <div className="flex items-center gap-2 bg-white/10 backdrop-blur px-3 py-1.5 rounded-xl border border-white/20">
                 <MapPin className="h-4 w-4 text-emerald-300 shrink-0" />
                 <span className="text-xs text-blue-100 font-semibold">Sucursal:</span>
@@ -1029,10 +1013,39 @@ export default function KioscoVentasPage() {
                     <Pencil className="h-2.5 w-2.5 opacity-70" />
                   </Button>
                 )}
-                {esAdmin && (
-                  <span className="text-[10px] text-blue-200 font-bold hidden sm:inline bg-blue-950/50 px-2 py-0.5 rounded">
-                    Admin
+                <span className="text-[10px] text-blue-200 font-bold hidden sm:inline bg-blue-950/50 px-2 py-0.5 rounded">
+                  Admin
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 bg-emerald-500/20 backdrop-blur px-3.5 py-1.5 rounded-xl border border-emerald-400/40 text-white shadow-sm">
+                <MapPin className="h-4 w-4 text-emerald-300 shrink-0" />
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-blue-200 font-semibold">Sucursal:</span>
+                  <span className="text-xs font-black text-white uppercase tracking-wider">
+                    {sucursalActual?.nombre || userSucursalNombre || 'MI SUCURSAL'}
                   </span>
+                </div>
+                <Badge variant="outline" className="text-[10px] bg-emerald-950/60 text-emerald-200 border-emerald-400/30 font-bold px-1.5 py-0 flex items-center gap-1 ml-1">
+                  <Lock className="h-2.5 w-2.5" />
+                  Tu Sucursal
+                </Badge>
+                {sucursalActual && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setSucursalAEditar(sucursalActual);
+                      setIsEditarSucursalOpen(true);
+                    }}
+                    className="h-6 px-2 text-[10px] text-emerald-200 hover:text-white hover:bg-emerald-600/40 font-bold flex items-center gap-1 border border-emerald-400/30 rounded-lg ml-1 transition-all"
+                    title="Editar número de contacto de la sucursal"
+                  >
+                    <Phone className="h-3 w-3 text-emerald-300" />
+                    <span>{sucursalActual.telefono || 'Editar Tel'}</span>
+                    <Pencil className="h-2.5 w-2.5 opacity-70" />
+                  </Button>
                 )}
               </div>
             )}
@@ -1852,43 +1865,57 @@ export default function KioscoVentasPage() {
                       </span>
                     </div>
 
-                    <Select
-                      value={vendedorSeleccionadoId}
-                      onValueChange={(val) => {
-                        setVendedorSeleccionadoId(val);
-                        if (val !== 'otro' && val !== 'tienda') {
-                          const v = vendedores.find(x => x.id === val);
-                          setVendedorNombre(v?.name || val);
-                          // El mismo usuario de sucursal es vendedor y cobrador
-                          setCobradorAsignadoId(val);
-                        } else if (val === 'tienda') {
-                          setVendedorNombre('VENTA MOSTRADOR');
-                          const cobSuc = cobradores.find(c => c.sucursalId === sucursalSeleccionada);
-                          if (cobSuc) setCobradorAsignadoId(cobSuc.id);
-                        }
-                      }}
-                    >
-                      <SelectTrigger className="h-8 text-xs bg-white font-medium">
-                        <SelectValue placeholder="Seleccione vendedor..." />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="tienda">Venta Directa de Mostrador</SelectItem>
-                        {vendedores.map(v => (
-                          <SelectItem key={v.id} value={v.id}>
-                            {v.name} {v.sucursal?.nombre ? `(${v.sucursal.nombre})` : ''}
-                          </SelectItem>
-                        ))}
-                        <SelectItem value="otro">Captura manual / Otro vendedor...</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    {esAdmin ? (
+                      <>
+                        <Select
+                          value={vendedorSeleccionadoId}
+                          onValueChange={(val) => {
+                            setVendedorSeleccionadoId(val);
+                            if (val !== 'otro' && val !== 'tienda') {
+                              const v = vendedores.find(x => x.id === val);
+                              setVendedorNombre(v?.name || val);
+                              // El mismo usuario de sucursal es vendedor y cobrador
+                              setCobradorAsignadoId(val);
+                            } else if (val === 'tienda') {
+                              setVendedorNombre('VENTA MOSTRADOR');
+                              const cobSuc = cobradores.find(c => c.sucursalId === sucursalSeleccionada);
+                              if (cobSuc) setCobradorAsignadoId(cobSuc.id);
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-xs bg-white font-medium">
+                            <SelectValue placeholder="Seleccione vendedor..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="tienda">Venta Directa de Mostrador</SelectItem>
+                            {vendedores.map(v => (
+                              <SelectItem key={v.id} value={v.id}>
+                                {v.name} {v.sucursal?.nombre ? `(${v.sucursal.nombre})` : ''}
+                              </SelectItem>
+                            ))}
+                            <SelectItem value="otro">Captura manual / Otro vendedor...</SelectItem>
+                          </SelectContent>
+                        </Select>
 
-                    {vendedorSeleccionadoId === 'otro' && (
-                      <Input
-                        placeholder="Nombre completo del vendedor *"
-                        value={vendedorManual}
-                        onChange={e => setVendedorManual(e.target.value.toUpperCase())}
-                        className="h-8 text-xs bg-white uppercase mt-1"
-                      />
+                        {vendedorSeleccionadoId === 'otro' && (
+                          <Input
+                            placeholder="Nombre completo del vendedor *"
+                            value={vendedorManual}
+                            onChange={e => setVendedorManual(e.target.value.toUpperCase())}
+                            className="h-8 text-xs bg-white uppercase mt-1"
+                          />
+                        )}
+                      </>
+                    ) : (
+                      <div className="h-8 px-2.5 bg-white border border-slate-200 rounded-md flex items-center justify-between text-xs">
+                        <span className="font-bold text-blue-950 uppercase flex items-center gap-1.5">
+                          <User className="h-3.5 w-3.5 text-blue-700" />
+                          {vendedorNombre || session?.user?.name || 'VENDEDOR ASIGNADO'}
+                        </span>
+                        <Badge variant="outline" className="text-[10px] bg-emerald-50 text-emerald-800 border-emerald-200 font-bold px-1.5 py-0">
+                          Tu Sesión
+                        </Badge>
+                      </div>
                     )}
                   </div>
 
@@ -2264,7 +2291,7 @@ export default function KioscoVentasPage() {
                   Consulte y reimprima cualquier contrato generado en el sistema
                 </CardDescription>
               </div>
-              <Button size="sm" variant="outline" onClick={cargarHistorial} className="gap-1.5">
+              <Button size="sm" variant="outline" onClick={() => cargarHistorial()} className="gap-1.5">
                 <RefreshCw className="h-3.5 w-3.5" />
                 Actualizar
               </Button>

@@ -46,6 +46,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import {
@@ -236,7 +237,7 @@ export default function MobileKioscoPage() {
 
   // Sincronizar sucursal si la sesión carga después
   useEffect(() => {
-    if (sucursales.length > 0 && (userSucursalId || userSucursalNombre)) {
+    if (sucursales.length > 0 && !esAdmin) {
       const userSuc = sucursales.find((s: any) =>
         (userSucursalId && s.id === userSucursalId) ||
         (userSucursalNombre && s.nombre.toUpperCase().trim() === userSucursalNombre.toUpperCase().trim())
@@ -244,8 +245,16 @@ export default function MobileKioscoPage() {
       if (userSuc && sucursalSeleccionada !== userSuc.id) {
         setSucursalSeleccionada(userSuc.id);
       }
+    } else if (sucursales.length > 0 && esAdmin && !sucursalSeleccionada) {
+      const userSuc = sucursales.find((s: any) =>
+        (userSucursalId && s.id === userSucursalId) ||
+        (userSucursalNombre && s.nombre.toUpperCase().trim() === userSucursalNombre.toUpperCase().trim())
+      );
+      if (userSuc) {
+        setSucursalSeleccionada(userSuc.id);
+      }
     }
-  }, [userSucursalId, userSucursalNombre, sucursales]);
+  }, [userSucursalId, userSucursalNombre, sucursales, esAdmin, sucursalSeleccionada]);
 
   // Función para obtener la existencia real de un producto en una sucursal específica
   const obtenerStockSucursal = (item: CatalogoItem, targetSucursalId?: string, targetSucursalNombre?: string): number => {
@@ -363,10 +372,12 @@ export default function MobileKioscoPage() {
     }
   };
 
-  const cargarMisVentas = async () => {
+  const cargarMisVentas = async (targetSucursalId?: string) => {
     try {
       setLoadingHistorial(true);
-      const res = await fetch('/api/ventas?limit=15');
+      const sucId = targetSucursalId || (esAdmin ? sucursalSeleccionada : undefined);
+      const url = sucId ? `/api/ventas?limit=15&sucursalId=${sucId}` : '/api/ventas?limit=15';
+      const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
         setMisVentas(data.ventas || []);
@@ -380,7 +391,7 @@ export default function MobileKioscoPage() {
 
   // Filtrado de productos (En Esta Sucursal vs Global)
   const productosFiltrados = productos.filter(p => {
-    if (filtroExistencias === 'sucursal') {
+    if (!esAdmin || filtroExistencias === 'sucursal') {
       const stockDisponible = obtenerStockSucursal(p);
       if (stockDisponible <= 0) return false;
     }
@@ -703,11 +714,38 @@ export default function MobileKioscoPage() {
             <Store className="w-5 h-5 text-amber-400" />
             Kiosco en Campo
           </h2>
-          <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
-            <Building2 className="w-3.5 h-3.5 text-emerald-400" />
-            <span>Sucursal:</span>
-            <span className="font-bold text-emerald-400">{sucursalActual?.nombre || 'SAN LUCAS'}</span>
-          </div>
+          {esAdmin ? (
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-1">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+              <span>Sucursal:</span>
+              <Select
+                value={sucursalSeleccionada}
+                onValueChange={(val) => {
+                  setSucursalSeleccionada(val);
+                  cargarMisVentas(val);
+                }}
+              >
+                <SelectTrigger className="h-6 text-[11px] bg-slate-900 border-slate-700 text-emerald-400 font-bold px-2 py-0 w-44">
+                  <SelectValue placeholder="Seleccionar sucursal" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-900 border-slate-800 text-white">
+                  {sucursales.map(s => (
+                    <SelectItem key={s.id} value={s.id} className="text-xs font-medium">
+                      {s.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <span className="text-[9px] bg-blue-900/60 text-blue-200 border border-blue-700/50 px-1.5 py-0.5 rounded font-bold">Admin</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs text-slate-400 mt-0.5">
+              <Building2 className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Sucursal:</span>
+              <span className="font-bold text-emerald-400">{sucursalActual?.nombre || 'SAN LUCAS'}</span>
+              <span className="text-[9px] bg-emerald-950 text-emerald-300 border border-emerald-800 px-1.5 py-0.5 rounded font-bold">Tu Sucursal</span>
+            </div>
+          )}
         </div>
 
         {carrito.length > 0 && (
@@ -780,33 +818,48 @@ export default function MobileKioscoPage() {
             )}
           </div>
 
-          {/* Selector de Existencias: En Esta Sucursal vs Todas las Sucursales */}
-          <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
-            <button
-              type="button"
-              onClick={() => setFiltroExistencias('sucursal')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 ${
-                filtroExistencias === 'sucursal'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Store className="w-3.5 h-3.5" />
-              En Esta Sucursal
-            </button>
-            <button
-              type="button"
-              onClick={() => setFiltroExistencias('global')}
-              className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 ${
-                filtroExistencias === 'global'
-                  ? 'bg-amber-500 text-slate-950 shadow-xs'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5" />
-              Todas las Sucursales
-            </button>
-          </div>
+          {/* Selector de Existencias: Exclusivo de sucursal para vendedores, configurable para admins */}
+          {esAdmin ? (
+            <div className="flex items-center gap-1.5 p-1 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+              <button
+                type="button"
+                onClick={() => setFiltroExistencias('sucursal')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 ${
+                  filtroExistencias === 'sucursal'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Store className="w-3.5 h-3.5" />
+                En Esta Sucursal
+              </button>
+              <button
+                type="button"
+                onClick={() => setFiltroExistencias('global')}
+                className={`flex-1 py-1.5 px-2 rounded-lg text-center font-bold text-[11px] transition-all flex items-center justify-center gap-1.5 ${
+                  filtroExistencias === 'global'
+                    ? 'bg-amber-500 text-slate-950 shadow-xs'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                Todas las Sucursales
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between p-2 bg-slate-900 border border-slate-800 rounded-xl text-xs">
+              <span className="text-slate-400 flex items-center gap-1.5 text-[11px] font-medium">
+                <Store className="w-3.5 h-3.5 text-emerald-400" />
+                Catálogo Local:
+              </span>
+              <span className="font-bold text-emerald-400 text-xs uppercase tracking-wide">
+                {sucursalActual?.nombre || 'MI SUCURSAL'}
+              </span>
+              <span className="text-[10px] bg-emerald-950/80 text-emerald-300 border border-emerald-800 px-2 py-0.5 rounded font-bold">
+                Stock Disponible
+              </span>
+            </div>
+          )}
 
           {/* Categorías deslizables */}
           <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar text-xs">
@@ -1500,7 +1553,7 @@ export default function MobileKioscoPage() {
             <Button
               size="sm"
               variant="ghost"
-              onClick={cargarMisVentas}
+              onClick={() => cargarMisVentas()}
               className="text-xs text-slate-400 hover:text-white h-8 gap-1"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${loadingHistorial ? 'animate-spin' : ''}`} />

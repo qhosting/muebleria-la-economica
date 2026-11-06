@@ -467,7 +467,10 @@ class BluetoothPrinterService {
         ticket += ticketData.empresa.direccion + this.LF;
       }
       if (ticketData.empresa.telefono) {
-        ticket += 'Tel: ' + ticketData.empresa.telefono + this.LF;
+        const telStr = ticketData.empresa.telefono.toLowerCase().startsWith('tel')
+          ? ticketData.empresa.telefono
+          : 'Tel: ' + ticketData.empresa.telefono;
+        ticket += telStr + this.LF;
       }
 
       // Separador

@@ -115,8 +115,8 @@ RECIBO DE PAGO #${ticketData.numeroRecibo || 'N/A'}
 --------------------------------
 Fecha: ${fechaFormatted}
 Cliente: ${ticketData.cliente.nombreCompleto}
-${ticketData.cliente.codigoCliente ? `Código: ${ticketData.cliente.codigoCliente}\n` : ''}Dirección: ${ticketData.cliente.direccion}
-Cobrador/Vendedor: ${ticketData.cobrador.nombre}
+${ticketData.cliente.codigoCliente ? `Código: ${ticketData.cliente.codigoCliente}\n` : ''}${ticketData.cliente.descripcionProducto ? `Artículo: ${ticketData.cliente.descripcionProducto}\n` : ''}Dirección: ${ticketData.cliente.direccion}
+${ticketData.empresa.direccion ? `Sucursal: ${ticketData.empresa.direccion}\n` : ''}${ticketData.empresa.telefono ? `Teléfono: ${ticketData.empresa.telefono}\n` : ''}Cobrador/Vendedor: ${ticketData.cobrador.nombre}
 --------------------------------
 Concepto: ${ticketData.pago.concepto || 'Pago de cuota'}
 Tipo: ${ticketData.pago.tipoPago}
@@ -127,7 +127,7 @@ Saldo Anterior: ${formatCurrency(ticketData.saldos.anterior)}
 Saldo Nuevo:    ${formatCurrency(ticketData.saldos.nuevo)}
 --------------------------------
 ¡GRACIAS POR SU PAGO!
-Mueblería La Económica
+${ticketData.empresa.nombre}
     `.trim();
 
     navigator.clipboard.writeText(text);
@@ -144,7 +144,7 @@ Mueblería La Económica
 --------------------------------
 *Fecha:* ${fechaFormatted}
 *Cliente:* ${ticketData.cliente.nombreCompleto}
-${ticketData.cliente.codigoCliente ? `*Código:* ${ticketData.cliente.codigoCliente}\n` : ''}*Cobrador/Vendedor:* ${ticketData.cobrador.nombre}
+${ticketData.cliente.codigoCliente ? `*Código:* ${ticketData.cliente.codigoCliente}\n` : ''}${ticketData.cliente.descripcionProducto ? `*Artículo:* ${ticketData.cliente.descripcionProducto}\n` : ''}*Cobrador/Vendedor:* ${ticketData.cobrador.nombre}
 --------------------------------
 *Concepto:* ${ticketData.pago.concepto || 'Abono de cuota'}
 *Método:* ${ticketData.pago.metodoPago || 'Efectivo'}
@@ -153,7 +153,7 @@ ${ticketData.cliente.codigoCliente ? `*Código:* ${ticketData.cliente.codigoClie
 *Saldo Anterior:* ${formatCurrency(ticketData.saldos.anterior)}
 *SALDO NUEVO:* ${formatCurrency(ticketData.saldos.nuevo)}
 --------------------------------
-_¡Gracias por su pago! Mueblería La Económica_
+${ticketData.empresa.direccion ? `📍 *Sucursal:* ${ticketData.empresa.direccion}\n` : ''}${ticketData.empresa.telefono ? `📞 *Tel:* ${ticketData.empresa.telefono}\n` : ''}_¡Gracias por su pago! ${ticketData.empresa.nombre}_
     `.trim();
 
     const url = tel.length >= 10
@@ -254,10 +254,14 @@ _¡Gracias por su pago! Mueblería La Económica_
                 {ticketData.empresa.nombre}
               </h2>
               {ticketData.empresa.direccion && (
-                <p className="text-[11px] text-gray-600">{ticketData.empresa.direccion}</p>
+                <p className="text-[11px] text-gray-600 whitespace-pre-line">{ticketData.empresa.direccion}</p>
               )}
               {ticketData.empresa.telefono && (
-                <p className="text-[11px] text-gray-600">Tel: {ticketData.empresa.telefono}</p>
+                <p className="text-[11px] text-gray-600">
+                  {ticketData.empresa.telefono.toLowerCase().startsWith('tel')
+                    ? ticketData.empresa.telefono
+                    : `Tel: ${ticketData.empresa.telefono}`}
+                </p>
               )}
               <div className="mt-2 pt-1 border-t border-gray-200">
                 <span className="font-bold text-gray-900 text-[11px] block">COMPROBANTE DE PAGO</span>

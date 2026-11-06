@@ -87,8 +87,8 @@ export function imprimirTicketTermicoUSB(
         <body>
           <div class="text-center border-b">
             <div class="title">${ticketData.empresa.nombre}</div>
-            ${ticketData.empresa.direccion ? `<div style="font-size:10px">${ticketData.empresa.direccion}</div>` : ''}
-            ${ticketData.empresa.telefono ? `<div style="font-size:10px">Tel: ${ticketData.empresa.telefono}</div>` : ''}
+            ${ticketData.empresa.direccion ? `<div style="font-size:10px; white-space:pre-line;">${ticketData.empresa.direccion}</div>` : ''}
+            ${ticketData.empresa.telefono ? `<div style="font-size:10px">${ticketData.empresa.telefono.toLowerCase().startsWith('tel') ? ticketData.empresa.telefono : `Tel: ${ticketData.empresa.telefono}`}</div>` : ''}
             <div class="bold" style="margin-top:4px; font-size:11px">COMPROBANTE DE PAGO</div>
             <div class="bold" style="font-size:12px">RECIBO #${ticketData.numeroRecibo || 'N/A'}</div>
           </div>

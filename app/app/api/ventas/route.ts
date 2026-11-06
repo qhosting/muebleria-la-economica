@@ -17,19 +17,52 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const search = searchParams.get('search') || '';
     const tipo = searchParams.get('tipo');
+    const sucursalIdParam = searchParams.get('sucursalId');
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const skip = (page - 1) * limit;
 
+    const userRole = (session.user as any)?.role;
+    const userSucursalId = (session.user as any)?.sucursalId;
+    const userId = (session.user as any)?.id;
+
     const where: any = {};
+
+    // Seguridad y alcance por rol:
+    // Si es vendedor, limitar estrictamente a las ventas de su sucursal o creadas por él
+    if (userRole === 'vendedor') {
+      if (userSucursalId) {
+        where.OR = [
+          { sucursalId: userSucursalId },
+          { vendedorId: userId }
+        ];
+      } else if (userId) {
+        where.vendedorId = userId;
+      }
+    } else {
+      // Si es admin o gestor, permitir filtrar por sucursal específica si viene en query params
+      if (sucursalIdParam && sucursalIdParam !== 'todas') {
+        where.sucursalId = sucursalIdParam;
+      }
+    }
 
     if (search) {
       const folioNumber = parseInt(search);
-      where.OR = [
+      const searchConditions = [
         { nombreCliente: { contains: search, mode: 'insensitive' } },
         { telefonoCliente: { contains: search, mode: 'insensitive' } },
         ...(isNaN(folioNumber) ? [] : [{ folio: folioNumber }])
       ];
+
+      if (where.OR) {
+        where.AND = [
+          { OR: where.OR },
+          { OR: searchConditions }
+        ];
+        delete where.OR;
+      } else {
+        where.OR = searchConditions;
+      }
     }
 
     if (tipo && (tipo === 'contado' || tipo === 'credito')) {
@@ -119,8 +152,10 @@ export async function POST(request: NextRequest) {
     const finalVendedorId = vendedorId || (userId || null);
     const finalVendedorNombre = (vendedor && vendedor !== 'TIENDA') ? vendedor : (session.user?.name || 'TIENDA');
 
-    // Resolver sucursal activa: si no viene especificada, asignar la del usuario o por defecto SAN LUCAS 3ER CUARTEL
-    let activeSucursalId = sucursalId || userSucursalId;
+    // Resolver sucursal activa: si es vendedor, se bloquea exclusivamente a su sucursal asignada
+    let activeSucursalId = userRole === 'admin'
+      ? (sucursalId || userSucursalId)
+      : (userSucursalId || sucursalId);
     if (!activeSucursalId) {
       const sucursalSanLucas = await prisma.sucursal.findFirst({
         where: { nombre: { contains: 'SAN LUCAS', mode: 'insensitive' } }
