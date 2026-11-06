@@ -2,7 +2,36 @@
 // Servicio de impresión por Bluetooth para tickets de cobranza
 'use client';
 
+import { Capacitor } from '@capacitor/core';
 import { numeroALetras } from './catalogo-kiosco';
+
+// Lista ampliada de UUIDs de servicios de impresoras térmicas ESC/POS (BLE)
+export const KNOWN_PRINTER_SERVICES = [
+  '000018f0-0000-1000-8000-00805f9b34fb', // Estándar ESC/POS BLE
+  'e7810a71-73ae-499d-8c15-faa9aef0c3f2', // Xprinter / POS-58
+  '49535343-fe7d-4ae5-8fa9-9fafd205e455', // ISSC transparent UART (muy popular en POS móviles)
+  '0000ffe0-0000-1000-8000-00805f9b34fb', // HM-10 BLE Serial (POS-58, PT-210)
+  '0000ff00-0000-1000-8000-00805f9b34fb', // ESC/POS genérico chino
+  '0000fee7-0000-1000-8000-00805f9b34fb', // Tencent / Ali POS
+  '0000fff0-0000-1000-8000-00805f9b34fb', // Impresoras portátiles
+  '0000ae00-0000-1000-8000-00805f9b34fb', // Impresoras térmicas
+  '0000af30-0000-1000-8000-00805f9b34fb', // Impresoras térmicas
+];
+
+export const KNOWN_WRITE_CHARACTERISTICS = [
+  '00002af1-0000-1000-8000-00805f9b34fb',
+  'bef8d6c9-9c21-4c9e-b632-bd58c1009f9f',
+  '49535343-aca3-481c-91ec-d31002b96163',
+  '49535343-8841-43f4-a8d4-ecbe34729bb3',
+  '0000ffe1-0000-1000-8000-00805f9b34fb',
+  '0000ff02-0000-1000-8000-00805f9b34fb',
+  '0000ff01-0000-1000-8000-00805f9b34fb',
+  '0000fec7-0000-1000-8000-00805f9b34fb',
+  '0000fff2-0000-1000-8000-00805f9b34fb',
+  '0000fff1-0000-1000-8000-00805f9b34fb',
+  '0000ae01-0000-1000-8000-00805f9b34fb',
+  '0000af31-0000-1000-8000-00805f9b34fb',
+];
 
 // Definiciones de tipos para Web Bluetooth API
 declare global {
@@ -143,6 +172,16 @@ class BluetoothPrinterService {
   private readonly SERVICE_UUID = '000018f0-0000-1000-8000-00805f9b34fb';
   private readonly CHARACTERISTIC_UUID = '00002af1-0000-1000-8000-00805f9b34fb';
 
+  // 📱 Estado para soporte nativo Capacitor (Android / iOS)
+  private isNativeDevice = false;
+  private nativeDeviceId: string | null = null;
+  private nativeDeviceName: string | null = null;
+  private nativeServiceUuid: string | null = null;
+  private nativeCharacteristicUuid: string | null = null;
+  private nativeCanWriteWithoutResponse = false;
+  private nativeConnected = false;
+  private bleClientInstance: any = null;
+
   // 🔧 Storage keys para persistencia
   private readonly STORAGE_KEY_CONNECTED = 'bluetooth_printer_connected';
   private readonly STORAGE_KEY_DEVICE_NAME = 'bluetooth_printer_device_name';
@@ -172,12 +211,65 @@ class BluetoothPrinterService {
     UNDERLINE_OFF: this.ESC + '-' + '\x00',
   };
 
+  private async getBleClient(): Promise<any> {
+    if (this.bleClientInstance) return this.bleClientInstance;
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      try {
+        const { BleClient } = await import('@capacitor-community/bluetooth-le');
+        this.bleClientInstance = BleClient;
+        return this.bleClientInstance;
+      } catch (err) {
+        console.error('Error importando @capacitor-community/bluetooth-le:', err);
+        return null;
+      }
+    }
+    return null;
+  }
+
   async isBluetoothAvailable(): Promise<boolean> {
-    return 'bluetooth' in navigator && 'requestDevice' in (navigator.bluetooth as any);
+    if (typeof window === 'undefined') return false;
+
+    // En app nativa (Android / iOS)
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const BleClient = await this.getBleClient();
+        if (!BleClient) return false;
+        await BleClient.initialize({ androidNeverForLocation: true });
+        return true;
+      } catch (e) {
+        console.warn('Error verificando Bluetooth nativo:', e);
+        return true;
+      }
+    }
+
+    // En navegador Web (Web Bluetooth API)
+    return 'bluetooth' in navigator && typeof (navigator.bluetooth as any)?.requestDevice === 'function';
+  }
+
+  // 🔍 Obtener lista de dispositivos emparejados en Android
+  async getPairedDevices(): Promise<Array<{ id: string; name: string }>> {
+    if (typeof window === 'undefined') return [];
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const BleClient = await this.getBleClient();
+        if (!BleClient) return [];
+        await BleClient.initialize({ androidNeverForLocation: true });
+        const bonded = await BleClient.getBondedDevices();
+        return (bonded || []).map((d: any) => ({
+          id: d.deviceId,
+          name: d.name || `Dispositivo (${d.deviceId.slice(-5)})`
+        }));
+      } catch (error) {
+        console.warn('Error obteniendo dispositivos vinculados en Android:', error);
+        return [];
+      }
+    }
+    return [];
   }
 
   // 🔧 Guardar estado de conexión en localStorage
-  private saveConnectionState(connected: boolean, deviceName?: string, deviceId?: string): void {
+  private saveConnectionState(connected: boolean, deviceName?: string | null, deviceId?: string | null): void {
     if (typeof window === 'undefined') return;
 
     try {
@@ -191,8 +283,6 @@ class BluetoothPrinterService {
       }
 
       if (!connected) {
-        // No borrar el nombre del dispositivo, solo marcarlo como desconectado
-        // Así el usuario sabe qué impresora reconectar
         localStorage.setItem(this.STORAGE_KEY_CONNECTED, 'false');
       }
     } catch (error) {
@@ -222,32 +312,147 @@ class BluetoothPrinterService {
     }
   }
 
-  // 🔧 NUEVO: Verificar estado real de conexión GATT
+  // 🔧 Verificar estado real de conexión GATT Web
   private checkRealConnectionStatus(): boolean {
     if (!this.connection.device || !this.connection.server) {
       return false;
     }
-
-    // Verificar si el servidor GATT está realmente conectado
     return this.connection.server.connected === true;
   }
 
-  async connectToPrinter(): Promise<boolean> {
+  async connectToPrinter(specificDeviceId?: string): Promise<boolean> {
     try {
       if (!await this.isBluetoothAvailable()) {
-        throw new Error('Bluetooth no está disponible en este dispositivo');
+        throw new Error('Bluetooth no está disponible en este dispositivo o navegador');
       }
 
-      // Buscar dispositivos Bluetooth
+      // ==========================================
+      // MODO NATIVO ANDROID / IOS (Capacitor BLE)
+      // ==========================================
+      if (Capacitor.isNativePlatform()) {
+        const BleClient = await this.getBleClient();
+        if (!BleClient) {
+          throw new Error('Plugin Bluetooth LE nativo no disponible');
+        }
+
+        await BleClient.initialize({ androidNeverForLocation: true });
+
+        try {
+          const isEnabled = await BleClient.isEnabled();
+          if (!isEnabled) {
+            await BleClient.requestEnable();
+          }
+        } catch (e) {
+          console.warn('No se pudo verificar o solicitar encendido de Bluetooth:', e);
+        }
+
+        let targetDeviceId: string = specificDeviceId || '';
+        let targetDeviceName = '';
+
+        if (!targetDeviceId) {
+          await BleClient.setDisplayStrings({
+            scanning: 'Buscando impresoras Bluetooth...',
+            cancel: 'Cancelar',
+            availableDevices: 'Impresoras y Dispositivos Encontrados',
+            noDeviceFound: 'No se encontraron impresoras cerca'
+          });
+
+          // Abre el diálogo de selección nativo de Android
+          const selected = await BleClient.requestDevice({
+            optionalServices: KNOWN_PRINTER_SERVICES
+          });
+
+          if (!selected || !selected.deviceId) {
+            throw new Error('No se seleccionó ninguna impresora');
+          }
+
+          targetDeviceId = selected.deviceId;
+          targetDeviceName = selected.name || 'Impresora Bluetooth';
+        }
+
+        console.log(`🔌 Conectando nativamente a impresora: ${targetDeviceId}...`);
+        await BleClient.connect(targetDeviceId, (disconnectedId: string) => {
+          console.log('⚠️ Impresora desconectada nativamente:', disconnectedId);
+          this.nativeConnected = false;
+          this.saveConnectionState(false);
+        });
+
+        // Descubrir servicios y buscar canal de escritura ESC/POS
+        await BleClient.discoverServices(targetDeviceId);
+        const services = await BleClient.getServices(targetDeviceId);
+
+        let foundServiceUuid: string | null = null;
+        let foundCharUuid: string | null = null;
+        let canWriteWithoutResp = false;
+
+        // 1. Priorizar servicios de impresión térmica conocidos
+        for (const service of services) {
+          const isKnown = KNOWN_PRINTER_SERVICES.some(s => s.toLowerCase() === service.uuid.toLowerCase());
+          if (isKnown) {
+            for (const char of service.characteristics) {
+              if (char.properties.write || char.properties.writeWithoutResponse) {
+                foundServiceUuid = service.uuid;
+                foundCharUuid = char.uuid;
+                canWriteWithoutResp = !!char.properties.writeWithoutResponse;
+                break;
+              }
+            }
+          }
+          if (foundCharUuid) break;
+        }
+
+        // 2. Si no coincide con UUIDs estándar, buscar en cualquier servicio con escritura disponible
+        if (!foundCharUuid) {
+          const ignoredServices = [
+            '00001800-0000-1000-8000-00805f9b34fb', // Generic Access
+            '00001801-0000-1000-8000-00805f9b34fb', // Generic Attribute
+            '0000180a-0000-1000-8000-00805f9b34fb', // Device Info
+            '0000180f-0000-1000-8000-00805f9b34fb', // Battery Service
+          ];
+
+          for (const service of services) {
+            if (ignoredServices.some(s => s.toLowerCase() === service.uuid.toLowerCase())) continue;
+            for (const char of service.characteristics) {
+              if (char.properties.write || char.properties.writeWithoutResponse) {
+                foundServiceUuid = service.uuid;
+                foundCharUuid = char.uuid;
+                canWriteWithoutResp = !!char.properties.writeWithoutResponse;
+                break;
+              }
+            }
+            if (foundCharUuid) break;
+          }
+        }
+
+        if (!foundServiceUuid || !foundCharUuid) {
+          await BleClient.disconnect(targetDeviceId);
+          throw new Error('La impresora no cuenta con un canal de datos ESC/POS compatible');
+        }
+
+        this.isNativeDevice = true;
+        this.nativeDeviceId = targetDeviceId;
+        this.nativeDeviceName = targetDeviceName || this.nativeDeviceName || 'Impresora Bluetooth';
+        this.nativeServiceUuid = foundServiceUuid;
+        this.nativeCharacteristicUuid = foundCharUuid;
+        this.nativeCanWriteWithoutResponse = canWriteWithoutResp;
+        this.nativeConnected = true;
+
+        this.saveConnectionState(true, this.nativeDeviceName, this.nativeDeviceId);
+        console.log(`✅ Impresora conectada nativamente: ${this.nativeDeviceName}`);
+        return true;
+      }
+
+      // ==========================================
+      // MODO WEB BLUETOOTH API (Chrome / Edge / PWA)
+      // ==========================================
+      // Permitir cualquier dispositivo Bluetooth disponible
       this.connection.device = await navigator.bluetooth.requestDevice({
-        filters: [
-          { services: [this.SERVICE_UUID] },
-          { namePrefix: 'POS' },
-          { namePrefix: 'Printer' },
-          { namePrefix: 'RP' },
-          { namePrefix: 'MTP' }
-        ],
-        optionalServices: ['battery_service', 'device_information']
+        acceptAllDevices: true,
+        optionalServices: [
+          ...KNOWN_PRINTER_SERVICES,
+          'battery_service',
+          'device_information'
+        ]
       });
 
       if (!this.connection.device) {
@@ -265,40 +470,81 @@ class BluetoothPrinterService {
         throw new Error('No se pudo conectar al servidor GATT');
       }
 
-      // Obtener el servicio
-      this.connection.service = await this.connection.server.getPrimaryService(this.SERVICE_UUID);
+      let activeService: WebBluetoothRemoteGATTService | null = null;
+      let activeCharacteristic: WebBluetoothRemoteGATTCharacteristic | null = null;
 
-      // Obtener la característica
-      this.connection.characteristic = await this.connection.service.getCharacteristic(this.CHARACTERISTIC_UUID);
+      // Buscar entre los servicios conocidos
+      for (const serviceUuid of KNOWN_PRINTER_SERVICES) {
+        try {
+          const s = await this.connection.server.getPrimaryService(serviceUuid);
+          for (const charUuid of KNOWN_WRITE_CHARACTERISTICS) {
+            try {
+              const c = await s.getCharacteristic(charUuid);
+              if (c) {
+                activeService = s;
+                activeCharacteristic = c;
+                break;
+              }
+            } catch {}
+          }
+          if (!activeCharacteristic) {
+            try {
+              const c = await s.getCharacteristic(this.CHARACTERISTIC_UUID);
+              if (c) {
+                activeService = s;
+                activeCharacteristic = c;
+              }
+            } catch {}
+          }
+          if (activeCharacteristic) break;
+        } catch {}
+      }
 
+      if (!activeService || !activeCharacteristic) {
+        throw new Error('No se encontró canal de datos ESC/POS compatible en la impresora');
+      }
+
+      this.connection.service = activeService;
+      this.connection.characteristic = activeCharacteristic;
       this.connection.isConnected = true;
+      this.isNativeDevice = false;
 
-      // 🔧 MEJORADO: Guardar estado con ID y nombre del dispositivo
       this.saveConnectionState(true, this.connection.device.name, this.connection.device.id);
 
       // Listener para desconexión
       this.connection.device.addEventListener('gattserverdisconnected', () => {
-        console.log('⚠️ Impresora desconectada (evento GATT)');
+        console.log('⚠️ Impresora desconectada (evento GATT Web)');
         this.connection.isConnected = false;
         this.saveConnectionState(false);
       });
 
-      console.log('✅ Impresora conectada:', this.connection.device.name);
+      console.log('✅ Impresora conectada vía Web:', this.connection.device.name);
       return true;
     } catch (error) {
       console.error('❌ Error conectando a impresora:', error);
       this.connection.isConnected = false;
+      this.nativeConnected = false;
       this.saveConnectionState(false);
       throw error;
     }
   }
 
-  // 🆕 NUEVO: Reconectar a la última impresora guardada
+  // 🆕 Reconectar a la última impresora guardada
   async reconnectToPrinter(): Promise<boolean> {
     try {
-      // Si ya hay un dispositivo conectado, solo reconectar GATT
+      // Modo Nativo
+      if (Capacitor.isNativePlatform()) {
+        const saved = this.loadConnectionState();
+        if (saved.deviceId) {
+          console.log('🔄 Intentando reconectar nativamente a:', saved.deviceName || saved.deviceId);
+          return await this.connectToPrinter(saved.deviceId);
+        }
+        return await this.connectToPrinter();
+      }
+
+      // Modo Web: si ya hay un dispositivo en memoria desconectado
       if (this.connection.device && !this.connection.isConnected) {
-        console.log('🔄 Intentando reconectar a:', this.connection.device.name);
+        console.log('🔄 Intentando reconectar Web a:', this.connection.device.name);
 
         if (!this.connection.device.gatt) {
           throw new Error('GATT no disponible en el dispositivo');
@@ -307,50 +553,87 @@ class BluetoothPrinterService {
         this.connection.server = await this.connection.device.gatt.connect();
 
         if (!this.connection.server) {
-          throw new Error('No se pudo conectar al servidor GATT');
+          throw new Error('No se pudo reconectar al servidor GATT');
         }
 
-        this.connection.service = await this.connection.server.getPrimaryService(this.SERVICE_UUID);
-        this.connection.characteristic = await this.connection.service.getCharacteristic(this.CHARACTERISTIC_UUID);
-        this.connection.isConnected = true;
+        let activeService: WebBluetoothRemoteGATTService | null = null;
+        let activeCharacteristic: WebBluetoothRemoteGATTCharacteristic | null = null;
 
-        this.saveConnectionState(true, this.connection.device.name, this.connection.device.id);
+        for (const serviceUuid of KNOWN_PRINTER_SERVICES) {
+          try {
+            const s = await this.connection.server.getPrimaryService(serviceUuid);
+            for (const charUuid of KNOWN_WRITE_CHARACTERISTICS) {
+              try {
+                const c = await s.getCharacteristic(charUuid);
+                if (c) {
+                  activeService = s;
+                  activeCharacteristic = c;
+                  break;
+                }
+              } catch {}
+            }
+            if (activeCharacteristic) break;
+          } catch {}
+        }
 
-        console.log('✅ Impresora reconectada:', this.connection.device.name);
-        return true;
+        if (activeService && activeCharacteristic) {
+          this.connection.service = activeService;
+          this.connection.characteristic = activeCharacteristic;
+          this.connection.isConnected = true;
+          this.saveConnectionState(true, this.connection.device.name, this.connection.device.id);
+          console.log('✅ Impresora reconectada Web:', this.connection.device.name);
+          return true;
+        }
       }
 
-      // Si no hay dispositivo guardado, hacer conexión normal
       return await this.connectToPrinter();
-
     } catch (error) {
       console.error('❌ Error reconectando a impresora:', error);
       this.connection.isConnected = false;
+      this.nativeConnected = false;
       this.saveConnectionState(false);
       throw error;
     }
   }
 
   async disconnect(): Promise<void> {
+    if (Capacitor.isNativePlatform()) {
+      if (this.nativeDeviceId) {
+        try {
+          const BleClient = await this.getBleClient();
+          if (BleClient) {
+            await BleClient.disconnect(this.nativeDeviceId);
+          }
+        } catch (e) {
+          console.warn('Error al desconectar nativo:', e);
+        }
+      }
+      this.nativeConnected = false;
+      this.nativeDeviceId = null;
+      this.saveConnectionState(false);
+      console.log('🔌 Impresora nativa desconectada manualmente');
+      return;
+    }
+
     if (this.connection.device && this.connection.isConnected) {
       this.connection.server?.disconnect();
       this.connection.isConnected = false;
       this.saveConnectionState(false);
-      console.log('🔌 Impresora desconectada manualmente');
+      console.log('🔌 Impresora web desconectada manualmente');
     }
   }
 
-  // 🔧 MEJORADO: Verificar estado real de conexión
+  // 🔧 Verificar estado real de conexión
   isConnected(): boolean {
-    // Primero verificar el estado local
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      return this.nativeConnected;
+    }
+
     if (!this.connection.isConnected) {
       return false;
     }
 
-    // Verificar el estado real del servidor GATT
     const realStatus = this.checkRealConnectionStatus();
-
-    // Si hay discrepancia, actualizar el estado
     if (realStatus !== this.connection.isConnected) {
       console.log('⚠️ Estado de conexión actualizado:', realStatus);
       this.connection.isConnected = realStatus;
@@ -361,10 +644,14 @@ class BluetoothPrinterService {
   }
 
   getConnectedDevice(): string | null {
-    // Verificar estado real antes de retornar el dispositivo
     if (!this.isConnected()) {
       return null;
     }
+
+    if (typeof window !== 'undefined' && Capacitor.isNativePlatform()) {
+      return this.nativeDeviceName || 'Impresora Bluetooth';
+    }
+
     return this.connection.device?.name || null;
   }
 
@@ -373,25 +660,60 @@ class BluetoothPrinterService {
     return this.loadConnectionState();
   }
 
-  // 🆕 NUEVO: Verificar si hay un dispositivo guardado para reconexión
+  // 🆕 Verificar si hay un dispositivo guardado para reconexión
   hasDeviceForReconnection(): boolean {
-    return this.connection.device !== null || this.lastConnectedDeviceId !== null;
+    return this.connection.device !== null || this.lastConnectedDeviceId !== null || this.nativeDeviceId !== null;
   }
 
   private async sendData(data: string): Promise<void> {
-    if (!this.connection.characteristic || !this.connection.isConnected) {
+    if (!this.isConnected()) {
       throw new Error('Impresora no conectada');
     }
 
     const encoder = new TextEncoder();
     const uint8Array = encoder.encode(data);
 
-    // Dividir en chunks para evitar problemas con MTU
+    // Modo Nativo Capacitor
+    if (Capacitor.isNativePlatform()) {
+      const BleClient = await this.getBleClient();
+      if (!BleClient || !this.nativeDeviceId || !this.nativeServiceUuid || !this.nativeCharacteristicUuid) {
+        throw new Error('Error en el canal de comunicación con la impresora nativa');
+      }
+
+      const chunkSize = 20;
+      for (let i = 0; i < uint8Array.length; i += chunkSize) {
+        const chunk = uint8Array.slice(i, i + chunkSize);
+        const dataView = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
+
+        if (this.nativeCanWriteWithoutResponse) {
+          await BleClient.writeWithoutResponse(
+            this.nativeDeviceId,
+            this.nativeServiceUuid,
+            this.nativeCharacteristicUuid,
+            dataView
+          );
+        } else {
+          await BleClient.write(
+            this.nativeDeviceId,
+            this.nativeServiceUuid,
+            this.nativeCharacteristicUuid,
+            dataView
+          );
+        }
+        await new Promise(resolve => setTimeout(resolve, 15));
+      }
+      return;
+    }
+
+    // Modo Web Bluetooth
+    if (!this.connection.characteristic) {
+      throw new Error('Canal de impresión no disponible');
+    }
+
     const chunkSize = 20;
     for (let i = 0; i < uint8Array.length; i += chunkSize) {
       const chunk = uint8Array.slice(i, i + chunkSize);
       await this.connection.characteristic.writeValue(chunk);
-      // Pequeña pausa entre chunks
       await new Promise(resolve => setTimeout(resolve, 10));
     }
   }

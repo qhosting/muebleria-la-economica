@@ -14,10 +14,12 @@ export function useBluetoothPrinter() {
   const [wasConnectedBefore, setWasConnectedBefore] = useState(false);
   const [previousDeviceName, setPreviousDeviceName] = useState<string | null>(null);
   const [canReconnect, setCanReconnect] = useState(false);
+  const [pairedDevices, setPairedDevices] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     checkBluetoothAvailability();
     loadPreviousConnectionState();
+    loadPairedDevices();
     updateConnectionStatus();
     
     // 🔧 Verificar estado cada 5 segundos
@@ -31,6 +33,16 @@ export function useBluetoothPrinter() {
   const checkBluetoothAvailability = async () => {
     const available = await bluetoothPrinter.isBluetoothAvailable();
     setIsBluetoothAvailable(available);
+  };
+
+  // 🔍 Cargar dispositivos vinculados previamente en Android
+  const loadPairedDevices = async () => {
+    try {
+      const devices = await bluetoothPrinter.getPairedDevices();
+      setPairedDevices(devices);
+    } catch (e) {
+      console.warn('Error cargando dispositivos vinculados:', e);
+    }
   };
 
   // 🔧 Cargar estado previo de conexión
@@ -62,7 +74,7 @@ export function useBluetoothPrinter() {
     setCanReconnect(hasDevice && !connected);
   };
 
-  const connectToPrinter = async (): Promise<boolean> => {
+  const connectToPrinter = async (deviceId?: string): Promise<boolean> => {
     if (!isBluetoothAvailable) {
       toast.error('Bluetooth no está disponible');
       return false;
@@ -71,7 +83,7 @@ export function useBluetoothPrinter() {
     setIsConnecting(true);
 
     try {
-      const success = await bluetoothPrinter.connectToPrinter();
+      const success = await bluetoothPrinter.connectToPrinter(deviceId);
       
       if (success) {
         updateConnectionStatus();
@@ -202,6 +214,8 @@ export function useBluetoothPrinter() {
     wasConnectedBefore,
     previousDeviceName,
     canReconnect,
+    pairedDevices,
+    loadPairedDevices,
     connectToPrinter,
     reconnectToPrinter,
     disconnectFromPrinter,

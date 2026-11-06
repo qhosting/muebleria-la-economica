@@ -6,6 +6,7 @@ import { Download, Smartphone, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Capacitor } from '@capacitor/core';
 import { APP_VERSION } from '@/lib/version';
+import { getFullPath } from '@/lib/api-config';
 
 interface APKDownloadButtonProps {
   className?: string;
@@ -20,13 +21,25 @@ export function APKDownloadButton({ className }: APKDownloadButtonProps = {}) {
     setIsNative(Capacitor.isNativePlatform());
   }, []);
 
-  const handleDownload = () => {
+  const handleDownload = async () => {
     toast.success('Iniciando descarga del APK', {
       description: 'Guarda e instala LaEconomica.apk en tu teléfono Android'
     });
 
+    const fullUrl = getFullPath('/downloads/LaEconomica.apk');
+
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { Browser } = await import('@capacitor/browser');
+        await Browser.open({ url: fullUrl, windowName: '_system' });
+        return;
+      } catch (e) {
+        console.warn('Error abriendo con Browser nativo:', e);
+      }
+    }
+
     const link = document.createElement('a');
-    link.href = '/downloads/LaEconomica.apk';
+    link.href = fullUrl;
     link.download = 'LaEconomica.apk';
     document.body.appendChild(link);
     link.click();

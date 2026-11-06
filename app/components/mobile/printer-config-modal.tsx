@@ -38,6 +38,8 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
     wasConnectedBefore,
     previousDeviceName,
     canReconnect,
+    pairedDevices,
+    loadPairedDevices,
     connectToPrinter,
     reconnectToPrinter,
     disconnectFromPrinter,
@@ -349,6 +351,48 @@ export function PrinterConfigModal({ isOpen, onClose }: PrinterConfigModalProps)
                 )}
 
                 <Separator />
+
+                {/* Dispositivos vinculados previamente en Android */}
+                {!isConnected && pairedDevices && pairedDevices.length > 0 && (
+                  <div className="space-y-1.5 p-2.5 bg-slate-50 dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-800">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                        Dispositivos Vinculados (Android)
+                      </span>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-5 px-1.5 text-[10px]"
+                        onClick={loadPairedDevices}
+                      >
+                        Actualizar
+                      </Button>
+                    </div>
+                    <div className="space-y-1 max-h-36 overflow-y-auto">
+                      {pairedDevices.map((dev) => (
+                        <div
+                          key={dev.id}
+                          className="flex items-center justify-between p-2 rounded-md bg-white dark:bg-slate-800 border text-xs shadow-sm"
+                        >
+                          <div className="truncate pr-2 text-left">
+                            <div className="font-medium text-xs truncate">{dev.name}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono">{dev.id}</div>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="h-7 text-xs px-2.5 flex-shrink-0"
+                            disabled={isConnecting}
+                            onClick={() => connectToPrinter(dev.id)}
+                          >
+                            Conectar
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Botones de conexión */}
                 <div className="space-y-2">

@@ -218,22 +218,33 @@ export function VersionCheckModal() {
   }, [detectNetworkState, checkVersion]);
 
   // Manejo de la descarga e instalación del APK
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (!versionData?.downloadUrl) return;
 
     setIsDownloading(true);
     const fullUrl = getFullPath(versionData.downloadUrl);
 
     toast.success('Iniciando descarga del APK...', {
-      description: 'Una vez descargado, toca el archivo o notificación para instalarlo.'
+      description: 'Abriendo el gestor de descargas de Android para instalar la actualización.'
     });
 
     try {
-      // 1. En Capacitor Android nativo, abrir con el sistema para lanzar el gestor de descargas/instalador
+      // 1. En Capacitor Android nativo, abrir a través del Browser del sistema o DownloadListener
       if (Capacitor.isNativePlatform()) {
-        window.open(fullUrl, '_system');
+        try {
+          const { Browser } = await import('@capacitor/browser');
+          await Browser.open({ url: fullUrl, windowName: '_system' });
+        } catch (browserErr) {
+          console.warn('Error con Browser nativo, intentando enlace directo:', browserErr);
+          const link = document.createElement('a');
+          link.href = fullUrl;
+          link.download = 'LaEconomica.apk';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        }
       } else {
-        // 2. En PWA / navegador
+        // 2. En PWA / navegador Web
         const link = document.createElement('a');
         link.href = fullUrl;
         link.download = 'LaEconomica.apk';
