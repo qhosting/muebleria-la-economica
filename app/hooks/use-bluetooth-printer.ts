@@ -167,7 +167,9 @@ export function useBluetoothPrinter() {
       toast.success('Página de prueba impresa');
       return true;
     } catch (error: any) {
-      toast.error('Error en prueba de impresión');
+      console.error('Error detallado en prueba de impresión:', error);
+      const message = error.message || 'Error en prueba de impresión';
+      toast.error(message);
       return false;
     }
   };

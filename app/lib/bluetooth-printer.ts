@@ -685,20 +685,44 @@ class BluetoothPrinterService {
         const chunk = uint8Array.slice(i, i + chunkSize);
         const dataView = new DataView(chunk.buffer, chunk.byteOffset, chunk.byteLength);
 
-        if (this.nativeCanWriteWithoutResponse) {
-          await BleClient.writeWithoutResponse(
-            this.nativeDeviceId,
-            this.nativeServiceUuid,
-            this.nativeCharacteristicUuid,
-            dataView
-          );
-        } else {
-          await BleClient.write(
-            this.nativeDeviceId,
-            this.nativeServiceUuid,
-            this.nativeCharacteristicUuid,
-            dataView
-          );
+        try {
+          if (this.nativeCanWriteWithoutResponse) {
+            await BleClient.writeWithoutResponse(
+              this.nativeDeviceId,
+              this.nativeServiceUuid,
+              this.nativeCharacteristicUuid,
+              dataView
+            );
+          } else {
+            await BleClient.write(
+              this.nativeDeviceId,
+              this.nativeServiceUuid,
+              this.nativeCharacteristicUuid,
+              dataView
+            );
+          }
+        } catch (writeErr) {
+          console.warn('Error en modo de escritura inicial, probando método alternativo:', writeErr);
+          // Intentar el método alterno (write vs writeWithoutResponse) por compatibilidad con impresoras
+          try {
+            if (this.nativeCanWriteWithoutResponse) {
+              await BleClient.write(
+                this.nativeDeviceId,
+                this.nativeServiceUuid,
+                this.nativeCharacteristicUuid,
+                dataView
+              );
+            } else {
+              await BleClient.writeWithoutResponse(
+                this.nativeDeviceId,
+                this.nativeServiceUuid,
+                this.nativeCharacteristicUuid,
+                dataView
+              );
+            }
+          } catch (retryErr) {
+            throw retryErr;
+          }
         }
         await new Promise(resolve => setTimeout(resolve, 15));
       }
@@ -769,7 +793,7 @@ class BluetoothPrinterService {
   }
 
   async printTicket(ticketData: TicketData): Promise<void> {
-    if (!this.connection.isConnected) {
+    if (!this.isConnected()) {
       throw new Error('Impresora no conectada');
     }
 
@@ -907,7 +931,7 @@ class BluetoothPrinterService {
   }
 
   async printTestPage(): Promise<void> {
-    if (!this.connection.isConnected) {
+    if (!this.isConnected()) {
       throw new Error('Impresora no conectada');
     }
 
@@ -922,7 +946,7 @@ class BluetoothPrinterService {
       ticket += this.createDivider() + this.LF;
       ticket += this.COMMANDS.LEFT;
       ticket += 'Fecha: ' + new Date().toLocaleString() + this.LF;
-      ticket += 'Dispositivo: ' + (this.connection.device?.name || 'Desconocido') + this.LF;
+      ticket += 'Dispositivo: ' + (this.getConnectedDevice() || 'Desconocido') + this.LF;
       ticket += 'Estado: Conectado' + this.LF;
       ticket += this.createDivider() + this.LF;
       ticket += this.COMMANDS.CENTER;
@@ -950,7 +974,7 @@ class BluetoothPrinterService {
       monto: number;
     }[];
   }): Promise<void> {
-    if (!this.connection.isConnected) {
+    if (!this.isConnected()) {
       throw new Error('Impresora no conectada');
     }
 
@@ -1014,7 +1038,7 @@ class BluetoothPrinterService {
   }
 
   async printVentaTicket(data: VentaTicketData): Promise<void> {
-    if (!this.connection.isConnected) {
+    if (!this.isConnected()) {
       throw new Error('Impresora no conectada');
     }
 
